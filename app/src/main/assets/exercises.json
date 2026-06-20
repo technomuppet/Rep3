@@ -1,0 +1,628 @@
+[
+  {
+    "name": "Barbell Back Squat",
+    "category": "Legs",
+    "equipment": "Barbell",
+    "type": "Strength",
+    "muscles": [
+      "Quadriceps",
+      "Glutes",
+      "Hamstrings"
+    ],
+    "primaryMuscles": [
+      "Quadriceps"
+    ],
+    "secondaryMuscles": [
+      "Glutes",
+      "Hamstrings"
+    ],
+    "movementPattern": "Legs \u2022 Squat",
+    "difficulty": "Intermediate",
+    "mediaAsset": "exercise_media/barbell_back_squat.gif"
+  },
+  {
+    "name": "Barbell Front Squat",
+    "category": "Legs",
+    "equipment": "Barbell",
+    "type": "Strength",
+    "muscles": [
+      "Quadriceps",
+      "Core",
+      "Glutes"
+    ],
+    "primaryMuscles": [
+      "Quadriceps"
+    ],
+    "secondaryMuscles": [
+      "Core",
+      "Glutes"
+    ],
+    "movementPattern": "Legs \u2022 Squat",
+    "difficulty": "Intermediate",
+    "mediaAsset": "exercise_media/barbell_front_squat.gif"
+  },
+  {
+    "name": "Barbell Bench Press",
+    "category": "Chest",
+    "equipment": "Barbell",
+    "type": "Strength",
+    "muscles": [
+      "Pectorals",
+      "Triceps",
+      "Front Deltoids"
+    ],
+    "primaryMuscles": [
+      "Pectorals"
+    ],
+    "secondaryMuscles": [
+      "Triceps",
+      "Front Deltoids"
+    ],
+    "movementPattern": "Push \u2022 Horizontal Press",
+    "difficulty": "Intermediate",
+    "mediaAsset": "exercise_media/barbell_bench_press.gif"
+  },
+  {
+    "name": "Incline Barbell Bench Press",
+    "category": "Chest",
+    "equipment": "Barbell",
+    "type": "Strength",
+    "muscles": [
+      "Upper Chest",
+      "Triceps",
+      "Front Deltoids"
+    ],
+    "primaryMuscles": [
+      "Upper Chest"
+    ],
+    "secondaryMuscles": [
+      "Triceps",
+      "Front Deltoids"
+    ],
+    "movementPattern": "Push \u2022 Horizontal Press",
+    "difficulty": "Intermediate",
+    "mediaAsset": "exercise_media/incline_barbell_bench_press.gif"
+  },
+  {
+    "name": "Barbell Deadlift",
+    "category": "Back",
+    "equipment": "Barbell",
+    "type": "Strength",
+    "muscles": [
+      "Lower Back",
+      "Glutes",
+      "Hamstrings",
+      "Traps"
+    ],
+    "primaryMuscles": [
+      "Lower Back"
+    ],
+    "secondaryMuscles": [
+      "Glutes",
+      "Hamstrings",
+      "Traps"
+    ],
+    "movementPattern": "Legs \u2022 Hinge",
+    "difficulty": "Intermediate",
+    "mediaAsset": "exercise_media/barbell_deadlift.gif"
+  },
+  {
+    "name": "Barbell Romanian Deadlift",
+    "category": "Legs",
+    "equipment": "Barbell",
+    "type": "Strength",
+    "muscles": [
+      "Hamstrings",
+      "Glutes",
+      "Lower Back"
+    ],
+    "primaryMuscles": [
+      "Hamstrings"
+    ],
+    "secondaryMuscles": [
+      "Glutes",
+      "Lower Back"
+    ],
+    "movementPattern": "Legs \u2022 Hinge",
+    "difficulty": "Intermediate",
+    "mediaAsset": "exercise_media/barbell_romanian_deadlift.gif"
+  },
+  {
+    "name": "Barbell Overhead Press",
+    "category": "Shoulders",
+    "equipment": "Barbell",
+    "type": "Strength",
+    "muscles": [
+      "Deltoids",
+      "Triceps",
+      "Upper Chest"
+    ],
+    "primaryMuscles": [
+      "Deltoids"
+    ],
+    "secondaryMuscles": [
+      "Triceps",
+      "Upper Chest"
+    ],
+    "movementPattern": "Push \u2022 Vertical Press",
+    "difficulty": "Intermediate",
+    "mediaAsset": "exercise_media/barbell_overhead_press.gif"
+  },
+  {
+    "name": "Barbell Bent Over Row",
+    "category": "Back",
+    "equipment": "Barbell",
+    "type": "Strength",
+    "muscles": [
+      "Lats",
+      "Rhomboids",
+      "Traps",
+      "Biceps"
+    ],
+    "primaryMuscles": [
+      "Lats"
+    ],
+    "secondaryMuscles": [
+      "Rhomboids",
+      "Traps",
+      "Biceps"
+    ],
+    "movementPattern": "Pull \u2022 Horizontal Pull",
+    "difficulty": "Intermediate",
+    "mediaAsset": "exercise_media/barbell_bent_over_row.gif"
+  },
+  {
+    "name": "Pull Ups",
+    "category": "Back",
+    "equipment": "Bodyweight",
+    "type": "Strength",
+    "muscles": [
+      "Lats",
+      "Biceps",
+      "Rhomboids"
+    ],
+    "primaryMuscles": [
+      "Lats"
+    ],
+    "secondaryMuscles": [
+      "Biceps",
+      "Rhomboids"
+    ],
+    "movementPattern": "Pull \u2022 Vertical Pull",
+    "difficulty": "Beginner",
+    "mediaAsset": "exercise_media/pull_ups.gif"
+  },
+  {
+    "name": "Chin Ups",
+    "category": "Back",
+    "equipment": "Bodyweight",
+    "type": "Strength",
+    "muscles": [
+      "Lats",
+      "Biceps"
+    ],
+    "primaryMuscles": [
+      "Lats"
+    ],
+    "secondaryMuscles": [
+      "Biceps"
+    ],
+    "movementPattern": "Pull \u2022 Vertical Pull",
+    "difficulty": "Beginner",
+    "mediaAsset": "exercise_media/chin_ups.gif"
+  },
+  {
+    "name": "Push Ups",
+    "category": "Chest",
+    "equipment": "Bodyweight",
+    "type": "Strength",
+    "muscles": [
+      "Chest",
+      "Triceps",
+      "Front Deltoids"
+    ],
+    "primaryMuscles": [
+      "Chest"
+    ],
+    "secondaryMuscles": [
+      "Triceps",
+      "Front Deltoids"
+    ],
+    "movementPattern": "Push \u2022 Horizontal Press",
+    "difficulty": "Beginner",
+    "mediaAsset": "exercise_media/push_ups.gif"
+  },
+  {
+    "name": "Tricep Dips",
+    "category": "Arms",
+    "equipment": "Bodyweight",
+    "type": "Strength",
+    "muscles": [
+      "Triceps",
+      "Chest",
+      "Front Deltoids"
+    ],
+    "primaryMuscles": [
+      "Triceps"
+    ],
+    "secondaryMuscles": [
+      "Chest",
+      "Front Deltoids"
+    ],
+    "movementPattern": "Push \u2022 Elbow Extension",
+    "difficulty": "Beginner",
+    "mediaAsset": "exercise_media/tricep_dips.gif"
+  },
+  {
+    "name": "Dumbbell Bench Press",
+    "category": "Chest",
+    "equipment": "Dumbbell",
+    "type": "Strength",
+    "muscles": [
+      "Chest",
+      "Triceps",
+      "Front Deltoids"
+    ],
+    "primaryMuscles": [
+      "Chest"
+    ],
+    "secondaryMuscles": [
+      "Triceps",
+      "Front Deltoids"
+    ],
+    "movementPattern": "Push \u2022 Horizontal Press",
+    "difficulty": "Beginner",
+    "mediaAsset": "exercise_media/dumbbell_bench_press.gif"
+  },
+  {
+    "name": "Incline Dumbbell Press",
+    "category": "Chest",
+    "equipment": "Dumbbell",
+    "type": "Strength",
+    "muscles": [
+      "Upper Chest",
+      "Front Deltoids",
+      "Triceps"
+    ],
+    "primaryMuscles": [
+      "Upper Chest"
+    ],
+    "secondaryMuscles": [
+      "Front Deltoids",
+      "Triceps"
+    ],
+    "movementPattern": "Isolation",
+    "difficulty": "Beginner",
+    "mediaAsset": "exercise_media/incline_dumbbell_press.gif"
+  },
+  {
+    "name": "Dumbbell Shoulder Press",
+    "category": "Shoulders",
+    "equipment": "Dumbbell",
+    "type": "Strength",
+    "muscles": [
+      "Deltoids",
+      "Triceps"
+    ],
+    "primaryMuscles": [
+      "Deltoids"
+    ],
+    "secondaryMuscles": [
+      "Triceps"
+    ],
+    "movementPattern": "Push \u2022 Vertical Press",
+    "difficulty": "Beginner",
+    "mediaAsset": "exercise_media/dumbbell_shoulder_press.gif"
+  },
+  {
+    "name": "Dumbbell Lateral Raise",
+    "category": "Shoulders",
+    "equipment": "Dumbbell",
+    "type": "Strength",
+    "muscles": [
+      "Side Deltoids"
+    ],
+    "primaryMuscles": [
+      "Side Deltoids"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "Shoulder Isolation",
+    "difficulty": "Beginner",
+    "mediaAsset": "exercise_media/dumbbell_lateral_raise.gif"
+  },
+  {
+    "name": "Dumbbell Bicep Curl",
+    "category": "Arms",
+    "equipment": "Dumbbell",
+    "type": "Strength",
+    "muscles": [
+      "Biceps"
+    ],
+    "primaryMuscles": [
+      "Biceps"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "Pull \u2022 Elbow Flexion",
+    "difficulty": "Beginner",
+    "mediaAsset": "exercise_media/dumbbell_bicep_curl.gif"
+  },
+  {
+    "name": "Hammer Curls",
+    "category": "Arms",
+    "equipment": "Dumbbell",
+    "type": "Strength",
+    "muscles": [
+      "Biceps",
+      "Forearms"
+    ],
+    "primaryMuscles": [
+      "Biceps"
+    ],
+    "secondaryMuscles": [
+      "Forearms"
+    ],
+    "movementPattern": "Pull \u2022 Elbow Flexion",
+    "difficulty": "Beginner",
+    "mediaAsset": "exercise_media/hammer_curls.gif"
+  },
+  {
+    "name": "Dumbbell Row",
+    "category": "Back",
+    "equipment": "Dumbbell",
+    "type": "Strength",
+    "muscles": [
+      "Lats",
+      "Rhomboids",
+      "Biceps"
+    ],
+    "primaryMuscles": [
+      "Lats"
+    ],
+    "secondaryMuscles": [
+      "Rhomboids",
+      "Biceps"
+    ],
+    "movementPattern": "Pull \u2022 Horizontal Pull",
+    "difficulty": "Beginner",
+    "mediaAsset": "exercise_media/dumbbell_row.gif"
+  },
+  {
+    "name": "Goblet Squat",
+    "category": "Legs",
+    "equipment": "Dumbbell",
+    "type": "Strength",
+    "muscles": [
+      "Quadriceps",
+      "Glutes",
+      "Core"
+    ],
+    "primaryMuscles": [
+      "Quadriceps"
+    ],
+    "secondaryMuscles": [
+      "Glutes",
+      "Core"
+    ],
+    "movementPattern": "Legs \u2022 Squat",
+    "difficulty": "Beginner",
+    "mediaAsset": "exercise_media/goblet_squat.gif"
+  },
+  {
+    "name": "Leg Press",
+    "category": "Legs",
+    "equipment": "Machine",
+    "type": "Strength",
+    "muscles": [
+      "Quadriceps",
+      "Glutes",
+      "Hamstrings"
+    ],
+    "primaryMuscles": [
+      "Quadriceps"
+    ],
+    "secondaryMuscles": [
+      "Glutes",
+      "Hamstrings"
+    ],
+    "movementPattern": "Legs \u2022 Squat",
+    "difficulty": "Beginner",
+    "mediaAsset": "exercise_media/leg_press.gif"
+  },
+  {
+    "name": "Leg Extension",
+    "category": "Legs",
+    "equipment": "Machine",
+    "type": "Strength",
+    "muscles": [
+      "Quadriceps"
+    ],
+    "primaryMuscles": [
+      "Quadriceps"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "Legs \u2022 Knee Extension",
+    "difficulty": "Beginner",
+    "mediaAsset": "exercise_media/leg_extension.gif"
+  },
+  {
+    "name": "Seated Leg Curl",
+    "category": "Legs",
+    "equipment": "Machine",
+    "type": "Strength",
+    "muscles": [
+      "Hamstrings"
+    ],
+    "primaryMuscles": [
+      "Hamstrings"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "Pull \u2022 Elbow Flexion",
+    "difficulty": "Beginner",
+    "mediaAsset": "exercise_media/seated_leg_curl.gif"
+  },
+  {
+    "name": "Calf Raises",
+    "category": "Legs",
+    "equipment": "Bodyweight",
+    "type": "Strength",
+    "muscles": [
+      "Calves"
+    ],
+    "primaryMuscles": [
+      "Calves"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "Legs \u2022 Calf Raise",
+    "difficulty": "Beginner",
+    "mediaAsset": "exercise_media/calf_raises.gif"
+  },
+  {
+    "name": "Lat Pulldown",
+    "category": "Back",
+    "equipment": "Cable",
+    "type": "Strength",
+    "muscles": [
+      "Lats",
+      "Biceps",
+      "Rhomboids"
+    ],
+    "primaryMuscles": [
+      "Lats"
+    ],
+    "secondaryMuscles": [
+      "Biceps",
+      "Rhomboids"
+    ],
+    "movementPattern": "Pull \u2022 Vertical Pull",
+    "difficulty": "Beginner",
+    "mediaAsset": "exercise_media/lat_pulldown.gif"
+  },
+  {
+    "name": "Cable Row",
+    "category": "Back",
+    "equipment": "Cable",
+    "type": "Strength",
+    "muscles": [
+      "Lats",
+      "Rhomboids",
+      "Biceps"
+    ],
+    "primaryMuscles": [
+      "Lats"
+    ],
+    "secondaryMuscles": [
+      "Rhomboids",
+      "Biceps"
+    ],
+    "movementPattern": "Pull \u2022 Horizontal Pull",
+    "difficulty": "Beginner",
+    "mediaAsset": "exercise_media/cable_row.gif"
+  },
+  {
+    "name": "Cable Chest Fly",
+    "category": "Chest",
+    "equipment": "Cable",
+    "type": "Strength",
+    "muscles": [
+      "Pectorals"
+    ],
+    "primaryMuscles": [
+      "Pectorals"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "Push \u2022 Fly",
+    "difficulty": "Beginner",
+    "mediaAsset": "exercise_media/cable_chest_fly.gif"
+  },
+  {
+    "name": "Tricep Pushdown",
+    "category": "Arms",
+    "equipment": "Cable",
+    "type": "Strength",
+    "muscles": [
+      "Triceps"
+    ],
+    "primaryMuscles": [
+      "Triceps"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "Push \u2022 Elbow Extension",
+    "difficulty": "Beginner",
+    "mediaAsset": "exercise_media/tricep_pushdown.gif"
+  },
+  {
+    "name": "Face Pulls",
+    "category": "Shoulders",
+    "equipment": "Cable",
+    "type": "Strength",
+    "muscles": [
+      "Rear Deltoids",
+      "Traps",
+      "Rhomboids"
+    ],
+    "primaryMuscles": [
+      "Rear Deltoids"
+    ],
+    "secondaryMuscles": [
+      "Traps",
+      "Rhomboids"
+    ],
+    "movementPattern": "Pull \u2022 Rear Delt Pull",
+    "difficulty": "Beginner",
+    "mediaAsset": "exercise_media/face_pulls.gif"
+  },
+  {
+    "name": "Plank",
+    "category": "Core",
+    "equipment": "Bodyweight",
+    "type": "Strength",
+    "muscles": [
+      "Abs",
+      "Core"
+    ],
+    "primaryMuscles": [
+      "Abs"
+    ],
+    "secondaryMuscles": [
+      "Core"
+    ],
+    "movementPattern": "Core \u2022 Anti-Extension",
+    "difficulty": "Beginner",
+    "mediaAsset": "exercise_media/plank.gif"
+  },
+  {
+    "name": "Russian Twist",
+    "category": "Core",
+    "equipment": "Bodyweight",
+    "type": "Strength",
+    "muscles": [
+      "Obliques",
+      "Abs"
+    ],
+    "primaryMuscles": [
+      "Obliques"
+    ],
+    "secondaryMuscles": [
+      "Abs"
+    ],
+    "movementPattern": "Core \u2022 Rotation",
+    "difficulty": "Beginner",
+    "mediaAsset": "exercise_media/russian_twist.gif"
+  },
+  {
+    "name": "Leg Raises",
+    "category": "Core",
+    "equipment": "Bodyweight",
+    "type": "Strength",
+    "muscles": [
+      "Lower Abs"
+    ],
+    "primaryMuscles": [
+      "Lower Abs"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "Core \u2022 Hip Flexion",
+    "difficulty": "Beginner",
+    "mediaAsset": "exercise_media/leg_raises.gif"
+  }
+]

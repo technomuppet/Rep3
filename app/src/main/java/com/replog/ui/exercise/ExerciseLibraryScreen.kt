@@ -1,0 +1,394 @@
+package com.replog.ui.exercise
+
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.replog.R
+import com.replog.data.model.Exercise
+import com.replog.data.model.ExerciseInsight
+import com.replog.data.model.ExerciseSetHistory
+import com.replog.ui.components.EmptyState
+import com.replog.ui.components.ExerciseIcon
+import com.replog.ui.components.PRBadge
+import com.replog.ui.components.RepLogCard
+import com.replog.ui.components.StatCard
+import com.replog.ui.components.formatWeight
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun ExerciseLibraryScreen(
+    contentPadding: PaddingValues,
+    viewModel: ExerciseViewModel = hiltViewModel()
+) {
+    val state by viewModel.uiState.collectAsState()
+    val selectedInsight by viewModel.selectedInsight.collectAsState()
+    var showAdd by remember { mutableStateOf(false) }
+    var pendingDelete by remember { mutableStateOf<Exercise?>(null) }
+
+    Scaffold(
+        modifier = Modifier.padding(contentPadding),
+        floatingActionButton = {
+            FloatingActionButton(onClick = { showAdd = true }) {
+                Icon(Icons.Default.Add, "Add")
+            }
+        }
+    ) { inner ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(inner),
+            contentPadding = PaddingValues(20.dp, 20.dp, 20.dp, 96.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            item {
+                Text("Exercise Library", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.ExtraBold)
+                Text("Browse movements, inspect progress, and add your own.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+
+            item {
+                OutlinedTextField(
+                    value = state.searchQuery,
+                    onValueChange = viewModel::onSearchQueryChanged,
+                    modifier = Modifier.fillMaxWidth(),
+                    leadingIcon = { Icon(Icons.Default.Search, null) },
+                    placeholder = { Text("Search exercises") },
+                    singleLine = true
+                )
+            }
+
+            item {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    state.categories.forEach { category ->
+                        FilterChip(
+                            selected = category == state.selectedCategory,
+                            onClick = { viewModel.onCategorySelected(category) },
+                            label = { Text(category) }
+                        )
+                    }
+                }
+            }
+
+            if (state.exercises.isEmpty()) {
+                item { EmptyState("No exercises found", "Try changing your search or add a custom exercise.") }
+            } else {
+                items(state.exercises, key = { it.id }) { exercise ->
+                    ExerciseItem(
+                        exercise = exercise,
+                        onClick = { viewModel.selectExercise(exercise) },
+                        onDelete = { pendingDelete = exercise }
+                    )
+                }
+            }
+        }
+    }
+
+    pendingDelete?.let { exercise ->
+        AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            title = { Text("Delete custom exercise?") },
+            text = { Text("This deletes ${exercise.name}. Existing workouts may still reference this movement and deletion can fail if it is in use.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteExercise(exercise)
+                    pendingDelete = null
+                }) { Text("Delete") }
+            },
+            dismissButton = { TextButton(onClick = { pendingDelete = null }) { Text("Cancel") } }
+        )
+    }
+
+    if (showAdd) {
+        AddExerciseDialog(
+            onDismiss = { showAdd = false },
+            onAdd = { name, category, equipment, muscles ->
+                viewModel.addCustomExercise(name, category, equipment, muscles)
+                showAdd = false
+            }
+        )
+    }
+
+    selectedInsight?.let { insight ->
+        ExerciseDetailDialog(
+            insight = insight,
+            useKg = state.useKg,
+            onDismiss = viewModel::clearSelectedExercise
+        )
+    }
+}
+
+@Composable
+private fun ExerciseItem(
+    exercise: Exercise,
+    onClick: () -> Unit,
+    onDelete: () -> Unit
+) = RepLogCard(onClick = onClick) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        ExerciseIcon()
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(exercise.name, fontWeight = FontWeight.Bold)
+            Text(
+                "${exercise.category} • ${exercise.equipment}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (exercise.movementPattern.isNotBlank()) {
+                Text(
+                    exercise.movementPattern,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            } else if (exercise.muscles.isNotBlank()) {
+                Text(
+                    exercise.muscles,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (exercise.isCustom) {
+                Text("Custom", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+            }
+        }
+        Icon(Icons.Default.TrendingUp, contentDescription = "Progress", tint = MaterialTheme.colorScheme.primary)
+        if (exercise.isCustom) {
+            IconButton(onClick = onDelete) {
+                Icon(Icons.Default.Delete, "Delete", tint = MaterialTheme.colorScheme.error)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExerciseDetailDialog(
+    insight: ExerciseInsight,
+    useKg: Boolean,
+    onDismiss: () -> Unit
+) {
+    val scroll = rememberScrollState()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(insight.exercise.name) },
+        text = {
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 560.dp)
+                    .verticalScroll(scroll),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+            Text(
+                "${insight.exercise.category} • ${insight.exercise.equipment} • ${insight.exercise.difficulty}",
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (insight.exercise.movementPattern.isNotBlank()) {
+                Text("Pattern: ${insight.exercise.movementPattern}", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+            }
+            if (insight.exercise.primaryMuscles.isNotBlank()) {
+                Text("Primary: ${insight.exercise.primaryMuscles}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (insight.exercise.secondaryMuscles.isNotBlank()) {
+                Text("Secondary: ${insight.exercise.secondaryMuscles}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else if (insight.exercise.muscles.isNotBlank()) {
+                Text(insight.exercise.muscles, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+
+            RepLogCard {
+                Image(
+                    painter = painterResource(id = R.drawable.exercise_media_placeholder),
+                    contentDescription = "Exercise media placeholder for ${insight.exercise.name}",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(150.dp)
+                )
+                Spacer(Modifier.height(8.dp))
+                Text("Exercise media", fontWeight = FontWeight.Bold)
+                Text(
+                    insight.exercise.mediaAsset.ifBlank { "Local image/GIF slot ready. Add bundled media assets in a future content pass." },
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    StatCard("Best weight", formatWeight(insight.bestWeight, useKg), Modifier.weight(1f))
+                    StatCard("Est. 1RM", formatWeight(insight.bestEstimatedOneRm, useKg), Modifier.weight(1f))
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    StatCard("Total sets", insight.totalSets.toString(), Modifier.weight(1f))
+                    StatCard("Volume", formatWeight(insight.totalVolume, useKg), Modifier.weight(1f))
+                }
+
+                Text("Estimated 1RM trend", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                ProgressChart(history = insight.history, useKg = useKg)
+
+                Text("Recent sets", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                if (insight.history.isEmpty()) {
+                    Text("No completed workout data yet. Log this exercise and finish a workout to build analytics.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    insight.history.takeLast(8).reversed().forEach { set ->
+                        HistorySetRow(set, useKg)
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } }
+    )
+}
+
+@Composable
+private fun ProgressChart(history: List<ExerciseSetHistory>, useKg: Boolean) {
+    val points = history
+        .groupBy { it.workoutStartTime }
+        .toSortedMap()
+        .map { (time, sets) -> time to (sets.maxOfOrNull { it.estimatedOneRm } ?: 0.0) }
+        .filter { it.second > 0.0 }
+
+    if (points.size < 2) {
+        RepLogCard {
+            Text("Finish at least two workouts with this exercise to see a trend line.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        return
+    }
+
+    val primary = MaterialTheme.colorScheme.primary
+    val grid = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f)
+    val min = points.minOf { it.second }
+    val max = points.maxOf { it.second }
+    val range = (max - min).takeIf { it > 0.0 } ?: 1.0
+
+    RepLogCard {
+        Canvas(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(170.dp)
+                .semantics { contentDescription = "Estimated one rep max trend chart for this exercise" }
+        ) {
+            val left = 8.dp.toPx()
+            val right = size.width - 8.dp.toPx()
+            val top = 12.dp.toPx()
+            val bottom = size.height - 18.dp.toPx()
+            val width = right - left
+            val height = bottom - top
+
+            repeat(4) { index ->
+                val y = top + height * (index / 3f)
+                drawLine(grid, Offset(left, y), Offset(right, y), strokeWidth = 1.dp.toPx())
+            }
+
+            val offsets = points.mapIndexed { index, point ->
+                val x = left + width * (index.toFloat() / (points.lastIndex).coerceAtLeast(1))
+                val y = bottom - (((point.second - min) / range).toFloat() * height)
+                Offset(x, y)
+            }
+
+            offsets.zipWithNext().forEach { (a, b) ->
+                drawLine(primary, a, b, strokeWidth = 4.dp.toPx(), cap = StrokeCap.Round)
+            }
+            offsets.forEach { point ->
+                drawCircle(primary, radius = 5.dp.toPx(), center = point)
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "${formatWeight(min, useKg)} → ${formatWeight(max, useKg)} estimated 1RM",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun HistorySetRow(set: ExerciseSetHistory, useKg: Boolean) {
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("${formatWeight(set.weight, useKg)} × ${set.reps}", fontWeight = FontWeight.SemiBold)
+            Text(
+                formatDate(set.workoutStartTime) + " • est. 1RM ${formatWeight(set.estimatedOneRm, useKg)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        if (set.isPR) PRBadge()
+    }
+}
+
+@Composable
+private fun AddExerciseDialog(
+    onDismiss: () -> Unit,
+    onAdd: (String, String, String, String) -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    var category by remember { mutableStateOf("") }
+    var equipment by remember { mutableStateOf("") }
+    var muscles by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add Custom Exercise") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(name, { name = it }, label = { Text("Exercise name") }, singleLine = true)
+                OutlinedTextField(category, { category = it }, label = { Text("Category") }, singleLine = true)
+                OutlinedTextField(equipment, { equipment = it }, label = { Text("Equipment") }, singleLine = true)
+                OutlinedTextField(muscles, { muscles = it }, label = { Text("Muscles") }, minLines = 2)
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = name.isNotBlank(), onClick = { onAdd(name, category, equipment, muscles) }) {
+                Text("Add")
+            }
+        },
+        dismissButton = { TextButton(onDismiss) { Text("Cancel") } }
+    )
+}
+
+private fun formatDate(timestamp: Long): String =
+    SimpleDateFormat("d MMM yyyy", Locale.getDefault()).format(Date(timestamp))

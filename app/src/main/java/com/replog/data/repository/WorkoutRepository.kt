@@ -1,0 +1,70 @@
+package com.replog.data.repository
+
+import com.replog.data.db.SessionDao
+import com.replog.data.db.SetLogDao
+import com.replog.data.db.PrescriptionDao
+import com.replog.data.db.TemplateDao
+import com.replog.data.model.ExerciseSetHistory
+import com.replog.data.model.SessionExercise
+import com.replog.data.model.SessionWithExercises
+import com.replog.data.model.SetLog
+import com.replog.data.model.TemplateExercise
+import com.replog.data.model.TemplateWithExercises
+import com.replog.data.model.WorkoutPrescription
+import com.replog.data.model.WorkoutSession
+import com.replog.data.model.WorkoutTemplate
+import kotlinx.coroutines.flow.Flow
+import javax.inject.Inject
+import javax.inject.Singleton
+
+@Singleton
+class WorkoutRepository @Inject constructor(
+    private val sessionDao: SessionDao,
+    private val setLogDao: SetLogDao,
+    private val templateDao: TemplateDao,
+    private val prescriptionDao: PrescriptionDao
+) {
+    fun getAllSessions(): Flow<List<SessionWithExercises>> = sessionDao.getAllSessions()
+    fun getRecentSessions(limit: Int): Flow<List<SessionWithExercises>> = sessionDao.getRecentSessions(limit)
+    suspend fun getSessionById(sessionId: Int): SessionWithExercises? = sessionDao.getSessionById(sessionId)
+    suspend fun getSessionEntity(sessionId: Int): WorkoutSession? = sessionDao.getSessionEntity(sessionId)
+    suspend fun insertSession(session: WorkoutSession): Long = sessionDao.insertSession(session)
+    suspend fun updateSession(session: WorkoutSession) = sessionDao.updateSession(session)
+    suspend fun deleteSession(session: WorkoutSession) = sessionDao.deleteSession(session)
+    suspend fun deleteSessionById(sessionId: Int) = sessionDao.deleteSessionById(sessionId)
+    suspend fun insertSessionExercise(sessionExercise: SessionExercise): Long = sessionDao.insertSessionExercise(sessionExercise)
+    suspend fun updateSessionExercise(sessionExercise: SessionExercise) = sessionDao.updateSessionExercise(sessionExercise)
+    suspend fun deleteSessionExercise(id: Int) = sessionDao.deleteSessionExercise(id)
+    suspend fun getCompletedSessionCount(): Int = sessionDao.getCompletedSessionCount()
+    suspend fun getTotalVolume(): Double = sessionDao.getTotalVolume()
+
+    suspend fun insertSet(setLog: SetLog): Long = setLogDao.insertSet(setLog)
+    suspend fun updateSet(setLog: SetLog) = setLogDao.updateSet(setLog)
+    suspend fun deleteSet(setLog: SetLog) = setLogDao.deleteSet(setLog)
+    suspend fun deleteSetById(setId: Int) = setLogDao.deleteSetById(setId)
+    fun getSetsForSessionExercise(sessionExerciseId: Int): Flow<List<SetLog>> = setLogDao.getSetsForSessionExercise(sessionExerciseId)
+    suspend fun getMaxWeightForReps(exerciseId: Int, reps: Int): Double = setLogDao.getMaxWeightForReps(exerciseId, reps)
+    suspend fun getMaxWeightForExercise(exerciseId: Int): Double = setLogDao.getMaxWeightForExercise(exerciseId)
+    suspend fun getRecentSetsForExercise(exerciseId: Int, limit: Int = 3): List<SetLog> = setLogDao.getRecentSetsForExercise(exerciseId, limit)
+    fun getExerciseHistory(exerciseId: Int): Flow<List<ExerciseSetHistory>> = setLogDao.getExerciseHistory(exerciseId)
+    fun getRecentPRs(): Flow<List<SetLog>> = setLogDao.getRecentPRs()
+
+    fun getAllTemplates(): Flow<List<TemplateWithExercises>> = templateDao.getAllTemplates()
+    suspend fun getTemplateById(templateId: Int): TemplateWithExercises? = templateDao.getTemplateById(templateId)
+    suspend fun insertTemplate(template: WorkoutTemplate): Long = templateDao.insertTemplate(template)
+    suspend fun insertTemplateExercise(templateExercise: TemplateExercise): Long = templateDao.insertTemplateExercise(templateExercise)
+    suspend fun updateTemplate(template: WorkoutTemplate) = templateDao.updateTemplate(template)
+    suspend fun deleteTemplateExercises(templateId: Int) = templateDao.deleteTemplateExercises(templateId)
+    suspend fun deleteTemplate(template: WorkoutTemplate) = templateDao.deleteTemplate(template)
+
+    suspend fun getPrescriptionsForSession(sessionId: Int): List<WorkoutPrescription> = prescriptionDao.getPrescriptionsForSession(sessionId)
+    suspend fun insertPrescription(prescription: WorkoutPrescription): Long = prescriptionDao.insertPrescription(prescription)
+    suspend fun insertPrescriptions(prescriptions: List<WorkoutPrescription>) = prescriptionDao.insertPrescriptions(prescriptions)
+    suspend fun deletePrescriptionsForSession(sessionId: Int) = prescriptionDao.deletePrescriptionsForSession(sessionId)
+
+    suspend fun isPR(exerciseId: Int, weight: Double, reps: Int): Boolean =
+        weight > setLogDao.getMaxWeightForReps(exerciseId, reps)
+
+    suspend fun isPRExcludingSet(exerciseId: Int, weight: Double, reps: Int, setId: Int): Boolean =
+        weight > setLogDao.getMaxWeightForRepsExcludingSet(exerciseId, reps, setId)
+}

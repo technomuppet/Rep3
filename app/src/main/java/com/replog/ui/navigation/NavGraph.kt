@@ -1,0 +1,108 @@
+package com.replog.ui.navigation
+
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.ShowChart
+import androidx.compose.material3.Icon
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import com.replog.ui.exercise.ExerciseLibraryScreen
+import com.replog.ui.history.HistoryScreen
+import com.replog.ui.home.HomeScreen
+import com.replog.ui.onboarding.OnboardingScreen
+import com.replog.ui.onboarding.OnboardingViewModel
+import com.replog.ui.progress.ProgressScreen
+import com.replog.ui.settings.SettingsScreen
+import com.replog.ui.workout.ActiveWorkoutScreen
+
+sealed class RepLogRoute(val route: String, val label: String, val icon: ImageVector) {
+    data object Home : RepLogRoute("home", "Home", Icons.Default.Home)
+    data object Workout : RepLogRoute("workout", "Workout", Icons.Default.FitnessCenter)
+    data object Progress : RepLogRoute("progress", "Progress", Icons.Default.ShowChart)
+    data object History : RepLogRoute("history", "History", Icons.Default.History)
+    data object Exercises : RepLogRoute("exercises", "Exercises", Icons.Default.List)
+    data object Settings : RepLogRoute("settings", "Settings", Icons.Default.Settings)
+}
+
+private val items = listOf(
+    RepLogRoute.Home,
+    RepLogRoute.Workout,
+    RepLogRoute.Progress,
+    RepLogRoute.History,
+    RepLogRoute.Exercises,
+    RepLogRoute.Settings
+)
+
+@Composable
+fun RepLogNavGraph(
+    navController: NavHostController = rememberNavController(),
+    onboardingViewModel: OnboardingViewModel = hiltViewModel()
+) {
+    val onboardingState by onboardingViewModel.uiState.collectAsState()
+
+    if (!onboardingState.onboardingComplete) {
+        OnboardingScreen(onComplete = onboardingViewModel::finish)
+        return
+    }
+
+    Scaffold(bottomBar = { RepLogBottomBar(navController) }) { padding ->
+        NavHost(navController, startDestination = RepLogRoute.Home.route) {
+            composable(RepLogRoute.Home.route) {
+                HomeScreen(
+                    contentPadding = padding,
+                    onStartWorkout = {
+                        navController.navigate(RepLogRoute.Workout.route) { launchSingleTop = true }
+                    },
+                    onViewHistory = {
+                        navController.navigate(RepLogRoute.History.route) { launchSingleTop = true }
+                    }
+                )
+            }
+            composable(RepLogRoute.Workout.route) { ActiveWorkoutScreen(padding) }
+            composable(RepLogRoute.Progress.route) { ProgressScreen(padding) }
+            composable(RepLogRoute.History.route) { HistoryScreen(padding) }
+            composable(RepLogRoute.Exercises.route) { ExerciseLibraryScreen(padding) }
+            composable(RepLogRoute.Settings.route) { SettingsScreen(padding) }
+        }
+    }
+}
+
+@Composable
+private fun RepLogBottomBar(navController: NavHostController) {
+    val entry by navController.currentBackStackEntryAsState()
+    val current = entry?.destination
+    NavigationBar {
+        items.forEach { item ->
+            NavigationBarItem(
+                selected = current?.hierarchy?.any { it.route == item.route } == true,
+                onClick = {
+                    navController.navigate(item.route) {
+                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                },
+                icon = { Icon(item.icon, item.label) },
+                label = { Text(item.label) }
+            )
+        }
+    }
+}

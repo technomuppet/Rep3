@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RepLog UI Mockups</title>
+<style>
+  :root{
+    --bg:#07111f;--panel:#0f172a;--card:#1e293b;--card2:#263449;--muted:#94a3b8;--text:#f8fafc;--sub:#cbd5e1;
+    --green:#22c55e;--green2:#16a34a;--blue:#3b82f6;--orange:#f97316;--red:#ef4444;--line:#334155;
+  }
+  *{box-sizing:border-box} body{margin:0;background:linear-gradient(135deg,#030712,#0f172a 45%,#052e1a);font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;color:var(--text)}
+  .wrap{padding:36px;max-width:1500px;margin:auto}.hero{margin-bottom:28px}.hero h1{font-size:42px;margin:0 0 8px;font-weight:900;letter-spacing:-.04em}.hero p{margin:0;color:var(--sub);font-size:18px;max-width:900px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(315px,1fr));gap:26px;align-items:start}.phone{width:315px;height:680px;background:#020617;border:1px solid #334155;border-radius:34px;padding:12px;margin:auto;box-shadow:0 30px 80px rgba(0,0,0,.45)}
+  .screen{height:100%;border-radius:25px;background:var(--bg);overflow:hidden;display:flex;flex-direction:column;position:relative}.status{height:30px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;color:#e2e8f0;font-size:12px}.content{padding:16px;overflow:hidden;flex:1}.nav{height:66px;background:rgba(15,23,42,.96);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(5,1fr);padding-top:8px}.nav div{text-align:center;color:var(--muted);font-size:10px}.nav .on{color:var(--green)}.nav svg{display:block;margin:0 auto 3px;width:18px;height:18px;fill:currentColor}.title{font-size:27px;font-weight:900;letter-spacing:-.04em;margin:0}.subtitle{color:var(--muted);font-size:13px;margin:3px 0 16px;line-height:1.35}.card{background:var(--card);border:1px solid rgba(148,163,184,.08);border-radius:18px;padding:14px;margin-bottom:12px}.card2{background:var(--card2)}.row{display:flex;align-items:center;gap:10px}.between{justify-content:space-between}.grow{flex:1}.label{font-size:12px;color:var(--muted)}.value{font-size:21px;font-weight:900;color:var(--green);letter-spacing:-.03em}.small{font-size:12px;color:var(--muted);line-height:1.35}.h3{font-size:16px;font-weight:800;margin:0 0 8px}.btn{height:45px;border-radius:14px;background:var(--green);color:#052e16;display:flex;align-items:center;justify-content:center;font-weight:900;margin-bottom:10px}.btn2{height:43px;border-radius:14px;border:1px solid #3f516b;color:#dbeafe;display:flex;align-items:center;justify-content:center;font-weight:800;margin-bottom:10px}.pill{display:inline-flex;border-radius:999px;background:rgba(34,197,94,.14);color:var(--green);font-size:11px;font-weight:800;padding:5px 8px;margin-right:5px}.pill.orange{background:rgba(249,115,22,.14);color:var(--orange)}.pill.blue{background:rgba(59,130,246,.14);color:#60a5fa}.pill.red{background:rgba(239,68,68,.15);color:#f87171}.bar{height:7px;background:#334155;border-radius:99px;overflow:hidden;margin-top:7px}.bar span{display:block;height:100%;background:var(--green);border-radius:99px}.chart{height:110px;border-radius:14px;background:linear-gradient(180deg,rgba(34,197,94,.08),rgba(59,130,246,.04));position:relative;overflow:hidden}.chart svg{position:absolute;inset:0}.mono{font-variant-numeric:tabular-nums}.exercise{padding:11px 0;border-bottom:1px solid rgba(148,163,184,.12)}.exercise:last-child{border-bottom:0}.icon{width:36px;height:36px;border-radius:12px;background:rgba(34,197,94,.13);display:flex;align-items:center;justify-content:center;color:var(--green);font-weight:900}.mock-label{font-weight:900;font-size:18px;margin:0 auto 10px;width:315px;color:#e5e7eb}.search{height:42px;border-radius:13px;border:1px solid #334155;background:#111827;color:#64748b;display:flex;align-items:center;padding:0 12px;margin-bottom:12px;font-size:13px}.chiprow{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}.chip{font-size:11px;border:1px solid #334155;border-radius:999px;padding:6px 9px;color:#cbd5e1}.chip.on{background:var(--green);border-color:var(--green);color:#052e16;font-weight:900}.setrow{display:grid;grid-template-columns:1fr auto;gap:8px;padding:7px 0;border-bottom:1px solid rgba(148,163,184,.1)}.logo{width:40px;height:40px;border-radius:14px;background:var(--green);color:#052e16;font-weight:900;display:flex;align-items:center;justify-content:center}.section{font-size:15px;font-weight:900;margin:16px 0 8px}.warn{border-left:3px solid var(--orange)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <h1>RepLog UI Mockups</h1>
+    <p>V3 concept direction: local-first serious lifter dashboard, fast gym logging, adaptive programming, Training DNA™, and owned data. These are static visual mockups for layout and product feel.</p>
+  </div>
+  <div class="grid">
+
+    <div><div class="mock-label">1. Home / Daily Command Centre</div><div class="phone"><div class="screen"><div class="status"><span>9:41</span><span>●●●</span></div><div class="content">
+      <div class="row between"><div><h2 class="title">RepLog</h2><p class="subtitle">Track every rep. Beat every best.</p></div><div class="logo">RL</div></div>
+      <div class="btn">Start Workout</div><div class="btn2">View History</div>
+      <div class="row"><div class="card grow"><div class="value">42</div><div class="label">Workouts</div></div><div class="card grow"><div class="value">184t</div><div class="label">Lifted</div></div></div>
+      <div class="card warn"><div class="row"><div class="icon">AI</div><div><div class="h3">Volume jump detected</div><div class="small">Your last session was 31% above recent average. Keep today controlled or avoid failure work.</div></div></div></div>
+      <div class="section">Adaptive suggestion</div>
+      <div class="card card2"><div class="row between"><div><div class="h3">Push Day vNext</div><div class="small">Bench +1 rep • OHP maintain • Dips add set</div></div><span class="pill">Start</span></div></div>
+      <div class="section">Recent PRs</div>
+      <div class="card"><span class="pill">PR</span><b>Bench Press</b><div class="small">100 kg × 5 • Est. 1RM 116.7 kg</div></div>
+    </div><div class="nav"><div class="on">⌂<br>Home</div><div>🏋<br>Workout</div><div>↗<br>Progress</div><div>◴<br>History</div><div>☰<br>Library</div></div></div></div></div>
+
+    <div><div class="mock-label">2. Workout / Adaptive Targets</div><div class="phone"><div class="screen"><div class="status"><span>9:41</span><span>●●●</span></div><div class="content">
+      <h2 class="title">Workout</h2><p class="subtitle">Active • 00:42:18</p>
+      <div class="card"><div class="row between"><div><b>Rest timer</b><div class="small">62s remaining</div></div><span class="pill blue">Skip</span></div><div class="bar"><span style="width:68%"></span></div></div>
+      <div class="row"><div class="card grow"><div class="value mono">14</div><div class="label">Sets</div></div><div class="card grow"><div class="value mono">2</div><div class="label">Targets hit</div></div></div>
+      <div class="card"><div class="row between"><div><div class="h3">Bench Press</div><div class="small">Chest • Barbell</div><span class="pill blue">Superset A1</span></div><span class="pill">Target</span></div>
+        <div class="card card2"><b>Today’s target</b><div class="small">Add 1 rep: 100 kg × 6 for 3 sets</div><div class="small">Small rep progression keeps overload controlled.</div></div>
+        <div class="setrow"><div><b>Set 1: 100 kg × 6</b><div class="small">Working • RPE 8.5</div></div><span class="pill">Hit</span></div>
+        <div class="setrow"><div><b>Set 2: 100 kg × 5</b><div class="small">Working • RPE 9</div></div></div>
+        <div class="btn2" style="margin-top:10px">Add Set</div>
+      </div>
+      <div class="card"><div class="h3">Chest Supported Row</div><div class="small">Back • Machine</div><span class="pill blue">Superset A2</span></div>
+    </div><div class="nav"><div>⌂<br>Home</div><div class="on">🏋<br>Workout</div><div>↗<br>Progress</div><div>◴<br>History</div><div>☰<br>Library</div></div></div></div></div>
+
+    <div><div class="mock-label">3. Progress / Training Intelligence</div><div class="phone"><div class="screen"><div class="status"><span>9:41</span><span>●●●</span></div><div class="content">
+      <h2 class="title">Progress</h2><p class="subtitle">Your local training intelligence system.</p>
+      <div class="row"><div class="card grow"><div class="value">1.84m</div><div class="label">kg lifted</div></div><div class="card grow"><div class="value">12,430</div><div class="label">Reps</div></div></div>
+      <div class="card"><div class="h3">Next best action</div><div class="small"><b style="color:var(--green)">High: Address Bench Press</b><br>RPE is very high. Consider a lower-fatigue week or fewer failure sets.</div></div>
+      <div class="card"><div class="h3">Training DNA™</div><div class="small">You gain most work in <b>4–6 reps</b>, average <b>13.8 hard sets/week</b>, highest volume in <b>Push</b>.</div><div class="row"><div class="card grow"><div class="value">4–6</div><div class="label">Rep range</div></div><div class="card grow"><div class="value">8.4</div><div class="label">Avg RPE</div></div></div></div>
+      <div class="card"><div class="h3">Strength forecast</div><div class="small">Bench Press</div><div class="value">116 → 122 kg</div><div class="small">Likely range 118–126 kg • next target 120 kg around 14 Aug</div><div class="chart"><svg viewBox="0 0 300 110"><polyline points="10,90 70,78 130,70 190,48 280,30" fill="none" stroke="#22c55e" stroke-width="5" stroke-linecap="round"/><circle cx="280" cy="30" r="5" fill="#22c55e"/></svg></div></div>
+    </div><div class="nav"><div>⌂<br>Home</div><div>🏋<br>Workout</div><div class="on">↗<br>Progress</div><div>◴<br>History</div><div>☰<br>Library</div></div></div></div></div>
+
+    <div><div class="mock-label">4. Analytics / Balance + Recovery</div><div class="phone"><div class="screen"><div class="status"><span>9:41</span><span>●●●</span></div><div class="content">
+      <h2 class="title">Analytics</h2><p class="subtitle">Local insights from your own history.</p>
+      <div class="card"><div class="row between"><div><div class="h3">Recovery signal</div><div class="small">Normal • 72/100</div></div><span class="pill orange">Watch</span></div><div class="bar"><span style="width:72%"></span></div><div class="small">Frequency and volume look stable.</div></div>
+      <div class="card"><div class="h3">Movement balance</div>
+        <div class="row between"><span>Push</span><span class="small">48%</span></div><div class="bar"><span style="width:48%"></span></div>
+        <div class="row between"><span>Pull</span><span class="small">27%</span></div><div class="bar"><span style="width:27%"></span></div>
+        <div class="row between"><span>Legs</span><span class="small">25%</span></div><div class="bar"><span style="width:25%"></span></div>
+      </div>
+      <div class="card"><div class="h3">Muscle recommendations</div><div class="small"><b style="color:var(--green)">Bring up Lats</b><br>Pull volume is underrepresented. Consider pulldowns, pull-ups or rows.</div><br><div class="small"><b style="color:var(--green)">Bring up Hamstrings</b><br>Add Romanian deadlifts or leg curls.</div></div>
+      <div class="card"><div class="h3">Plateau watch</div><div class="small">Bench stalled ~6 weeks. Reduce junk volume and keep 1–2 high-quality top sets.</div></div>
+    </div><div class="nav"><div>⌂<br>Home</div><div>🏋<br>Workout</div><div class="on">↗<br>Progress</div><div>◴<br>History</div><div>☰<br>Library</div></div></div></div></div>
+
+    <div><div class="mock-label">5. Exercise Library / Smart Metadata</div><div class="phone"><div class="screen"><div class="status"><span>9:41</span><span>●●●</span></div><div class="content">
+      <h2 class="title">Exercise Library</h2><p class="subtitle">Smart metadata powers future coaching.</p><div class="search">Search movement, muscle, equipment...</div><div class="chiprow"><span class="chip on">All</span><span class="chip">Push</span><span class="chip">Pull</span><span class="chip">Legs</span><span class="chip">Hinge</span></div>
+      <div class="card"><div class="row"><div class="icon">BP</div><div class="grow"><div class="h3">Barbell Bench Press</div><div class="small">Push • Horizontal Press</div><div class="small">Primary: Pectorals</div></div></div></div>
+      <div class="card"><div class="row"><div class="icon">SQ</div><div class="grow"><div class="h3">Barbell Back Squat</div><div class="small">Legs • Squat</div><div class="small">Primary: Quadriceps</div></div></div></div>
+      <div class="card card2"><div class="h3">Exercise detail</div><div class="small">Barbell Bench Press • Intermediate</div><div class="card"><b>Exercise media</b><div class="small">Local GIF/image slot</div></div><div class="row"><div class="card grow"><div class="value">120</div><div class="label">Est 1RM</div></div><div class="card grow"><div class="value">42</div><div class="label">Sets</div></div></div></div>
+    </div><div class="nav"><div>⌂<br>Home</div><div>🏋<br>Workout</div><div>↗<br>Progress</div><div>◴<br>History</div><div class="on">☰<br>Library</div></div></div></div></div>
+
+    <div><div class="mock-label">6. Template Editor / Programmed Targets</div><div class="phone"><div class="screen"><div class="status"><span>9:41</span><span>●●●</span></div><div class="content">
+      <h2 class="title">Edit Template</h2><p class="subtitle">Templates are now programmable sessions.</p><div class="search">Push Day v4</div>
+      <div class="card"><div class="row between"><div><div class="h3">1. Bench Press</div><div class="small">4 sets × 6 reps @ 100 kg</div></div><span class="pill">Edit</span></div></div>
+      <div class="card"><div class="row between"><div><div class="h3">2. Chest Row</div><div class="small">4 sets × 8 reps @ 80 kg</div></div><span class="pill blue">A2</span></div></div>
+      <div class="card"><div class="h3">Target editor</div><div class="row"><div class="card grow"><div class="value">4</div><div class="label">Sets</div></div><div class="card grow"><div class="value">6</div><div class="label">Reps</div></div></div><div class="search">Target weight: 100 kg</div><div class="btn">Save target</div></div>
+      <div class="btn2">Add Exercise</div><div class="btn">Save Template</div>
+    </div><div class="nav"><div>⌂<br>Home</div><div class="on">🏋<br>Workout</div><div>↗<br>Progress</div><div>◴<br>History</div><div>☰<br>Library</div></div></div></div></div>
+
+  </div>
+</div>
+</body>
+</html>
