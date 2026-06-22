@@ -17,7 +17,7 @@ steps:
     uses: actions/setup-java@v4
     with:
       distribution: temurin
-      java-version: 17
+      java-version: '17'
 
   - name: Grant execute permission
     run: chmod +x gradlew
