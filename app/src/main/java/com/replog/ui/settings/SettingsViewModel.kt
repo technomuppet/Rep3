@@ -70,7 +70,7 @@ class SettingsViewModel @Inject constructor(
     ) { values ->
         SettingsUiState(
             useKg = values[0] as Boolean,
-            restPresets = values[1] as Int,
+            restPresets = values[1] as RestPresets,
             customKgPlates = values[2] as String,
             customLbPlates = values[3] as String,
             exportStatus = values[4] as String?,
@@ -82,7 +82,7 @@ class SettingsViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
     fun setUseKg(value: Boolean) = viewModelScope.launch { prefs.setUseKg(value) }
-    fun setRestPresets(value: Int) = viewModelScope.launch { prefs.setRestPresets(value) }
+    fun setRestPresets(value: RestPresets) = viewModelScope.launch { prefs.setRestPresets(value) }
     fun setCustomKgPlates(value: String) = viewModelScope.launch { prefs.setCustomKgPlates(value) }
     fun setCustomLbPlates(value: String) = viewModelScope.launch { prefs.setCustomLbPlates(value) }
 
