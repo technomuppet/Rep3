@@ -37,7 +37,13 @@ object DemoDataGenerator {
                 WorkoutSession(
                     templateName = if (index % 2 == 0) "Demo Strength A" else "Demo Strength B",
                     startTime = start,
-                    endTime = start + 58L * 60L * 1000L
+                    endTime = start + 58L * 60L * 1000L,
+                    notes = if (index % 3 == 0) "Felt strong" else null,
+                    qualityScore = 75 + index,
+                    totalVolume = 0.0,
+                    totalSets = 0,
+                    totalReps = 0,
+                    prCount = 0
                 )
             ).toInt()
 
@@ -48,7 +54,8 @@ object DemoDataGenerator {
                         sessionId = sessionId,
                         exerciseId = exercise.id,
                         orderIndex = order,
-                        supersetGroup = if (order in 1..2) "A" else null
+                        supersetGroup = if (order in 1..2) "A" else null,
+                        notes = if (order == 0) "Focus form" else ""
                     )
                 ).toInt()
                 seedSets(workoutRepository, sessionExerciseId, exercise, index, start)
@@ -83,11 +90,15 @@ object DemoDataGenerator {
                 setNumber = 1,
                 weight = base * 0.6,
                 reps = 8,
+                isPR = false,
+                prType = null,
                 setType = SetType.WARMUP,
-                timestamp = startTime + 5_000L
+                timestamp = startTime + 5_000L,
+                completed = true
             )
         )
         repeat(3) { setIndex ->
+            val isPr = blockIndex >= 8 && setIndex == 2
             workoutRepository.insertSet(
                 SetLog(
                     sessionExerciseId = sessionExerciseId,
@@ -95,9 +106,11 @@ object DemoDataGenerator {
                     weight = base,
                     reps = 5 + (blockIndex % 3),
                     rpe = 7.5 + (setIndex * 0.5),
-                    isPR = blockIndex >= 8 && setIndex == 2,
+                    isPR = isPr,
+                    prType = if (isPr) "weight" else null,
                     setType = if (setIndex == 2 && blockIndex % 4 == 0) SetType.AMRAP else SetType.WORKING,
-                    timestamp = startTime + ((setIndex + 2) * 90_000L)
+                    timestamp = startTime + ((setIndex + 2) * 90_000L),
+                    completed = true
                 )
             )
         }

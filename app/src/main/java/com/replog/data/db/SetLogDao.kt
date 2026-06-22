@@ -60,6 +60,44 @@ interface SetLogDao {
     @Query("""
         SELECT set_logs.*
         FROM set_logs
+        INNER JOIN session_exercises se ON set_logs.sessionExerciseId = se.id
+        WHERE se.exerciseId = :exerciseId AND se.sessionId = (
+            SELECT ws.id FROM workout_sessions ws
+            INNER JOIN session_exercises se2 ON se2.sessionId = ws.id
+            WHERE se2.exerciseId = :exerciseId
+              AND ws.endTime IS NOT NULL
+              AND (:excludeSessionId IS NULL OR ws.id != :excludeSessionId)
+            ORDER BY ws.startTime DESC
+            LIMIT 1
+        )
+        ORDER BY set_logs.setNumber ASC
+    """)
+    suspend fun getPreviousWorkoutSetsForExercise(exerciseId: Int, excludeSessionId: Int?): List<SetLog>
+
+    @Query("""
+        SELECT set_logs.* FROM set_logs
+        INNER JOIN session_exercises se ON set_logs.sessionExerciseId = se.id
+        INNER JOIN workout_sessions ws ON se.sessionId = ws.id
+        WHERE se.exerciseId = :exerciseId
+          AND ws.endTime IS NOT NULL
+          AND (:excludeSessionId IS NULL OR ws.id != :excludeSessionId)
+        ORDER BY ws.startTime DESC, set_logs.setNumber ASC
+        LIMIT :limit
+    """)
+    suspend fun getLastSetsExcludingSession(exerciseId: Int, excludeSessionId: Int?, limit: Int): List<SetLog>
+
+    @Query("""
+        SELECT set_logs.*
+        FROM set_logs
+        INNER JOIN session_exercises se ON set_logs.sessionExerciseId = se.id
+        WHERE se.exerciseId = :exerciseId
+        ORDER BY set_logs.timestamp DESC
+    """)
+    suspend fun getAllSetsForExercise(exerciseId: Int): List<SetLog>
+
+    @Query("""
+        SELECT set_logs.*
+        FROM set_logs
         INNER JOIN session_exercises ON set_logs.sessionExerciseId = session_exercises.id
         WHERE session_exercises.exerciseId = :exerciseId AND set_logs.isPR = 1
         ORDER BY timestamp DESC LIMIT 5

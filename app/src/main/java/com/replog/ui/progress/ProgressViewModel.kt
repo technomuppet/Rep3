@@ -304,7 +304,7 @@ class ProgressViewModel @Inject constructor(
                 entry.exercise.id to DatedSet(
                     time = session.session.startTime,
                     exerciseName = entry.exercise.name,
-                    set = entry.sets.maxByOrNull { estimatedOneRm(it.weight, it.reps) } ?: SetLog(sessionExerciseId = entry.sessionExercise.id, setNumber = 0, weight = 0.0, reps = 0),
+                    set = entry.sets.maxByOrNull { estimatedOneRm(it.weight, it.reps) } ?: SetLog(sessionExerciseId = entry.sessionExercise.id, setNumber = 0, weight = 0.0, reps = 0, isPR=false, prType=null, completed=true),
                     estimatedOneRm = entry.sets.maxOfOrNull { estimatedOneRm(it.weight, it.reps) } ?: 0.0
                 )
             }

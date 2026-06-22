@@ -21,4 +21,5 @@ object AppModule {
     @Provides fun providePrescriptionDao(db: AppDatabase): PrescriptionDao = db.prescriptionDao()
     @Provides fun provideTrainingDnaDao(db: AppDatabase): TrainingDnaDao = db.trainingDnaDao()
     @Provides fun provideKnowledgeGraphDao(db: AppDatabase): KnowledgeGraphDao = db.knowledgeGraphDao()
+    @Provides fun provideRestLogDao(db: AppDatabase): RestLogDao = db.restLogDao()
 }

@@ -18,6 +18,13 @@ object SetType {
     val all = listOf(WORKING, WARMUP, DROP, FAILURE, AMRAP, CLUSTER, REST_PAUSE, TEMPO)
 }
 
+object PRType {
+    const val WEIGHT = "weight"
+    const val REPS = "reps"
+    const val VOLUME = "volume"
+    const val E1RM = "e1rm"
+}
+
 @Entity(
     tableName = "set_logs",
     foreignKeys = [ForeignKey(entity = SessionExercise::class, parentColumns = ["id"], childColumns = ["sessionExerciseId"], onDelete = ForeignKey.CASCADE)],
@@ -35,8 +42,10 @@ data class SetLog(
     val reps: Int,
     val isBodyweight: Boolean = false,
     val isPR: Boolean = false,
+    val prType: String? = null,
     val timestamp: Long = System.currentTimeMillis(),
     val setType: String = SetType.WORKING,
     val rpe: Double? = null,
-    val tempo: String? = null
+    val tempo: String? = null,
+    val completed: Boolean = true
 )

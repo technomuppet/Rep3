@@ -13,6 +13,7 @@ import com.replog.data.model.TemplateWithExercises
 import com.replog.data.model.WorkoutPrescription
 import com.replog.data.model.WorkoutSession
 import com.replog.data.model.WorkoutTemplate
+import com.replog.domain.pr.PRDetector
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -37,6 +38,10 @@ class WorkoutRepository @Inject constructor(
     suspend fun deleteSessionExercise(id: Int) = sessionDao.deleteSessionExercise(id)
     suspend fun getCompletedSessionCount(): Int = sessionDao.getCompletedSessionCount()
     suspend fun getTotalVolume(): Double = sessionDao.getTotalVolume()
+    
+    suspend fun reorderSessionExercises(sessionId: Int, orderedIds: List<Int>) {
+        orderedIds.forEachIndexed { index, id -> sessionDao.updateSessionExerciseOrder(id, index) }
+    }
 
     suspend fun insertSet(setLog: SetLog): Long = setLogDao.insertSet(setLog)
     suspend fun updateSet(setLog: SetLog) = setLogDao.updateSet(setLog)
@@ -46,6 +51,14 @@ class WorkoutRepository @Inject constructor(
     suspend fun getMaxWeightForReps(exerciseId: Int, reps: Int): Double = setLogDao.getMaxWeightForReps(exerciseId, reps)
     suspend fun getMaxWeightForExercise(exerciseId: Int): Double = setLogDao.getMaxWeightForExercise(exerciseId)
     suspend fun getRecentSetsForExercise(exerciseId: Int, limit: Int = 3): List<SetLog> = setLogDao.getRecentSetsForExercise(exerciseId, limit)
+    
+    suspend fun getPreviousWorkoutSetsForExercise(exerciseId: Int, excludeSessionId: Int?): List<SetLog> =
+        setLogDao.getPreviousWorkoutSetsForExercise(exerciseId, excludeSessionId)
+    suspend fun getLastSetsExcludingSession(exerciseId: Int, excludeSessionId: Int?, limit: Int): List<SetLog> =
+        setLogDao.getLastSetsExcludingSession(exerciseId, excludeSessionId, limit)
+
+    suspend fun getAllSetsForExercise(exerciseId: Int): List<SetLog> = setLogDao.getAllSetsForExercise(exerciseId)
+
     fun getExerciseHistory(exerciseId: Int): Flow<List<ExerciseSetHistory>> = setLogDao.getExerciseHistory(exerciseId)
     fun getRecentPRs(): Flow<List<SetLog>> = setLogDao.getRecentPRs()
 
@@ -62,9 +75,13 @@ class WorkoutRepository @Inject constructor(
     suspend fun insertPrescriptions(prescriptions: List<WorkoutPrescription>) = prescriptionDao.insertPrescriptions(prescriptions)
     suspend fun deletePrescriptionsForSession(sessionId: Int) = prescriptionDao.deletePrescriptionsForSession(sessionId)
 
+    suspend fun checkPR(exerciseId: Int, weight: Double, reps: Int, excludeSetId: Int? = null): com.replog.domain.pr.PRResult {
+        val history = setLogDao.getAllSetsForExercise(exerciseId)
+        return PRDetector.check(weight, reps, history, excludeSetId)
+    }
     suspend fun isPR(exerciseId: Int, weight: Double, reps: Int): Boolean =
-        weight > setLogDao.getMaxWeightForReps(exerciseId, reps)
+        checkPR(exerciseId, weight, reps).isPR
 
     suspend fun isPRExcludingSet(exerciseId: Int, weight: Double, reps: Int, setId: Int): Boolean =
-        weight > setLogDao.getMaxWeightForRepsExcludingSet(exerciseId, reps, setId)
+        checkPR(exerciseId, weight, reps, setId).isPR
 }

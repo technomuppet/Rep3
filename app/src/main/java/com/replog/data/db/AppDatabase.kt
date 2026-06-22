@@ -9,6 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.replog.data.model.BodyweightLog
 import com.replog.data.model.Exercise
 import com.replog.data.model.KnowledgeGraphRelation
+import com.replog.data.model.RestLog
 import com.replog.data.model.SessionExercise
 import com.replog.data.model.SetLog
 import com.replog.data.model.TemplateExercise
@@ -28,9 +29,10 @@ import com.replog.data.model.WorkoutTemplate
         BodyweightLog::class,
         WorkoutPrescription::class,
         TrainingDnaMetric::class,
-        KnowledgeGraphRelation::class
+        KnowledgeGraphRelation::class,
+        RestLog::class
     ],
-    version = 8,
+    version = 10,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -42,6 +44,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun prescriptionDao(): PrescriptionDao
     abstract fun trainingDnaDao(): TrainingDnaDao
     abstract fun knowledgeGraphDao(): KnowledgeGraphDao
+    abstract fun restLogDao(): RestLogDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
@@ -173,9 +176,49 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS rest_logs (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        sessionExerciseId INTEGER NOT NULL,
+                        setId INTEGER,
+                        plannedSeconds INTEGER NOT NULL,
+                        actualSeconds INTEGER,
+                        skipped INTEGER NOT NULL DEFAULT 0,
+                        startedAt INTEGER NOT NULL,
+                        completedAt INTEGER,
+                        FOREIGN KEY(sessionExerciseId) REFERENCES session_exercises(id) ON UPDATE NO ACTION ON DELETE CASCADE,
+                        FOREIGN KEY(setId) REFERENCES set_logs(id) ON UPDATE NO ACTION ON DELETE SET NULL
+                    )
+                    """.trimIndent()
+                )
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_rest_logs_sessionExerciseId ON rest_logs(sessionExerciseId)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_rest_logs_setId ON rest_logs(setId)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_rest_logs_startedAt ON rest_logs(startedAt)")
+            }
+        }
+
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // WorkoutSession scoring fields
+                database.execSQL("ALTER TABLE workout_sessions ADD COLUMN qualityScore INTEGER")
+                database.execSQL("ALTER TABLE workout_sessions ADD COLUMN totalVolume REAL NOT NULL DEFAULT 0")
+                database.execSQL("ALTER TABLE workout_sessions ADD COLUMN totalSets INTEGER NOT NULL DEFAULT 0")
+                database.execSQL("ALTER TABLE workout_sessions ADD COLUMN totalReps INTEGER NOT NULL DEFAULT 0")
+                database.execSQL("ALTER TABLE workout_sessions ADD COLUMN prCount INTEGER NOT NULL DEFAULT 0")
+                // SessionExercise notes
+                database.execSQL("ALTER TABLE session_exercises ADD COLUMN notes TEXT NOT NULL DEFAULT ''")
+                // SetLog PR types + completed flag
+                database.execSQL("ALTER TABLE set_logs ADD COLUMN prType TEXT")
+                database.execSQL("ALTER TABLE set_logs ADD COLUMN completed INTEGER NOT NULL DEFAULT 1")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase = INSTANCE ?: synchronized(this) {
             Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "replog_database")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
                 .build()
                 .also { INSTANCE = it }
         }

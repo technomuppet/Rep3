@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -108,21 +109,10 @@ fun SettingsScreen(
             }
         }
 
-        RepLogCard {
-            Text("Default Rest Timer", fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(8.dp))
-            var rest by remember(state.restSeconds) { mutableStateOf(state.restSeconds.toString()) }
-            OutlinedTextField(
-                value = rest,
-                onValueChange = {
-                    rest = it.filter(Char::isDigit)
-                    rest.toIntOrNull()?.let(viewModel::setRestSeconds)
-                },
-                label = { Text("Seconds") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                singleLine = true
-            )
-        }
+        RestTimerSettingsCard(
+            presets = state.restPresets,
+            onChange = viewModel::setRestPresets
+        )
 
         PlateCalculatorCard(
             useKg = state.useKg,
@@ -341,6 +331,38 @@ private fun PlateCalculatorCard(
             "Loaded: ${formatWeight(load.loadedWeight, useKg)}" + if (kotlin.math.abs(load.remainingWeight) > 0.01) " • Remaining: ${clean(load.remainingWeight)}" else "",
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+    }
+}
+
+
+@Composable
+private fun RestTimerSettingsCard(
+    presets: com.replog.util.timer.RestPresets,
+    onChange: (com.replog.util.timer.RestPresets) -> Unit
+) {
+    var compound by remember(presets.compoundSeconds) { mutableStateOf(presets.compoundSeconds.toString()) }
+    var isolation by remember(presets.isolationSeconds) { mutableStateOf(presets.isolationSeconds.toString()) }
+    var bodyweight by remember(presets.bodyweightSeconds) { mutableStateOf(presets.bodyweightSeconds.toString()) }
+
+    fun commit() {
+        onChange(
+            presets.copy(
+                compoundSeconds = compound.toIntOrNull()?.coerceIn(15,600) ?: presets.compoundSeconds,
+                isolationSeconds = isolation.toIntOrNull()?.coerceIn(15,600) ?: presets.isolationSeconds,
+                bodyweightSeconds = bodyweight.toIntOrNull()?.coerceIn(15,600) ?: presets.bodyweightSeconds
+            )
+        )
+    }
+    RepLogCard {
+        Row { Icon(Icons.Default.Timer, null, tint = MaterialTheme.colorScheme.primary); Spacer(Modifier.width(12.dp)); Column { Text("Rest timer presets", fontWeight = FontWeight.Bold); Text("Smart rest times automatically applied after each set.", color = MaterialTheme.colorScheme.onSurfaceVariant) } }
+        Spacer(Modifier.height(12.dp))
+        OutlinedTextField(compound, { compound = it.filter(Char::isDigit); commit() }, Modifier.fillMaxWidth(), label = { Text("Compound (Barbell, Squat, Press)") }, suffix = { Text("sec") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true)
+        Spacer(Modifier.height(8.dp))
+        OutlinedTextField(isolation, { isolation = it.filter(Char::isDigit); commit() }, Modifier.fillMaxWidth(), label = { Text("Isolation") }, suffix = { Text("sec") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true)
+        Spacer(Modifier.height(8.dp))
+        OutlinedTextField(bodyweight, { bodyweight = it.filter(Char::isDigit); commit() }, Modifier.fillMaxWidth(), label = { Text("Bodyweight") }, suffix = { Text("sec") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true)
+        Spacer(Modifier.height(6.dp))
+        Text("Per-exercise overrides supported in data layer – UI editor coming in V2.1.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

@@ -6,7 +6,7 @@ import com.replog.data.model.SessionWithExercises
 import com.replog.data.model.WorkoutPrescription
 
 data class RepLogBackup(
-    val schemaVersion: Int = 3,
+    val schemaVersion: Int = 4,
     val exportedAt: Long = System.currentTimeMillis(),
     val sessions: List<BackupSession> = emptyList(),
     val bodyweights: List<BackupBodyweight> = emptyList()
@@ -17,6 +17,11 @@ data class BackupSession(
     val startTime: Long,
     val endTime: Long?,
     val notes: String?,
+    val qualityScore: Int? = null,
+    val totalVolume: Double = 0.0,
+    val totalSets: Int = 0,
+    val totalReps: Int = 0,
+    val prCount: Int = 0,
     val exercises: List<BackupSessionExercise>,
     val prescriptions: List<BackupPrescription> = emptyList()
 )
@@ -33,6 +38,7 @@ data class BackupSessionExercise(
     val mediaAsset: String = "",
     val orderIndex: Int,
     val supersetGroup: String? = null,
+    val notes: String = "",
     val sets: List<BackupSet>
 )
 
@@ -42,10 +48,12 @@ data class BackupSet(
     val reps: Int,
     val isBodyweight: Boolean,
     val isPR: Boolean,
+    val prType: String? = null,
     val timestamp: Long,
     val setType: String = "Working",
     val rpe: Double? = null,
-    val tempo: String? = null
+    val tempo: String? = null,
+    val completed: Boolean = true
 )
 
 data class BackupPrescription(
@@ -81,6 +89,11 @@ object BackupJson {
                     startTime = session.session.startTime,
                     endTime = session.session.endTime,
                     notes = session.session.notes,
+                    qualityScore = session.session.qualityScore,
+                    totalVolume = session.session.totalVolume,
+                    totalSets = session.session.totalSets,
+                    totalReps = session.session.totalReps,
+                    prCount = session.session.prCount,
                     exercises = session.exercises.sortedBy { it.sessionExercise.orderIndex }.map { entry ->
                         BackupSessionExercise(
                             exerciseName = entry.exercise.name,
@@ -94,6 +107,7 @@ object BackupJson {
                             mediaAsset = entry.exercise.mediaAsset,
                             orderIndex = entry.sessionExercise.orderIndex,
                             supersetGroup = entry.sessionExercise.supersetGroup,
+                            notes = entry.sessionExercise.notes,
                             sets = entry.sets.sortedBy { it.setNumber }.map { set ->
                                 BackupSet(
                                     setNumber = set.setNumber,
@@ -101,10 +115,12 @@ object BackupJson {
                                     reps = set.reps,
                                     isBodyweight = set.isBodyweight,
                                     isPR = set.isPR,
+                                    prType = set.prType,
                                     timestamp = set.timestamp,
                                     setType = set.setType,
                                     rpe = set.rpe,
-                                    tempo = set.tempo
+                                    tempo = set.tempo,
+                                    completed = set.completed
                                 )
                             }
                         )

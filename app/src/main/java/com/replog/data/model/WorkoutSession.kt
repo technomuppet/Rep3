@@ -13,5 +13,10 @@ data class WorkoutSession(
     val templateName: String? = null,
     val startTime: Long,
     val endTime: Long? = null,
-    val notes: String? = null
+    val notes: String? = null,
+    val qualityScore: Int? = null,
+    val totalVolume: Double = 0.0,
+    val totalSets: Int = 0,
+    val totalReps: Int = 0,
+    val prCount: Int = 0
 )

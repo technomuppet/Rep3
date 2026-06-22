@@ -18,5 +18,6 @@ data class SessionExercise(
     val sessionId: Int,
     val exerciseId: Int,
     val orderIndex: Int,
-    val supersetGroup: String? = null
+    val supersetGroup: String? = null,
+    val notes: String = ""
 )
