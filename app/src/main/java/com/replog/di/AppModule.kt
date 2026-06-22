@@ -22,4 +22,8 @@ object AppModule {
     @Provides fun provideTrainingDnaDao(db: AppDatabase): TrainingDnaDao = db.trainingDnaDao()
     @Provides fun provideKnowledgeGraphDao(db: AppDatabase): KnowledgeGraphDao = db.knowledgeGraphDao()
     @Provides fun provideRestLogDao(db: AppDatabase): RestLogDao = db.restLogDao()
+    @Provides fun provideTrainingDnaSnapshotDao(db: AppDatabase): TrainingDnaSnapshotDao = db.trainingDnaSnapshotDao()
+    @Provides fun provideTrainingDnaProgressionScoreDao(db: AppDatabase): TrainingDnaProgressionScoreDao = db.trainingDnaProgressionScoreDao()
+    @Provides fun providePlateauEventDao(db: AppDatabase): PlateauEventDao = db.plateauEventDao()
+    @Provides fun provideRecommendationHistoryDao(db: AppDatabase): RecommendationHistoryDao = db.recommendationHistoryDao()
 }

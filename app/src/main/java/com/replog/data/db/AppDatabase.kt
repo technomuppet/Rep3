@@ -9,11 +9,15 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.replog.data.model.BodyweightLog
 import com.replog.data.model.Exercise
 import com.replog.data.model.KnowledgeGraphRelation
+import com.replog.data.model.PlateauEvent
+import com.replog.data.model.RecommendationHistory
 import com.replog.data.model.RestLog
 import com.replog.data.model.SessionExercise
 import com.replog.data.model.SetLog
 import com.replog.data.model.TemplateExercise
 import com.replog.data.model.TrainingDnaMetric
+import com.replog.data.model.TrainingDnaProgressionScore
+import com.replog.data.model.TrainingDnaSnapshot
 import com.replog.data.model.WorkoutPrescription
 import com.replog.data.model.WorkoutSession
 import com.replog.data.model.WorkoutTemplate
@@ -30,9 +34,13 @@ import com.replog.data.model.WorkoutTemplate
         WorkoutPrescription::class,
         TrainingDnaMetric::class,
         KnowledgeGraphRelation::class,
-        RestLog::class
+        RestLog::class,
+        TrainingDnaSnapshot::class,
+        TrainingDnaProgressionScore::class,
+        PlateauEvent::class,
+        RecommendationHistory::class
     ],
-    version = 10,
+    version = 11,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -45,6 +53,10 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun trainingDnaDao(): TrainingDnaDao
     abstract fun knowledgeGraphDao(): KnowledgeGraphDao
     abstract fun restLogDao(): RestLogDao
+    abstract fun trainingDnaSnapshotDao(): TrainingDnaSnapshotDao
+    abstract fun trainingDnaProgressionScoreDao(): TrainingDnaProgressionScoreDao
+    abstract fun plateauEventDao(): PlateauEventDao
+    abstract fun recommendationHistoryDao(): RecommendationHistoryDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
@@ -216,9 +228,102 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // --- Sprint 5 (Training DNA + Recommendation engine) tables ---
+        // Sprint 5 originally created these under MIGRATION_8_9 because it branched
+        // from the v8 base. After reconciling with Sprint 4 (which owns 8->9 and
+        // 9->10), the Sprint 5 tables are relocated to a fresh 10->11 migration so
+        // every prior version upgrades cleanly. Note: Sprint 5 declared the
+        // RecommendationHistory entity but never created its table in any migration;
+        // that latent defect is fixed here by creating recommendation_history too.
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS training_dna_snapshots (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        generatedAt INTEGER NOT NULL,
+                        preferredRepRange TEXT NOT NULL,
+                        preferredVolumeRange TEXT NOT NULL,
+                        preferredFrequency TEXT NOT NULL,
+                        strongestMuscles TEXT NOT NULL,
+                        weakestMuscles TEXT NOT NULL,
+                        fastestProgressingExercises TEXT NOT NULL,
+                        stalledExercises TEXT NOT NULL,
+                        averageWorkoutDuration REAL NOT NULL,
+                        averageRecoveryHours REAL NOT NULL,
+                        monthlyPRCount INTEGER NOT NULL,
+                        volumeToleranceScore REAL NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_training_dna_snapshots_generatedAt ON training_dna_snapshots(generatedAt)")
+
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS training_dna_progression_scores (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        exerciseId INTEGER NOT NULL,
+                        calculatedAt INTEGER NOT NULL,
+                        score30Day REAL NOT NULL,
+                        score90Day REAL NOT NULL,
+                        scoreLifetime REAL NOT NULL,
+                        estimatedOneRm30Day REAL NOT NULL,
+                        estimatedOneRm90Day REAL NOT NULL,
+                        estimatedOneRmLifetime REAL NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_training_dna_progression_scores_exerciseId ON training_dna_progression_scores(exerciseId)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_training_dna_progression_scores_calculatedAt ON training_dna_progression_scores(calculatedAt)")
+
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS plateau_events (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        exerciseId INTEGER NOT NULL,
+                        exerciseName TEXT NOT NULL,
+                        detectedAt INTEGER NOT NULL,
+                        periodDays INTEGER NOT NULL,
+                        reason TEXT NOT NULL,
+                        lastLoad REAL NOT NULL,
+                        lastReps INTEGER NOT NULL,
+                        lastVolume REAL NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_plateau_events_exerciseId ON plateau_events(exerciseId)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_plateau_events_detectedAt ON plateau_events(detectedAt)")
+
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS recommendation_history (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        timestamp INTEGER NOT NULL,
+                        recommendationType TEXT NOT NULL,
+                        title TEXT NOT NULL,
+                        explanation TEXT NOT NULL,
+                        dataUsed TEXT NOT NULL,
+                        reasoning TEXT NOT NULL,
+                        expectedOutcome TEXT NOT NULL,
+                        confidenceScore REAL NOT NULL,
+                        estimatedDurationMinutes INTEGER NOT NULL,
+                        workoutSplit TEXT,
+                        outcome TEXT,
+                        rejectedReason TEXT
+                    )
+                    """.trimIndent()
+                )
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_recommendation_history_timestamp ON recommendation_history(timestamp)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_recommendation_history_recommendationType ON recommendation_history(recommendationType)")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase = INSTANCE ?: synchronized(this) {
             Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "replog_database")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
+                .addMigrations(
+                    MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
+                    MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11
+                )
                 .build()
                 .also { INSTANCE = it }
         }

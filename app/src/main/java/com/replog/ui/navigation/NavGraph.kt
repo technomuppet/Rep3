@@ -24,6 +24,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.replog.ui.exercise.ExerciseLibraryScreen
 import com.replog.ui.history.HistoryScreen
 import com.replog.ui.home.HomeScreen
@@ -31,6 +32,7 @@ import com.replog.ui.onboarding.OnboardingScreen
 import com.replog.ui.onboarding.OnboardingViewModel
 import com.replog.ui.progress.ProgressScreen
 import com.replog.ui.settings.SettingsScreen
+import com.replog.ui.trainingdna.TrainingDnaInsightScreen
 import com.replog.ui.workout.ActiveWorkoutScreen
 
 sealed class RepLogRoute(val route: String, val label: String, val icon: ImageVector) {
@@ -40,6 +42,8 @@ sealed class RepLogRoute(val route: String, val label: String, val icon: ImageVe
     data object History : RepLogRoute("history", "History", Icons.Default.History)
     data object Exercises : RepLogRoute("exercises", "Exercises", Icons.Default.List)
     data object Settings : RepLogRoute("settings", "Settings", Icons.Default.Settings)
+    data object TrainingDna : RepLogRoute("training_dna", "Training DNA", Icons.Default.ShowChart)
+    data object CoachHistory : RepLogRoute("coach_history", "Coach History", Icons.Default.History)
 }
 
 private val items = listOf(
@@ -73,11 +77,28 @@ fun RepLogNavGraph(
                     },
                     onViewHistory = {
                         navController.navigate(RepLogRoute.History.route) { launchSingleTop = true }
+                    },
+                    onStartRecommendedWorkout = {
+                        navController.navigate(RepLogRoute.Workout.route + "?fromRecommendation=true") { launchSingleTop = true }
+                    },
+                    onViewRecoveryGuidance = {
+                        navController.navigate(RepLogRoute.TrainingDna.route) { launchSingleTop = true }
+                    },
+                    onOpenCoachHistory = {
+                        navController.navigate(RepLogRoute.CoachHistory.route) { launchSingleTop = true }
                     }
                 )
             }
-            composable(RepLogRoute.Workout.route) { ActiveWorkoutScreen(padding) }
-            composable(RepLogRoute.Progress.route) { ProgressScreen(padding) }
+            composable(
+                route = RepLogRoute.Workout.route + "?fromRecommendation={fromRecommendation}",
+                arguments = listOf(navArgument("fromRecommendation") { defaultValue = "false" })
+            ) { entry ->
+                val fromRec = entry.arguments?.getString("fromRecommendation") == "true"
+                ActiveWorkoutScreen(padding, startFromRecommendation = fromRec)
+            }
+            composable(RepLogRoute.Progress.route) { ProgressScreen(padding, onOpenTrainingDna = { navController.navigate(RepLogRoute.TrainingDna.route) { launchSingleTop = true } }) }
+            composable(RepLogRoute.TrainingDna.route) { TrainingDnaInsightScreen(padding) }
+            composable(RepLogRoute.CoachHistory.route) { com.replog.ui.coach.CoachHistoryScreen(padding) }
             composable(RepLogRoute.History.route) { HistoryScreen(padding) }
             composable(RepLogRoute.Exercises.route) { ExerciseLibraryScreen(padding) }
             composable(RepLogRoute.Settings.route) { SettingsScreen(padding) }
@@ -92,7 +113,7 @@ private fun RepLogBottomBar(navController: NavHostController) {
     NavigationBar {
         items.forEach { item ->
             NavigationBarItem(
-                selected = current?.hierarchy?.any { it.route == item.route } == true,
+                selected = current?.hierarchy?.any { it.route?.substringBefore("?") == item.route } == true,
                 onClick = {
                     navController.navigate(item.route) {
                         popUpTo(navController.graph.findStartDestination().id) { saveState = true }

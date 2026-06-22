@@ -57,6 +57,7 @@ import java.util.Locale
 @Composable
 fun ProgressScreen(
     contentPadding: PaddingValues,
+    onOpenTrainingDna: () -> Unit,
     viewModel: ProgressViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -75,6 +76,8 @@ fun ProgressScreen(
             Text("Progress", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.ExtraBold)
             Text("Your training signal across volume, PRs, strength and bodyweight.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+
+        item { PrimaryButton("View Training DNA") { onOpenTrainingDna() } }
 
         item {
             BodyweightCard(

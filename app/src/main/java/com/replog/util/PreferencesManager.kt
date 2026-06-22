@@ -46,6 +46,8 @@ class PreferencesManager @Inject constructor(@ApplicationContext context: Contex
         val REST_AUTO_START = booleanPreferencesKey("rest_auto_start")
         val PROG_SUGGESTED_COUNT = intPreferencesKey("prog_suggested_count")
         val PROG_ACCEPTED_COUNT = intPreferencesKey("prog_accepted_count")
+        val COACH_LAST_GEN_DAY = longPreferencesKey("coach_last_gen_day")
+        val COACH_LAST_GEN_SESSION_COUNT = intPreferencesKey("coach_last_gen_session_count")
     }
 
     val useKg: Flow<Boolean> = store.data.map { it[Keys.USE_KG] ?: true }
@@ -118,6 +120,16 @@ class PreferencesManager @Inject constructor(@ApplicationContext context: Contex
         }
     }
     suspend fun setOnboardingComplete(value: Boolean = true) { store.edit { it[Keys.ONBOARDING_COMPLETE] = value } }
+
+    // --- Smart Coach: recompute-only-when-necessary cache markers ---
+    val coachLastGenDay: Flow<Long> = store.data.map { it[Keys.COACH_LAST_GEN_DAY] ?: 0L }
+    val coachLastGenSessionCount: Flow<Int> = store.data.map { it[Keys.COACH_LAST_GEN_SESSION_COUNT] ?: -1 }
+    suspend fun setCoachGenerationMarker(dayEpoch: Long, sessionCount: Int) {
+        store.edit {
+            it[Keys.COACH_LAST_GEN_DAY] = dayEpoch
+            it[Keys.COACH_LAST_GEN_SESSION_COUNT] = sessionCount
+        }
+    }
 
     suspend fun setRestPresets(presets: RestPresets) {
         store.edit {

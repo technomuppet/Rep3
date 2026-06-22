@@ -14,6 +14,7 @@ import com.replog.data.model.WorkoutPrescription
 import com.replog.data.model.WorkoutSession
 import com.replog.data.model.WorkoutTemplate
 import com.replog.data.repository.ExerciseRepository
+import com.replog.data.repository.TrainingDNARepository
 import com.replog.data.repository.WorkoutRepository
 import com.replog.domain.pr.PRDetector
 import com.replog.domain.progression.ProgressionSuggester
@@ -98,10 +99,15 @@ data class ActiveWorkoutUiState(
 @HiltViewModel
 class ActiveWorkoutViewModel @Inject constructor(
     private val workouts: WorkoutRepository,
+    private val trainingDnaRepository: TrainingDNARepository,
     exercises: ExerciseRepository,
     private val prefs: PreferencesManager,
-    private val restTimer: RestTimerManager
+    private val restTimer: RestTimerManager,
+    private val coachHandoff: com.replog.ui.coach.CoachHandoff,
+    private val recommendationRepository: com.replog.data.repository.RecommendationRepository
 ) : ViewModel() {
+    // Phase 3 — recommendation accepted via the Smart Coach card and pending completion.
+    private var pendingCoachRecommendation: com.replog.domain.recommendation.Recommendation? = null
     private val activeId = MutableStateFlow<Int?>(null)
     private val tick = MutableStateFlow(0)
     private val saving = MutableStateFlow(false)
@@ -256,6 +262,39 @@ class ActiveWorkoutViewModel @Inject constructor(
         activeId.value = id; prefs.setActiveSessionId(id); refresh()
     }
 
+    /**
+     * Phase 3 — Smart Start. If the Coach card staged a recommendation, build the
+     * active session directly from its WorkoutPlan (uses the existing prescription
+     * pipeline; introduces no new planning logic). Safe no-op if nothing is staged.
+     */
+    fun consumePendingRecommendation() = viewModelScope.launch {
+        val rec = coachHandoff.consume() ?: return@launch
+        val plan = rec.workoutPlan ?: return@launch
+        summary.value = null; previousWorkoutCache.clear(); cachedForSessionId = null; restTimer.cancel()
+        val id = workouts.insertSession(
+            WorkoutSession(templateName = rec.title, startTime = System.currentTimeMillis())
+        ).toInt()
+        plan.exercises.forEachIndexed { index, planned ->
+            workouts.insertSessionExercise(
+                SessionExercise(sessionId = id, exerciseId = planned.exerciseId, orderIndex = index, notes = "")
+            )
+        }
+        workouts.insertPrescriptions(plan.exercises.map { planned ->
+            WorkoutPrescription(
+                sessionId = id,
+                exerciseId = planned.exerciseId,
+                source = "Coach",
+                targetSets = planned.targetSets,
+                targetReps = planned.targetReps,
+                targetWeight = planned.targetWeight,
+                adjustment = planned.progression.name,
+                reason = planned.reason
+            )
+        })
+        pendingCoachRecommendation = rec
+        activeId.value = id; prefs.setActiveSessionId(id); refresh()
+    }
+
     fun startWorkoutFromTemplate(template: TemplateWithExercises) = viewModelScope.launch {
         summary.value = null; previousWorkoutCache.clear(); cachedForSessionId = null; restTimer.cancel()
         val id = workouts.insertSession(WorkoutSession(templateName = template.template.name, startTime = System.currentTimeMillis())).toInt()
@@ -283,6 +322,23 @@ class ActiveWorkoutViewModel @Inject constructor(
         val prCount = session.exercises.sumOf { e -> e.sets.count { it.isPR } }
         val scoreResult = WorkoutScorer.score(session, (endTime - session.session.startTime) / 60000, prCount)
         workouts.updateSession(session.session.copy(endTime = endTime, qualityScore = scoreResult.score, totalVolume = volume, totalSets = setCount, totalReps = repCount, prCount = prCount))
+        // Sprint 5: regenerate Training DNA after the completed session is persisted.
+        // Must never block or fail the workout summary.
+        try {
+            trainingDnaRepository.generateDNA()
+        } catch (_: Exception) {
+            // DNA generation is best-effort; ignore failures here.
+        }
+        // Phase 3 — if this workout came from an accepted Coach recommendation,
+        // upgrade its history outcome to "Completed". Best-effort.
+        pendingCoachRecommendation?.let { rec ->
+            try {
+                recommendationRepository.recordAcceptance(rec, completed = true)
+            } catch (_: Exception) {
+            } finally {
+                pendingCoachRecommendation = null
+            }
+        }
         summary.value = session.toSummary(endTime, prescriptions, scoreResult.score, repCount)
         activeId.value = null; previousWorkoutCache.clear(); cachedForSessionId = null
         prefs.setActiveSessionId(null); restTimer.cancel(); restored.value = false; refresh()

@@ -52,6 +52,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -87,8 +88,14 @@ import com.replog.util.timer.RestTimerState
 @Composable
 fun ActiveWorkoutScreen(
     contentPadding: PaddingValues,
+    startFromRecommendation: Boolean = false,
     viewModel: ActiveWorkoutViewModel = hiltViewModel()
 ) {
+    // Phase 3 — Smart Start: if arriving from the Coach card, build the session
+    // from the staged recommendation exactly once.
+    LaunchedEffect(startFromRecommendation) {
+        if (startFromRecommendation) viewModel.consumePendingRecommendation()
+    }
     val state by viewModel.uiState.collectAsState()
     var addExercise by remember { mutableStateOf(false) }
     var showCreateTemplate by remember { mutableStateOf(false) }

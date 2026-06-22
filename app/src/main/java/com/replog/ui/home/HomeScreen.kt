@@ -21,13 +21,36 @@ import java.util.*
 import kotlin.math.roundToInt
 
 @Composable
-fun HomeScreen(contentPadding: PaddingValues, onStartWorkout: () -> Unit, onViewHistory: () -> Unit, viewModel: HomeViewModel = hiltViewModel()) {
+fun HomeScreen(
+    contentPadding: PaddingValues,
+    onStartWorkout: () -> Unit,
+    onViewHistory: () -> Unit,
+    onStartRecommendedWorkout: () -> Unit = {},
+    onViewRecoveryGuidance: () -> Unit = {},
+    onOpenCoachHistory: () -> Unit = {},
+    viewModel: HomeViewModel = hiltViewModel(),
+    coachViewModel: com.replog.ui.coach.CoachViewModel = hiltViewModel()
+) {
     val state by viewModel.uiState.collectAsState()
-    LaunchedEffect(Unit) { viewModel.refresh() }
+    val coachState by coachViewModel.state.collectAsState()
+    LaunchedEffect(Unit) { viewModel.refresh(); coachViewModel.loadRecommendation(force = false) }
     LazyColumn(Modifier.fillMaxSize().padding(contentPadding), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        item { Text("RepLog", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.ExtraBold); Text("Track every rep. Beat every best.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        item { Text("RepLog", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.ExtraBold); Text("Your training coach in your pocket.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        item {
+            com.replog.ui.coach.SmartCoachCard(
+                state = coachState,
+                onStart = {
+                    coachViewModel.acceptRecommendation(
+                        onLaunchWorkout = onStartRecommendedWorkout,
+                        onRestDay = onViewRecoveryGuidance
+                    )
+                },
+                onDismiss = { coachViewModel.dismissRecommendation() },
+                onRefresh = { coachViewModel.loadRecommendation(force = true) }
+            )
+        }
         item { PrimaryButton("Start Workout", onClick = onStartWorkout) }
-        item { SecondaryButton("View History", onClick = onViewHistory) }
+        item { Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) { SecondaryButton("View History", Modifier.weight(1f), onClick = onViewHistory); SecondaryButton("Coach History", Modifier.weight(1f), onClick = onOpenCoachHistory) } }
         item { Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) { StatCard("Workouts", state.sessionCount.toString(), Modifier.weight(1f)); StatCard("Volume", formatWeight(state.totalVolume), Modifier.weight(1f)) } }
         item { HomeInsightCard(state.insight) }
         item { Text("Recent Workouts", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
