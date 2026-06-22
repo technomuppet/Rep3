@@ -47,7 +47,7 @@ class RestTimerService : Service() {
     private fun startTimer(endAt: Long) {
         currentEndAt = endAt
         ensureChannel()
-        startForeground(NOTIFICATION_ID, buildNotification("Rest timer", timeLeft(endAt), remaining = 60, total = 60, running = true))
+        startForeground(NOTIFICATION_ID, buildNotification("Rest timer", timeLeft(endAt), remaining = 60, total = 60, ongoing = true))
         tickJob?.cancel()
         tickJob = scope.launch {
             var wasReady = false

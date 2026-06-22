@@ -29,11 +29,12 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
 import javax.inject.Inject
+import com.replog.util.timer.RestPresets
 
 data class SettingsUiState(
     val useKg: Boolean = true,
-    val restSeconds: Int = 90,
     val customKgPlates: String = "25, 20, 15, 10, 5, 2.5, 1.25",
+    val restPresets: RestPresets = RestPresets(),
     val customLbPlates: String = "45, 35, 25, 10, 5, 2.5",
     val exportStatus: String? = null,
     val backupStatus: String? = null,
@@ -58,7 +59,7 @@ class SettingsViewModel @Inject constructor(
 
     val uiState: StateFlow<SettingsUiState> = combine(
         prefs.useKg.map { it as Any? },
-        prefs.restSeconds.map { it as Any? },
+        prefs.restPresets.map { it as Any? },
         prefs.customKgPlates.map { it as Any? },
         prefs.customLbPlates.map { it as Any? },
         exportStatus.map { it as Any? },
@@ -69,7 +70,7 @@ class SettingsViewModel @Inject constructor(
     ) { values ->
         SettingsUiState(
             useKg = values[0] as Boolean,
-            restSeconds = values[1] as Int,
+            restPresets = values[1] as Int,
             customKgPlates = values[2] as String,
             customLbPlates = values[3] as String,
             exportStatus = values[4] as String?,
@@ -81,7 +82,7 @@ class SettingsViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
     fun setUseKg(value: Boolean) = viewModelScope.launch { prefs.setUseKg(value) }
-    fun setRestSeconds(value: Int) = viewModelScope.launch { prefs.setRestSeconds(value) }
+    fun setRestPresets(value: Int) = viewModelScope.launch { prefs.setRestPresets(value) }
     fun setCustomKgPlates(value: String) = viewModelScope.launch { prefs.setCustomKgPlates(value) }
     fun setCustomLbPlates(value: String) = viewModelScope.launch { prefs.setCustomLbPlates(value) }
 
