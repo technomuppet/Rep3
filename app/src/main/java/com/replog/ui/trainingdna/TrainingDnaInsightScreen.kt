@@ -22,7 +22,12 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.HealthAndSafety
+import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Surface
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -57,6 +62,11 @@ fun TrainingDnaInsightScreen(
         item {
             Text("Training DNA", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.ExtraBold)
             Text("Your personal training signature, built from every workout.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+
+        // Priority 3 (#13) — Recovery dashboard (shown even before full DNA exists).
+        state.recovery?.let { rec ->
+            item { RecoveryDashboardCard(rec) }
         }
 
         if (!state.hasData) {
@@ -142,6 +152,24 @@ fun TrainingDnaInsightScreen(
                         }
                     }
                 }
+            }
+
+            // Priority 3 (#14) — Adaptive template swaps for stalled lifts.
+            if (state.adaptiveSwaps.isNotEmpty()) {
+                item {
+                    Text("Suggested swaps", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(8.dp))
+                }
+                items(state.adaptiveSwaps) { swap -> AdaptiveSwapCard(swap) }
+            }
+
+            // Priority 3 (#11) — Progression forecasts.
+            if (state.forecasts.isNotEmpty()) {
+                item {
+                    Text("Progression forecast", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(8.dp))
+                }
+                items(state.forecasts) { nf -> ForecastCard(nf) }
             }
 
             item {
@@ -257,4 +285,60 @@ private fun DnaMeaningCard(interpretation: com.replog.domain.trainingdna.DnaInte
             Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
+}
+
+@Composable
+private fun RecoveryDashboardCard(state: com.replog.domain.recovery.RecoveryDashboardState) = RepLogCard {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Default.HealthAndSafety, null, tint = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.width(10.dp))
+        Text("Recovery", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.weight(1f))
+        Text("${state.score}%", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+    }
+    Spacer(Modifier.height(8.dp))
+    LinearProgressIndicator(progress = { (state.score / 100f) }, modifier = Modifier.fillMaxWidth().height(8.dp))
+    Spacer(Modifier.height(10.dp))
+    Text(state.directive, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
+    Text(state.directiveDetail, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+    if (state.factors.isNotEmpty()) {
+        Spacer(Modifier.height(8.dp))
+        state.factors.take(4).forEach { factor ->
+            Text("• $factor", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun ForecastCard(nf: NamedForecast) = RepLogCard {
+    val f = nf.forecast
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Default.TrendingUp, null, tint = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(nf.exerciseName, fontWeight = FontWeight.Bold)
+            Text(
+                "Now ~${if (f.currentE1rm % 1.0 == 0.0) f.currentE1rm.toInt().toString() else "%.1f".format(f.currentE1rm)} kg 1RM",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+    Spacer(Modifier.height(6.dp))
+    Text("Projected: ${f.projectionLabel}", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+    Text(f.explanation, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+@Composable
+private fun AdaptiveSwapCard(swap: com.replog.domain.adaptive.AdaptiveSwap) = RepLogCard {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Default.SwapHoriz, null, tint = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text("${swap.fromName} → ${swap.toName}", fontWeight = FontWeight.Bold)
+            Text("for ${swap.durationWeeks} weeks", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+    Spacer(Modifier.height(6.dp))
+    Text(swap.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
