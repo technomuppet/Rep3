@@ -1,0 +1,257 @@
+From eb48fee97be436377f22f8db9b7f330b66330bc4 Mon Sep 17 00:00:00 2001
+From: RepLog Dev <dev@replog.local>
+Date: Tue, 23 Jun 2026 06:22:03 +0000
+Subject: [PATCH 6/7] Volume Landmarks (#12): weekly sets per muscle vs optimal
+ range
+
+Counts weekly working sets per muscle group from existing session data and
+compares against evidence-based optimal ranges (MEV-MRV style). Pure,
+deterministic; no schema change.
+
+- domain/volume/VolumeLandmarks.kt: maps fine-grained library muscles to
+  10 trainable groups; counts working sets (warmups excluded), primary x1.0
+  + secondary x0.5 fractional accounting; status Under/In Range/Above/None.
+- TrainingDnaViewModel: computes volumeLandmarks from completed sessions
+  (1-week window) and exposes them in state.
+- Training DNA screen: 'Weekly volume' section with a card per trained
+  muscle group (sets/week, optimal range, status, progress bar).
+
+Verified: domain compiles on kotlinc 1.9.22 (170 classes); 4 logic tests
+pass in-sandbox (in-range, fractional secondary, warmup exclusion, above/
+none). No tests committed.
+---
+ .../replog/domain/volume/VolumeLandmarks.kt   | 124 ++++++++++++++++++
+ .../trainingdna/TrainingDnaInsightScreen.kt   |  35 +++++
+ .../ui/trainingdna/TrainingDnaViewModel.kt    |   7 +
+ 3 files changed, 166 insertions(+)
+ create mode 100644 app/src/main/java/com/replog/domain/volume/VolumeLandmarks.kt
+
+diff --git a/app/src/main/java/com/replog/domain/volume/VolumeLandmarks.kt b/app/src/main/java/com/replog/domain/volume/VolumeLandmarks.kt
+new file mode 100644
+index 0000000..345e51b
+--- /dev/null
++++ b/app/src/main/java/com/replog/domain/volume/VolumeLandmarks.kt
+@@ -0,0 +1,124 @@
++package com.replog.domain.volume
++
++import com.replog.data.model.SessionWithExercises
++import com.replog.data.model.SetType
++
++/**
++ * Priority 3 (#12) — Volume Landmarks.
++ *
++ * Counts weekly working sets per muscle group from the existing session data
++ * and compares against evidence-based optimal ranges (roughly MEV–MRV).
++ * Pure, deterministic; no schema change and no new tracking — it reads the
++ * sets the user already logged.
++ */
++data class VolumeLandmark(
++    val muscleGroup: String,
++    val weeklySets: Double,
++    val optimalLow: Int,
++    val optimalHigh: Int,
++    val status: VolumeStatus
++)
++
++enum class VolumeStatus(val label: String) {
++    UNDER("Below optimal"),
++    IN_RANGE("In Range"),
++    ABOVE("Above optimal"),
++    NONE("Not trained")
++}
++
++object VolumeLandmarks {
++
++    private const val DAY_MS = 24L * 60L * 60L * 1000L
++
++    /**
++     * Evidence-informed weekly working-set ranges per muscle group.
++     * (General hypertrophy guidance; deliberately simple and offline.)
++     */
++    private val OPTIMAL: Map<String, IntRange> = mapOf(
++        "Chest" to 10..20,
++        "Back" to 10..20,
++        "Shoulders" to 8..20,
++        "Biceps" to 8..16,
++        "Triceps" to 8..16,
++        "Quads" to 8..18,
++        "Hamstrings" to 6..16,
++        "Glutes" to 6..16,
++        "Calves" to 8..16,
++        "Core" to 6..16
++    )
++
++    /** Order to display groups in. */
++    val GROUP_ORDER: List<String> = OPTIMAL.keys.toList()
++
++    /**
++     * Map a fine-grained library muscle name to a trainable group.
++     * Returns null for non-hypertrophy categories (e.g. Cardiovascular).
++     */
++    private fun groupFor(muscle: String): String? = when (muscle.trim().lowercase()) {
++        "pectorals" -> "Chest"
++        "lats", "upper back", "traps", "back" -> "Back"
++        "front deltoids", "side deltoids", "rear deltoids" -> "Shoulders"
++        "biceps" -> "Biceps"
++        "triceps" -> "Triceps"
++        "quadriceps" -> "Quads"
++        "hamstrings" -> "Hamstrings"
++        "glutes" -> "Glutes"
++        "calves" -> "Calves"
++        "core", "obliques" -> "Core"
++        else -> null // forearms, abductors, adductors, cardiovascular, full body
++    }
++
++    /**
++     * Weekly working sets per muscle group over the trailing [weeks] weeks.
++     * A working set counts 1.0 for the exercise's primary muscle group(s) and
++     * 0.5 for secondary group(s) — standard fractional-set accounting.
++     */
++    fun analyze(
++        sessions: List<SessionWithExercises>,
++        nowMillis: Long,
++        weeks: Int = 1
++    ): List<VolumeLandmark> {
++        val windowStart = nowMillis - weeks * 7L * DAY_MS
++        val completedInWindow = sessions.filter {
++            it.session.endTime != null && it.session.startTime >= windowStart
++        }
++
++        val setsByGroup = mutableMapOf<String, Double>()
++        for (session in completedInWindow) {
++            for (entry in session.exercises) {
++                val workingSets = entry.sets.count { it.setType != SetType.WARMUP }
++                if (workingSets == 0) continue
++                val primaryGroups = entry.exercise.primaryMuscles.split(",")
++                    .mapNotNull { groupFor(it) }.distinct()
++                val secondaryGroups = entry.exercise.secondaryMuscles.split(",")
++                    .mapNotNull { groupFor(it) }.distinct()
++                    .filter { it !in primaryGroups }
++
++                primaryGroups.forEach { g -> setsByGroup[g] = (setsByGroup[g] ?: 0.0) + workingSets }
++                secondaryGroups.forEach { g -> setsByGroup[g] = (setsByGroup[g] ?: 0.0) + workingSets * 0.5 }
++            }
++        }
++
++        // Normalise to per-week if a longer window was requested.
++        val divisor = weeks.coerceAtLeast(1).toDouble()
++
++        return GROUP_ORDER.map { group ->
++            val range = OPTIMAL.getValue(group)
++            val weekly = (setsByGroup[group] ?: 0.0) / divisor
++            VolumeLandmark(
++                muscleGroup = group,
++                weeklySets = weekly,
++                optimalLow = range.first,
++                optimalHigh = range.last,
++                status = statusFor(weekly, range)
++            )
++        }
++    }
++
++    private fun statusFor(weekly: Double, range: IntRange): VolumeStatus = when {
++        weekly <= 0.0 -> VolumeStatus.NONE
++        weekly < range.first -> VolumeStatus.UNDER
++        weekly > range.last -> VolumeStatus.ABOVE
++        else -> VolumeStatus.IN_RANGE
++    }
++}
+diff --git a/app/src/main/java/com/replog/ui/trainingdna/TrainingDnaInsightScreen.kt b/app/src/main/java/com/replog/ui/trainingdna/TrainingDnaInsightScreen.kt
+index c8383ed..0bd29f2 100644
+--- a/app/src/main/java/com/replog/ui/trainingdna/TrainingDnaInsightScreen.kt
++++ b/app/src/main/java/com/replog/ui/trainingdna/TrainingDnaInsightScreen.kt
+@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Speed
+ import androidx.compose.material.icons.filled.Star
+ import androidx.compose.material.icons.filled.Warning
+ import androidx.compose.material.icons.filled.Add
++import androidx.compose.material.icons.filled.BarChart
+ import androidx.compose.material.icons.filled.CheckCircle
+ import androidx.compose.material.icons.filled.HealthAndSafety
+ import androidx.compose.material.icons.filled.SwapHoriz
+@@ -135,6 +136,17 @@ fun TrainingDnaInsightScreen(
+                 )
+             }
+ 
++            // Priority 3 (#12) — Weekly volume landmarks per muscle group.
++            val trainedLandmarks = state.volumeLandmarks.filter { it.status != com.replog.domain.volume.VolumeStatus.NONE }
++            if (trainedLandmarks.isNotEmpty()) {
++                item {
++                    Text("Weekly volume", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
++                    Text("Working sets per muscle this week vs the optimal range.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
++                    Spacer(Modifier.height(8.dp))
++                }
++                items(trainedLandmarks) { lm -> VolumeLandmarkCard(lm) }
++            }
++
+             // Priority 2 (#8) — Muscle gap analysis: fix-it suggestions + one-tap add.
+             if (state.muscleGaps.isNotEmpty()) {
+                 item {
+@@ -401,3 +413,26 @@ private fun MuscleGapCard(
+     Spacer(Modifier.height(10.dp))
+     SecondaryButton("Add to template") { onAddToTemplate() }
+ }
++
++@Composable
++private fun VolumeLandmarkCard(lm: com.replog.domain.volume.VolumeLandmark) = RepLogCard {
++    val (statusColor, statusText) = when (lm.status) {
++        com.replog.domain.volume.VolumeStatus.IN_RANGE -> androidx.compose.ui.graphics.Color(0xFF2E7D32) to "In Range"
++        com.replog.domain.volume.VolumeStatus.UNDER -> MaterialTheme.colorScheme.tertiary to "Below optimal"
++        com.replog.domain.volume.VolumeStatus.ABOVE -> MaterialTheme.colorScheme.error to "Above optimal"
++        com.replog.domain.volume.VolumeStatus.NONE -> MaterialTheme.colorScheme.onSurfaceVariant to "Not trained"
++    }
++    val sets = if (lm.weeklySets % 1.0 == 0.0) lm.weeklySets.toInt().toString() else "%.1f".format(lm.weeklySets)
++    Row(verticalAlignment = Alignment.CenterVertically) {
++        Icon(Icons.Default.BarChart, null, tint = MaterialTheme.colorScheme.primary)
++        Spacer(Modifier.width(12.dp))
++        Column(Modifier.weight(1f)) {
++            Text(lm.muscleGroup, fontWeight = FontWeight.Bold)
++            Text("$sets sets/week  •  optimal ${lm.optimalLow}–${lm.optimalHigh}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
++        }
++        Text(statusText, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = statusColor)
++    }
++    Spacer(Modifier.height(8.dp))
++    val progress = (lm.weeklySets / lm.optimalHigh.toFloat().coerceAtLeast(1f)).toFloat().coerceIn(0f, 1f)
++    LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().height(6.dp), color = statusColor)
++}
+diff --git a/app/src/main/java/com/replog/ui/trainingdna/TrainingDnaViewModel.kt b/app/src/main/java/com/replog/ui/trainingdna/TrainingDnaViewModel.kt
+index 15f0f33..7c9e639 100644
+--- a/app/src/main/java/com/replog/ui/trainingdna/TrainingDnaViewModel.kt
++++ b/app/src/main/java/com/replog/ui/trainingdna/TrainingDnaViewModel.kt
+@@ -15,6 +15,8 @@ import com.replog.domain.forecast.ProgressionForecast
+ import com.replog.domain.forecast.ProgressionForecaster
+ import com.replog.domain.musclegap.MuscleGapAnalyzer
+ import com.replog.domain.musclegap.MuscleGapSuggestion
++import com.replog.domain.volume.VolumeLandmark
++import com.replog.domain.volume.VolumeLandmarks
+ import com.replog.domain.recommendation.RecoveryAnalyzer
+ import com.replog.domain.recovery.RecoveryDashboard
+ import com.replog.domain.recovery.RecoveryDashboardState
+@@ -50,6 +52,7 @@ data class TrainingDnaUiState(
+     val adaptiveSwaps: List<AdaptiveSwap> = emptyList(),
+     // Priority 2 (#8) — muscle gap suggestions
+     val muscleGaps: List<MuscleGapSuggestion> = emptyList(),
++    val volumeLandmarks: List<VolumeLandmark> = emptyList(),
+     val hasData: Boolean = false
+ )
+ 
+@@ -101,6 +104,9 @@ class TrainingDnaViewModel @Inject constructor(
+         val weak = snapshot.weakestMuscles.split(",").map { it.trim() }.filter { it.isNotBlank() }
+         val gaps = MuscleGapAnalyzer.analyze(weak, exercises)
+ 
++        // Volume landmarks (#12) — weekly working sets per muscle group vs optimal.
++        val landmarks = VolumeLandmarks.analyze(completed, now, weeks = 1)
++
+         TrainingDnaUiState(
+             preferredRepRange = snapshot.preferredRepRange,
+             preferredVolumeRange = snapshot.preferredVolumeRange,
+@@ -119,6 +125,7 @@ class TrainingDnaViewModel @Inject constructor(
+             forecasts = forecasts,
+             adaptiveSwaps = swaps,
+             muscleGaps = gaps,
++            volumeLandmarks = landmarks,
+             hasData = true
+         )
+     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TrainingDnaUiState())
+-- 
+2.47.3
+

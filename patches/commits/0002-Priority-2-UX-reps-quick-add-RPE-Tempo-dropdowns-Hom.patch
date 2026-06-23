@@ -1,0 +1,412 @@
+From 0157fcec516299eb4bd1118e7d7800a5acfca0fe Mon Sep 17 00:00:00 2001
+From: RepLog Dev <dev@replog.local>
+Date: Tue, 23 Jun 2026 05:39:36 +0000
+Subject: [PATCH 2/7] Priority 2 UX: reps quick-add, RPE/Tempo dropdowns, Home
+ dashboard
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+#5 Reps quick-add: +1/+2/+5 (and -1) buttons in the set dialog, alongside
+   the existing weight quick-add.
+#7 RPE: replaced free-text entry with labelled preset chips
+   (RPE 6 Easy ... RPE 10 Failure, plus 'No RPE'). Stored as the same
+   SetLog.rpe Double.
+#6 Tempo: replaced raw notation entry with named presets (Normal 2-0-2,
+   Controlled 3-1-2, Slow Eccentric 4-1-2, Pause Reps 3-2-1, Custom,
+   Not tracked) that translate to notation behind the scenes; Custom keeps
+   a manual field. Stored as the same SetLog.tempo String.
+   New pure helper: domain/logging/SetInputPresets.kt.
+#3 Home vs Workout separation: Home is now a dashboard — today's
+   recommendation + recovery (Smart Coach card), weekly progress
+   (sessions + volume this week), day streak, total workouts, coaching
+   insight and last PR; removed the duplicate Start Workout button and the
+   recent-workouts feed (those belong to the Workout/History tabs).
+   New pure helper: domain/home/HomeDashboardStats.kt (weekly progress +
+   day-streak), wired into HomeViewModel.
+
+Compile-safe and additive: storage model unchanged (rpe Double?, tempo
+String?); all set-save signatures unchanged. New pure-Kotlin helpers
+type-check on kotlinc 1.9.22 and pass logic tests (RPE/Tempo: 3, streak/
+weekly: 5) run in-sandbox. No tests committed (kept build/CI test-free).
+---
+ .../replog/domain/home/HomeDashboardStats.kt  | 75 +++++++++++++++++++
+ .../replog/domain/logging/SetInputPresets.kt  | 69 +++++++++++++++++
+ .../java/com/replog/ui/home/HomeScreen.kt     | 39 ++++++++--
+ .../java/com/replog/ui/home/HomeViewModel.kt  | 15 +++-
+ .../replog/ui/workout/ActiveWorkoutScreen.kt  | 63 +++++++++++++---
+ 5 files changed, 240 insertions(+), 21 deletions(-)
+ create mode 100644 app/src/main/java/com/replog/domain/home/HomeDashboardStats.kt
+ create mode 100644 app/src/main/java/com/replog/domain/logging/SetInputPresets.kt
+
+diff --git a/app/src/main/java/com/replog/domain/home/HomeDashboardStats.kt b/app/src/main/java/com/replog/domain/home/HomeDashboardStats.kt
+new file mode 100644
+index 0000000..1370df6
+--- /dev/null
++++ b/app/src/main/java/com/replog/domain/home/HomeDashboardStats.kt
+@@ -0,0 +1,75 @@
++package com.replog.domain.home
++
++import java.util.Calendar
++
++/**
++ * Priority 2 — Home dashboard stats (issue #3: make Home a dashboard, not a
++ * duplicate of the Workout screen). Pure, deterministic helpers computed from
++ * completed-session start times. No schema or analytics-engine changes.
++ */
++data class WeeklyProgress(
++    val sessionsThisWeek: Int,
++    val volumeThisWeek: Double
++)
++
++object HomeDashboardStats {
++
++    private const val DAY_MS = 24L * 60L * 60L * 1000L
++
++    /** Sessions + total volume since the start of the current calendar week. */
++    fun weeklyProgress(
++        completedStartTimesToVolume: List<Pair<Long, Double>>,
++        nowMillis: Long
++    ): WeeklyProgress {
++        val weekStart = startOfWeek(nowMillis)
++        val inWeek = completedStartTimesToVolume.filter { it.first >= weekStart }
++        return WeeklyProgress(
++            sessionsThisWeek = inWeek.size,
++            volumeThisWeek = inWeek.sumOf { it.second }
++        )
++    }
++
++    /**
++     * Day streak: number of consecutive days up to today (or yesterday) that
++     * contain at least one completed workout. Training yesterday but not today
++     * keeps the streak alive; a gap of a full day breaks it.
++     */
++    fun dayStreak(completedStartTimes: List<Long>, nowMillis: Long): Int {
++        if (completedStartTimes.isEmpty()) return 0
++        val trainedDays = completedStartTimes.map { dayIndex(it) }.toSet()
++        val today = dayIndex(nowMillis)
++        // Streak may end today or yesterday (today not yet trained is still fine).
++        var cursor = when {
++            today in trainedDays -> today
++            (today - 1) in trainedDays -> today - 1
++            else -> return 0
++        }
++        var streak = 0
++        while (cursor in trainedDays) {
++            streak++
++            cursor--
++        }
++        return streak
++    }
++
++    private fun dayIndex(millis: Long): Long {
++        val cal = Calendar.getInstance().apply {
++            timeInMillis = millis
++            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
++            set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
++        }
++        return cal.timeInMillis / DAY_MS
++    }
++
++    private fun startOfWeek(millis: Long): Long {
++        val cal = Calendar.getInstance().apply {
++            timeInMillis = millis
++            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
++            set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
++            set(Calendar.DAY_OF_WEEK, firstDayOfWeek)
++        }
++        // If setting DAY_OF_WEEK rolled forward past now, step back a week.
++        if (cal.timeInMillis > millis) cal.add(Calendar.DAY_OF_YEAR, -7)
++        return cal.timeInMillis
++    }
++}
+diff --git a/app/src/main/java/com/replog/domain/logging/SetInputPresets.kt b/app/src/main/java/com/replog/domain/logging/SetInputPresets.kt
+new file mode 100644
+index 0000000..5b796c7
+--- /dev/null
++++ b/app/src/main/java/com/replog/domain/logging/SetInputPresets.kt
+@@ -0,0 +1,69 @@
++package com.replog.domain.logging
++
++/**
++ * Priority 2 — friendlier set-logging inputs (RPE + Tempo).
++ *
++ * Pure data/helpers so the UI can show plain-language choices while still
++ * storing the same SetLog.rpe (Double?) and SetLog.tempo (String?) values the
++ * rest of the app already understands. No schema or analytics changes.
++ */
++
++/** Labeled RPE options shown as a dropdown/chips instead of free-text entry. */
++data class RpeOption(val value: Double?, val label: String)
++
++object RpePresets {
++    val OPTIONS: List<RpeOption> = listOf(
++        RpeOption(null, "No RPE"),
++        RpeOption(6.0, "RPE 6 · Easy"),
++        RpeOption(7.0, "RPE 7 · Moderate"),
++        RpeOption(8.0, "RPE 8 · Hard"),
++        RpeOption(9.0, "RPE 9 · Very Hard"),
++        RpeOption(10.0, "RPE 10 · Failure")
++    )
++
++    /** Map a stored rpe value back to the closest preset label (for display/selection). */
++    fun labelFor(value: Double?): String =
++        OPTIONS.firstOrNull { it.value == value?.let { v -> Math.round(v).toDouble() } }?.label
++            ?: value?.let { "RPE ${trimmed(it)}" }
++            ?: "No RPE"
++
++    private fun trimmed(v: Double): String =
++        if (v % 1.0 == 0.0) v.toInt().toString() else v.toString()
++}
++
++/**
++ * Named tempo presets that translate to standard eccentric-pause-concentric
++ * notation behind the scenes. CUSTOM allows manual notation entry.
++ */
++data class TempoOption(val key: String, val label: String, val notation: String?) {
++    val isCustom: Boolean get() = key == "CUSTOM"
++}
++
++object TempoPresets {
++    val OPTIONS: List<TempoOption> = listOf(
++        TempoOption("NONE", "Not tracked", null),
++        TempoOption("NORMAL", "Normal", "2-0-2"),
++        TempoOption("CONTROLLED", "Controlled", "3-1-2"),
++        TempoOption("SLOW_ECCENTRIC", "Slow Eccentric", "4-1-2"),
++        TempoOption("PAUSE", "Pause Reps", "3-2-1"),
++        TempoOption("CUSTOM", "Custom", null)
++    )
++
++    /**
++     * Given a stored tempo notation string, choose which preset it represents.
++     * A blank/null tempo -> NONE; a known notation -> its named preset;
++     * any other non-blank notation -> CUSTOM.
++     */
++    fun optionForNotation(notation: String?): TempoOption {
++        val n = notation?.trim().orEmpty()
++        if (n.isBlank()) return OPTIONS.first { it.key == "NONE" }
++        return OPTIONS.firstOrNull { it.notation == n } ?: OPTIONS.first { it.key == "CUSTOM" }
++    }
++
++    /** Resolve the tempo string to persist for a chosen preset + custom text. */
++    fun resolveNotation(option: TempoOption, customText: String): String? = when {
++        option.key == "NONE" -> null
++        option.isCustom -> customText.trim().ifBlank { null }
++        else -> option.notation
++    }
++}
+diff --git a/app/src/main/java/com/replog/ui/home/HomeScreen.kt b/app/src/main/java/com/replog/ui/home/HomeScreen.kt
+index c00b5fd..b50b18f 100644
+--- a/app/src/main/java/com/replog/ui/home/HomeScreen.kt
++++ b/app/src/main/java/com/replog/ui/home/HomeScreen.kt
+@@ -35,7 +35,9 @@ fun HomeScreen(
+     val coachState by coachViewModel.state.collectAsState()
+     LaunchedEffect(Unit) { viewModel.refresh(); coachViewModel.loadRecommendation(force = false) }
+     LazyColumn(Modifier.fillMaxSize().padding(contentPadding), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+-        item { Text("RepLog", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.ExtraBold); Text("Your training coach in your pocket.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
++        item { Text("Today", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.ExtraBold); Text("Your training dashboard.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
++
++        // What to train today (recommendation + recovery) — the core of the dashboard.
+         item {
+             com.replog.ui.coach.SmartCoachCard(
+                 state = coachState,
+@@ -49,14 +51,35 @@ fun HomeScreen(
+                 onRefresh = { coachViewModel.loadRecommendation(force = true) }
+             )
+         }
+-        item { PrimaryButton("Start Workout", onClick = onStartWorkout) }
+-        item { Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) { SecondaryButton("View History", Modifier.weight(1f), onClick = onViewHistory); SecondaryButton("Coach History", Modifier.weight(1f), onClick = onOpenCoachHistory) } }
+-        item { Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) { StatCard("Workouts", state.sessionCount.toString(), Modifier.weight(1f)); StatCard("Volume", formatWeight(state.totalVolume), Modifier.weight(1f)) } }
++
++        // Weekly progress + streak
++        item {
++            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
++                StatCard("This week", "${state.sessionsThisWeek} workouts", Modifier.weight(1f))
++                StatCard("Week volume", formatWeight(state.volumeThisWeek), Modifier.weight(1f))
++            }
++        }
++        item {
++            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
++                StatCard("Day streak", if (state.dayStreak > 0) "🔥 ${state.dayStreak}" else "—", Modifier.weight(1f))
++                StatCard("Total workouts", state.sessionCount.toString(), Modifier.weight(1f))
++            }
++        }
++
++        // Coaching insight + last PR (single, not a full feed — that lives in History/Progress)
+         item { HomeInsightCard(state.insight) }
+-        item { Text("Recent Workouts", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+-        if (state.recentSessions.isEmpty()) item { EmptyState("No workouts yet", "Start your first workout to build your training history.") } else items(state.recentSessions) { RecentWorkoutCard(it) }
+-        item { Text("Recent PRs", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+-        if (state.recentPRs.isEmpty()) item { RepLogCard { Text("PRs will appear here when you beat previous bests.", color = MaterialTheme.colorScheme.onSurfaceVariant) } } else items(state.recentPRs) { pr -> RepLogCard { Row(verticalAlignment = Alignment.CenterVertically) { PRBadge(); Spacer(Modifier.width(10.dp)); Text("${formatWeight(pr.weight)} × ${pr.reps} reps", fontWeight = FontWeight.Bold) } } }
++        item { Text("Last PR", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
++        item {
++            val lastPr = state.recentPRs.firstOrNull()
++            if (lastPr == null) {
++                RepLogCard { Text("PRs will appear here when you beat previous bests.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
++            } else {
++                RepLogCard { Row(verticalAlignment = Alignment.CenterVertically) { PRBadge(); Spacer(Modifier.width(10.dp)); Text("${formatWeight(lastPr.weight)} × ${lastPr.reps} reps", fontWeight = FontWeight.Bold) } }
++            }
++        }
++
++        // Lightweight navigation to the detail areas (their full job lives elsewhere).
++        item { Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) { SecondaryButton("History", Modifier.weight(1f), onClick = onViewHistory); SecondaryButton("Coach History", Modifier.weight(1f), onClick = onOpenCoachHistory) } }
+     }
+ }
+ 
+diff --git a/app/src/main/java/com/replog/ui/home/HomeViewModel.kt b/app/src/main/java/com/replog/ui/home/HomeViewModel.kt
+index 36e013b..7e13073 100644
+--- a/app/src/main/java/com/replog/ui/home/HomeViewModel.kt
++++ b/app/src/main/java/com/replog/ui/home/HomeViewModel.kt
+@@ -25,6 +25,9 @@ data class HomeUiState(
+     val recentSessions: List<SessionWithExercises> = emptyList(),
+     val recentPRs: List<SetLog> = emptyList(),
+     val insight: HomeInsight = HomeInsight(),
++    val sessionsThisWeek: Int = 0,
++    val volumeThisWeek: Double = 0.0,
++    val dayStreak: Int = 0,
+     val isLoading: Boolean = true
+ )
+ 
+@@ -38,12 +41,22 @@ class HomeViewModel @Inject constructor(private val repo: WorkoutRepository) : V
+         repo.getRecentPRs(),
+         repo.getAllSessions()
+     ) { s, sessions, prs, allSessions ->
++        val completed = allSessions.filter { it.session.endTime != null }
++        val now = System.currentTimeMillis()
++        val startTimes = completed.map { it.session.startTime }
++        val startTimesToVolume = completed.map { c ->
++            c.session.startTime to c.exercises.sumOf { e -> e.sets.sumOf { it.weight * it.reps } }
++        }
++        val weekly = com.replog.domain.home.HomeDashboardStats.weeklyProgress(startTimesToVolume, now)
+         HomeUiState(
+             sessionCount = s.first,
+             totalVolume = s.second,
+             recentSessions = sessions,
+             recentPRs = prs,
+-            insight = buildHomeInsight(allSessions.filter { it.session.endTime != null }),
++            insight = buildHomeInsight(completed),
++            sessionsThisWeek = weekly.sessionsThisWeek,
++            volumeThisWeek = weekly.volumeThisWeek,
++            dayStreak = com.replog.domain.home.HomeDashboardStats.dayStreak(startTimes, now),
+             isLoading = false
+         )
+     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HomeUiState())
+diff --git a/app/src/main/java/com/replog/ui/workout/ActiveWorkoutScreen.kt b/app/src/main/java/com/replog/ui/workout/ActiveWorkoutScreen.kt
+index 2258251..8eca8c6 100644
+--- a/app/src/main/java/com/replog/ui/workout/ActiveWorkoutScreen.kt
++++ b/app/src/main/java/com/replog/ui/workout/ActiveWorkoutScreen.kt
+@@ -766,14 +766,16 @@ private fun AddOrEditSetDialog(
+     var weight by remember(initialSet?.id) { mutableStateOf(initialSet?.weight?.toCleanString().orEmpty()) }
+     var reps by remember(initialSet?.id) { mutableStateOf(initialSet?.reps?.toString().orEmpty()) }
+     var setType by remember(initialSet?.id) { mutableStateOf(initialSet?.setType ?: SetType.WORKING) }
+-    var rpe by remember(initialSet?.id) { mutableStateOf(initialSet?.rpe?.toCleanString().orEmpty()) }
+-    var tempo by remember(initialSet?.id) { mutableStateOf(initialSet?.tempo.orEmpty()) }
++    var rpeValueState by remember(initialSet?.id) { mutableStateOf(initialSet?.rpe) }
++    var tempoOption by remember(initialSet?.id) { mutableStateOf(com.replog.domain.logging.TempoPresets.optionForNotation(initialSet?.tempo)) }
++    var customTempo by remember(initialSet?.id) { mutableStateOf(if (tempoOption.isCustom) initialSet?.tempo.orEmpty() else "") }
+     var showAdvanced by remember { mutableStateOf(initialSet?.rpe != null || !initialSet?.tempo.isNullOrBlank() || initialSet?.setType != SetType.WORKING) }
+ 
+     val weightValue = weight.toDoubleOrNull() ?: 0.0
+     val repsValue = reps.toIntOrNull() ?: 0
+     val valid = weightValue >= 0 && repsValue > 0
+-    val rpeValue = rpe.toDoubleOrNull()?.coerceIn(1.0, 10.0)
++    val rpeValue = rpeValueState?.coerceIn(1.0, 10.0)
++    val tempoToSave = com.replog.domain.logging.TempoPresets.resolveNotation(tempoOption, customTempo)
+ 
+     fun bumpWeight(delta: Double) {
+         val current = weight.toDoubleOrNull() ?: 0.0
+@@ -781,6 +783,11 @@ private fun AddOrEditSetDialog(
+         weight = if (next % 1.0 == 0.0) next.toInt().toString() else "%.2f".format(next).trimEnd('0').trimEnd('.')
+     }
+ 
++    fun bumpReps(delta: Int) {
++        val current = reps.toIntOrNull() ?: 0
++        reps = (current + delta).coerceAtLeast(0).toString()
++    }
++
+     AlertDialog(
+         onDismissRequest = onDismiss,
+         title = { Text(title) },
+@@ -794,6 +801,7 @@ private fun AddOrEditSetDialog(
+                         reps = v.filter { it.isDigit() }
+                     }
+                 }
++                // Weight quick-add
+                 FlowRow(
+                     horizontalArrangement = Arrangement.spacedBy(8.dp),
+                     verticalArrangement = Arrangement.spacedBy(6.dp)
+@@ -802,6 +810,15 @@ private fun AddOrEditSetDialog(
+                         TextButton(onClick = { bumpWeight(delta) }) { Text(label, fontWeight = FontWeight.Bold) }
+                     }
+                 }
++                // Reps quick-add (#5)
++                FlowRow(
++                    horizontalArrangement = Arrangement.spacedBy(8.dp),
++                    verticalArrangement = Arrangement.spacedBy(6.dp)
++                ) {
++                    listOf(-1 to "-1", 1 to "+1", 2 to "+2", 5 to "+5").forEach { (delta, label) ->
++                        TextButton(onClick = { bumpReps(delta) }) { Text("$label rep", fontWeight = FontWeight.Bold) }
++                    }
++                }
+ 
+                 if (!showAdvanced) {
+                     TextButton(onClick = { showAdvanced = true }) { Text("Set type / RPE / Tempo…") }
+@@ -816,16 +833,38 @@ private fun AddOrEditSetDialog(
+                             )
+                         }
+                     }
+-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+-                        NumberInputField(rpe, "RPE", Modifier.weight(1f)) { value ->
+-                            rpe = value.filter { it.isDigit() || it == '.' }
++
++                    // RPE preset chips (#7)
++                    Text("Effort (RPE)", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
++                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
++                        com.replog.domain.logging.RpePresets.OPTIONS.forEach { option ->
++                            FilterChip(
++                                selected = rpeValueState == option.value,
++                                onClick = { rpeValueState = option.value },
++                                label = { Text(option.label) }
++                            )
+                         }
++                    }
++
++                    // Tempo preset chips (#6) + custom field
++                    Text("Tempo", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
++                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
++                        com.replog.domain.logging.TempoPresets.OPTIONS.forEach { option ->
++                            val suffix = option.notation?.let { " ($it)" } ?: ""
++                            FilterChip(
++                                selected = tempoOption.key == option.key,
++                                onClick = { tempoOption = option },
++                                label = { Text(option.label + suffix) }
++                            )
++                        }
++                    }
++                    if (tempoOption.isCustom) {
+                         OutlinedTextField(
+-                            value = tempo,
+-                            onValueChange = { tempo = it.take(12) },
+-                            modifier = Modifier.weight(1f),
+-                            label = { Text("Tempo") },
+-                            placeholder = { Text("3-1-1") },
++                            value = customTempo,
++                            onValueChange = { customTempo = it.take(12) },
++                            modifier = Modifier.fillMaxWidth(),
++                            label = { Text("Custom tempo") },
++                            placeholder = { Text("e.g. 3-1-1") },
+                             singleLine = true
+                         )
+                     }
+@@ -835,7 +874,7 @@ private fun AddOrEditSetDialog(
+         confirmButton = {
+             TextButton(
+                 enabled = valid,
+-                onClick = { onSave(weightValue, repsValue, setType, rpeValue, tempo) }
++                onClick = { onSave(weightValue, repsValue, setType, rpeValue, tempoToSave) }
+             ) { Text("Complete", fontWeight = FontWeight.Bold) }
+         },
+         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+-- 
+2.47.3
+
