@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.SwapHoriz
@@ -133,6 +134,17 @@ fun TrainingDnaInsightScreen(
                     muscles = state.weakestMuscles,
                     icon = Icons.Default.Accessibility
                 )
+            }
+
+            // Priority 3 (#12) — Weekly volume landmarks per muscle group.
+            val trainedLandmarks = state.volumeLandmarks.filter { it.status != com.replog.domain.volume.VolumeStatus.NONE }
+            if (trainedLandmarks.isNotEmpty()) {
+                item {
+                    Text("Weekly volume", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text("Working sets per muscle this week vs the optimal range.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(8.dp))
+                }
+                items(trainedLandmarks) { lm -> VolumeLandmarkCard(lm) }
             }
 
             // Priority 2 (#8) — Muscle gap analysis: fix-it suggestions + one-tap add.
@@ -400,4 +412,27 @@ private fun MuscleGapCard(
     }
     Spacer(Modifier.height(10.dp))
     SecondaryButton("Add to template") { onAddToTemplate() }
+}
+
+@Composable
+private fun VolumeLandmarkCard(lm: com.replog.domain.volume.VolumeLandmark) = RepLogCard {
+    val (statusColor, statusText) = when (lm.status) {
+        com.replog.domain.volume.VolumeStatus.IN_RANGE -> androidx.compose.ui.graphics.Color(0xFF2E7D32) to "In Range"
+        com.replog.domain.volume.VolumeStatus.UNDER -> MaterialTheme.colorScheme.tertiary to "Below optimal"
+        com.replog.domain.volume.VolumeStatus.ABOVE -> MaterialTheme.colorScheme.error to "Above optimal"
+        com.replog.domain.volume.VolumeStatus.NONE -> MaterialTheme.colorScheme.onSurfaceVariant to "Not trained"
+    }
+    val sets = if (lm.weeklySets % 1.0 == 0.0) lm.weeklySets.toInt().toString() else "%.1f".format(lm.weeklySets)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Default.BarChart, null, tint = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(lm.muscleGroup, fontWeight = FontWeight.Bold)
+            Text("$sets sets/week  •  optimal ${lm.optimalLow}–${lm.optimalHigh}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Text(statusText, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = statusColor)
+    }
+    Spacer(Modifier.height(8.dp))
+    val progress = (lm.weeklySets / lm.optimalHigh.toFloat().coerceAtLeast(1f)).toFloat().coerceIn(0f, 1f)
+    LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().height(6.dp), color = statusColor)
 }

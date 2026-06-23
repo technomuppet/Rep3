@@ -15,6 +15,8 @@ import com.replog.domain.forecast.ProgressionForecast
 import com.replog.domain.forecast.ProgressionForecaster
 import com.replog.domain.musclegap.MuscleGapAnalyzer
 import com.replog.domain.musclegap.MuscleGapSuggestion
+import com.replog.domain.volume.VolumeLandmark
+import com.replog.domain.volume.VolumeLandmarks
 import com.replog.domain.recommendation.RecoveryAnalyzer
 import com.replog.domain.recovery.RecoveryDashboard
 import com.replog.domain.recovery.RecoveryDashboardState
@@ -50,6 +52,7 @@ data class TrainingDnaUiState(
     val adaptiveSwaps: List<AdaptiveSwap> = emptyList(),
     // Priority 2 (#8) — muscle gap suggestions
     val muscleGaps: List<MuscleGapSuggestion> = emptyList(),
+    val volumeLandmarks: List<VolumeLandmark> = emptyList(),
     val hasData: Boolean = false
 )
 
@@ -101,6 +104,9 @@ class TrainingDnaViewModel @Inject constructor(
         val weak = snapshot.weakestMuscles.split(",").map { it.trim() }.filter { it.isNotBlank() }
         val gaps = MuscleGapAnalyzer.analyze(weak, exercises)
 
+        // Volume landmarks (#12) — weekly working sets per muscle group vs optimal.
+        val landmarks = VolumeLandmarks.analyze(completed, now, weeks = 1)
+
         TrainingDnaUiState(
             preferredRepRange = snapshot.preferredRepRange,
             preferredVolumeRange = snapshot.preferredVolumeRange,
@@ -119,6 +125,7 @@ class TrainingDnaViewModel @Inject constructor(
             forecasts = forecasts,
             adaptiveSwaps = swaps,
             muscleGaps = gaps,
+            volumeLandmarks = landmarks,
             hasData = true
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TrainingDnaUiState())
