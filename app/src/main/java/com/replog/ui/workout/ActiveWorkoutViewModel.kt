@@ -64,6 +64,7 @@ data class ProgressionSuggestionUi(
 )
 
 data class WorkoutSummary(
+    val sessionId: Int = 0,
     val name: String,
     val durationMillis: Long,
     val exerciseCount: Int,
@@ -220,6 +221,19 @@ class ActiveWorkoutViewModel @Inject constructor(
     fun refresh() { tick.value++ }
     fun dismissRestoredBanner() { restored.value = false }
     fun dismissSummary() { summary.value = null }
+
+    /**
+     * Session Rating (#10): persist the user's 1–5 rating for the just-finished
+     * session and refresh Training DNA so the signal feeds future recommendations.
+     */
+    fun rateWorkout(rating: Int) {
+        val id = summary.value?.sessionId ?: return
+        if (id <= 0) return
+        viewModelScope.launch {
+            workouts.setSessionRating(id, rating.coerceIn(1, 5))
+            try { trainingDnaRepository.generateDNA() } catch (_: Exception) {}
+        }
+    }
 
     fun skipRestTimer() = viewModelScope.launch { restTimer.skip() }
     fun addRestSeconds(seconds: Int) = viewModelScope.launch { restTimer.addSeconds(seconds) }
@@ -444,6 +458,7 @@ class ActiveWorkoutViewModel @Inject constructor(
         val hits = evaluations.count { it.second }
         val misses = evaluations.count { !it.second }
         return WorkoutSummary(
+            sessionId = session.id,
             name = session.templateName ?: "Workout",
             durationMillis = endTime - session.startTime,
             exerciseCount = exercises.size,

@@ -323,7 +323,7 @@ fun ActiveWorkoutScreen(
 
     // Sprint 3 – Workout Completion Screen
     state.summary?.let { summary ->
-        WorkoutCompletionDialog(summary = summary, useKg = state.useKg, onDismiss = viewModel::dismissSummary)
+        WorkoutCompletionDialog(summary = summary, useKg = state.useKg, onRate = viewModel::rateWorkout, onDismiss = viewModel::dismissSummary)
     }
 }
 
@@ -929,8 +929,12 @@ private fun ExercisePickerDialog(
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun WorkoutCompletionDialog(summary: WorkoutSummary, useKg: Boolean, onDismiss: () -> Unit) {
+private fun WorkoutCompletionDialog(summary: WorkoutSummary, useKg: Boolean, onRate: (Int) -> Unit, onDismiss: () -> Unit) {
+    // Session Rating (#10): 5 = Amazing ... 1 = Terrible.
+    var rating by remember(summary.sessionId) { mutableStateOf(0) }
+    val ratingLabels = listOf(5 to "Amazing", 4 to "Good", 3 to "Average", 2 to "Poor", 1 to "Terrible")
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = { Icon(Icons.Default.Star, null, tint = MaterialTheme.colorScheme.primary) },
@@ -938,6 +942,16 @@ private fun WorkoutCompletionDialog(summary: WorkoutSummary, useKg: Boolean, onD
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(summary.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text("How was this workout?", fontWeight = FontWeight.SemiBold)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ratingLabels.forEach { (value, label) ->
+                        FilterChip(
+                            selected = rating == value,
+                            onClick = { rating = value; onRate(value) },
+                            label = { Text(label) }
+                        )
+                    }
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     StatCard("Duration", formatDuration(summary.durationMillis), Modifier.weight(1f))
                     StatCard("Sets", summary.setCount.toString(), Modifier.weight(1f))

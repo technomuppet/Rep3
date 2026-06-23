@@ -18,5 +18,7 @@ data class WorkoutSession(
     val totalVolume: Double = 0.0,
     val totalSets: Int = 0,
     val totalReps: Int = 0,
-    val prCount: Int = 0
+    val prCount: Int = 0,
+    /** User's post-workout session rating, 1 (Terrible) – 5 (Amazing); null if unrated. */
+    val sessionRating: Int? = null
 )

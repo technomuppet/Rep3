@@ -91,6 +91,24 @@ class AppDatabaseMigrationTest {
         db.close()
     }
 
+    @Test
+    fun migrate11To12_addsSessionRating() {
+        helper.createDatabase(testDb, 11).apply {
+            // Minimal workout_sessions shape as of v11 (scoring columns from 9->10).
+            execSQL(
+                "CREATE TABLE IF NOT EXISTS workout_sessions (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "templateName TEXT, startTime INTEGER NOT NULL, endTime INTEGER, notes TEXT, " +
+                    "qualityScore INTEGER, totalVolume REAL NOT NULL DEFAULT 0, totalSets INTEGER NOT NULL DEFAULT 0, " +
+                    "totalReps INTEGER NOT NULL DEFAULT 0, prCount INTEGER NOT NULL DEFAULT 0)"
+            )
+            close()
+        }
+
+        val db = helper.runMigrationsAndValidate(testDb, 12, true, AppDatabase.MIGRATION_11_12)
+        assertColumnExists(db, "workout_sessions", "sessionRating")
+        db.close()
+    }
+
     private fun createVersion6Schema(db: SupportSQLiteDatabase) {
         db.execSQL("CREATE TABLE IF NOT EXISTS exercises (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, name TEXT NOT NULL, category TEXT NOT NULL, equipment TEXT NOT NULL, type TEXT NOT NULL, muscles TEXT NOT NULL, primaryMuscles TEXT NOT NULL, secondaryMuscles TEXT NOT NULL, movementPattern TEXT NOT NULL, difficulty TEXT NOT NULL, mediaAsset TEXT NOT NULL, isCustom INTEGER NOT NULL)")
         db.execSQL("CREATE TABLE IF NOT EXISTS workout_sessions (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, templateName TEXT, startTime INTEGER NOT NULL, endTime INTEGER, notes TEXT)")
@@ -167,6 +185,17 @@ class AppDatabaseMigrationTest {
     private fun assertTableExists(db: SupportSQLiteDatabase, tableName: String) {
         db.query("SELECT name FROM sqlite_master WHERE type='table' AND name=?", arrayOf(tableName)).use { cursor ->
             check(cursor.moveToFirst()) { "Missing table $tableName" }
+        }
+    }
+
+    private fun assertColumnExists(db: SupportSQLiteDatabase, tableName: String, columnName: String) {
+        db.query("PRAGMA table_info($tableName)").use { cursor ->
+            var found = false
+            val nameIdx = cursor.getColumnIndex("name")
+            while (cursor.moveToNext()) {
+                if (cursor.getString(nameIdx) == columnName) { found = true; break }
+            }
+            check(found) { "Missing column $columnName on $tableName" }
         }
     }
 }

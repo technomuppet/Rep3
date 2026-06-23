@@ -31,6 +31,9 @@ class WorkoutRepository @Inject constructor(
     suspend fun getSessionEntity(sessionId: Int): WorkoutSession? = sessionDao.getSessionEntity(sessionId)
     suspend fun insertSession(session: WorkoutSession): Long = sessionDao.insertSession(session)
     suspend fun updateSession(session: WorkoutSession) = sessionDao.updateSession(session)
+    suspend fun setSessionRating(sessionId: Int, rating: Int) {
+        sessionDao.getSessionEntity(sessionId)?.let { sessionDao.updateSession(it.copy(sessionRating = rating)) }
+    }
     suspend fun deleteSession(session: WorkoutSession) = sessionDao.deleteSession(session)
     suspend fun deleteSessionById(sessionId: Int) = sessionDao.deleteSessionById(sessionId)
     suspend fun insertSessionExercise(sessionExercise: SessionExercise): Long = sessionDao.insertSessionExercise(sessionExercise)
