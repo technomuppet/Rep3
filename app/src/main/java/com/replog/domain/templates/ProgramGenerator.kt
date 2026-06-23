@@ -11,12 +11,14 @@ package com.replog.domain.templates
 enum class TrainingGoal { STRENGTH, HYPERTROPHY, FAT_LOSS, GENERAL }
 enum class EquipmentAccess { FULL_GYM, DUMBBELLS_ONLY, BODYWEIGHT_ONLY }
 enum class TrainingLevel { BEGINNER, INTERMEDIATE, ADVANCED }
+enum class WorkoutStyle { NO_PREFERENCE, FULL_BODY, UPPER_LOWER, PUSH_PULL_LEGS }
 
 data class ProgramRequest(
     val goal: TrainingGoal,
     val daysPerWeek: Int,
     val equipment: EquipmentAccess,
-    val level: TrainingLevel
+    val level: TrainingLevel,
+    val style: WorkoutStyle = WorkoutStyle.NO_PREFERENCE
 )
 
 data class GeneratedProgram(
@@ -82,19 +84,32 @@ object ProgramGenerator {
                 )
             }
 
-            // HYPERTROPHY and GENERAL share split logic driven by days/week.
+            // HYPERTROPHY and GENERAL share split logic driven by days/week and
+            // the user's preferred workout style (where the schedule allows it).
             else -> when (days) {
                 2 -> GeneratedProgram(
                     name = "2-Day Full Body",
                     rationale = "Two full-body sessions cover every muscle on a low-frequency schedule.",
                     templateNames = byName("Full Body A", "Full Body B")
                 )
-                3 -> GeneratedProgram(
+                3 -> if (request.style == WorkoutStyle.PUSH_PULL_LEGS) GeneratedProgram(
+                    name = "Push / Pull / Legs",
+                    rationale = "3-day PPL matching your preferred split.",
+                    templateNames = byName("Push (PPL)", "Pull (PPL)", "Legs (PPL)")
+                ) else GeneratedProgram(
                     name = "3-Day Full Body",
                     rationale = "Three full-body sessions — ideal frequency for most lifters.",
                     templateNames = byName("Full Body A", "Full Body B", "3 Day Strength")
                 )
-                4 -> GeneratedProgram(
+                4 -> if (request.style == WorkoutStyle.PUSH_PULL_LEGS) GeneratedProgram(
+                    name = "Push / Pull / Legs + Upper",
+                    rationale = "4-day PPL-style split matching your preference.",
+                    templateNames = byName("Push (PPL)", "Pull (PPL)", "Legs (PPL)", "Upper")
+                ) else if (request.style == WorkoutStyle.FULL_BODY) GeneratedProgram(
+                    name = "4-Day Full Body",
+                    rationale = "Four full-body sessions per your preference.",
+                    templateNames = byName("Full Body A", "Full Body B", "Full Body A", "Full Body B")
+                ) else GeneratedProgram(
                     name = "Upper / Lower",
                     rationale = "4-day Upper/Lower split balances volume and recovery.",
                     templateNames = byName("Upper", "Lower", "Upper", "Lower")

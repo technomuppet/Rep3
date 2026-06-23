@@ -8,6 +8,7 @@ import com.replog.domain.templates.ProgramGenerator
 import com.replog.domain.templates.ProgramRequest
 import com.replog.domain.templates.TrainingGoal
 import com.replog.domain.templates.TrainingLevel
+import com.replog.domain.templates.WorkoutStyle
 import com.replog.util.DataSeeder
 import com.replog.util.PreferencesManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -28,7 +29,8 @@ data class OnboardingAnswers(
     val goal: TrainingGoal = TrainingGoal.HYPERTROPHY,
     val level: TrainingLevel = TrainingLevel.BEGINNER,
     val equipment: EquipmentAccess = EquipmentAccess.FULL_GYM,
-    val daysPerWeek: Int = 3
+    val daysPerWeek: Int = 3,
+    val style: WorkoutStyle = WorkoutStyle.NO_PREFERENCE
 )
 
 @HiltViewModel
@@ -54,7 +56,8 @@ class OnboardingViewModel @Inject constructor(
             goal = answers.goal.name,
             level = answers.level.name,
             equipment = answers.equipment.name,
-            daysPerWeek = answers.daysPerWeek
+            daysPerWeek = answers.daysPerWeek,
+            style = answers.style.name
         )
         val program = ProgramGenerator.generate(answers.toRequest())
         dataSeeder.installGeneratedProgram(program)
@@ -71,6 +74,7 @@ class OnboardingViewModel @Inject constructor(
         goal = goal,
         daysPerWeek = daysPerWeek,
         equipment = equipment,
-        level = level
+        level = level,
+        style = style
     )
 }

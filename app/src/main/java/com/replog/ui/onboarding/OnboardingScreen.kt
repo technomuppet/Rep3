@@ -27,6 +27,7 @@ import com.replog.domain.templates.ProgramGenerator
 import com.replog.domain.templates.ProgramRequest
 import com.replog.domain.templates.TrainingGoal
 import com.replog.domain.templates.TrainingLevel
+import com.replog.domain.templates.WorkoutStyle
 import com.replog.ui.components.PrimaryButton
 import com.replog.ui.components.RepLogCard
 import com.replog.ui.components.SecondaryButton
@@ -40,11 +41,12 @@ fun OnboardingScreen(
     var level by remember { mutableStateOf(TrainingLevel.BEGINNER) }
     var equipment by remember { mutableStateOf(EquipmentAccess.FULL_GYM) }
     var days by remember { mutableStateOf(3) }
+    var style by remember { mutableStateOf(WorkoutStyle.NO_PREFERENCE) }
     var useKg by remember { mutableStateOf(true) }
 
-    val answers = OnboardingAnswers(useKg, goal, level, equipment, days)
-    val preview = remember(goal, level, equipment, days) {
-        ProgramGenerator.generate(ProgramRequest(goal, days, equipment, level))
+    val answers = OnboardingAnswers(useKg, goal, level, equipment, days, style)
+    val preview = remember(goal, level, equipment, days, style) {
+        ProgramGenerator.generate(ProgramRequest(goal, days, equipment, level, style))
     }
 
     LazyColumn(
@@ -85,6 +87,15 @@ fun OnboardingScreen(
         item {
             Question("How many days per week?") {
                 (2..6).forEach { d -> Choice("$d days", days == d) { days = d } }
+            }
+        }
+
+        item {
+            Question("Preferred workout style?") {
+                Choice("No preference", style == WorkoutStyle.NO_PREFERENCE) { style = WorkoutStyle.NO_PREFERENCE }
+                Choice("Full body", style == WorkoutStyle.FULL_BODY) { style = WorkoutStyle.FULL_BODY }
+                Choice("Upper / Lower", style == WorkoutStyle.UPPER_LOWER) { style = WorkoutStyle.UPPER_LOWER }
+                Choice("Push / Pull / Legs", style == WorkoutStyle.PUSH_PULL_LEGS) { style = WorkoutStyle.PUSH_PULL_LEGS }
             }
         }
 

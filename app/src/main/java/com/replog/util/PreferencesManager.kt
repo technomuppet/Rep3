@@ -52,6 +52,7 @@ class PreferencesManager @Inject constructor(@ApplicationContext context: Contex
         val PROFILE_LEVEL = stringPreferencesKey("profile_level")
         val PROFILE_EQUIPMENT = stringPreferencesKey("profile_equipment")
         val PROFILE_DAYS = intPreferencesKey("profile_days_per_week")
+        val PROFILE_STYLE = stringPreferencesKey("profile_style")
     }
 
     val useKg: Flow<Boolean> = store.data.map { it[Keys.USE_KG] ?: true }
@@ -130,12 +131,14 @@ class PreferencesManager @Inject constructor(@ApplicationContext context: Contex
     val profileLevel: Flow<String?> = store.data.map { it[Keys.PROFILE_LEVEL] }
     val profileEquipment: Flow<String?> = store.data.map { it[Keys.PROFILE_EQUIPMENT] }
     val profileDaysPerWeek: Flow<Int?> = store.data.map { it[Keys.PROFILE_DAYS] }
-    suspend fun setTrainingProfile(goal: String, level: String, equipment: String, daysPerWeek: Int) {
+    val profileStyle: Flow<String?> = store.data.map { it[Keys.PROFILE_STYLE] }
+    suspend fun setTrainingProfile(goal: String, level: String, equipment: String, daysPerWeek: Int, style: String = "NO_PREFERENCE") {
         store.edit {
             it[Keys.PROFILE_GOAL] = goal
             it[Keys.PROFILE_LEVEL] = level
             it[Keys.PROFILE_EQUIPMENT] = equipment
             it[Keys.PROFILE_DAYS] = daysPerWeek
+            it[Keys.PROFILE_STYLE] = style
         }
     }
 
