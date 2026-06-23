@@ -72,6 +72,7 @@ fun ExerciseLibraryScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val selectedInsight by viewModel.selectedInsight.collectAsState()
+    val swaps by viewModel.swapSuggestions.collectAsState()
     var showAdd by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<Exercise?>(null) }
 
@@ -161,6 +162,7 @@ fun ExerciseLibraryScreen(
         ExerciseDetailDialog(
             insight = insight,
             useKg = state.useKg,
+            swaps = swaps,
             onDismiss = viewModel::clearSelectedExercise
         )
     }
@@ -212,6 +214,7 @@ private fun ExerciseItem(
 private fun ExerciseDetailDialog(
     insight: ExerciseInsight,
     useKg: Boolean,
+    swaps: List<com.replog.domain.swap.ExerciseSwap>,
     onDismiss: () -> Unit
 ) {
     val scroll = rememberScrollState()
@@ -239,6 +242,20 @@ private fun ExerciseDetailDialog(
                 Text("Secondary: ${insight.exercise.secondaryMuscles}", color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else if (insight.exercise.muscles.isNotBlank()) {
                 Text(insight.exercise.muscles, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+
+            if (swaps.isNotEmpty()) {
+                RepLogCard {
+                    Text("Swap / alternatives", fontWeight = FontWeight.Bold)
+                    Text("Equipment busy or unavailable? Try one of these.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(8.dp))
+                    swaps.forEach { s ->
+                        Column(Modifier.padding(vertical = 4.dp)) {
+                            Text(s.exercise.name, fontWeight = FontWeight.SemiBold)
+                            Text(s.matchReason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
             }
 
             RepLogCard {

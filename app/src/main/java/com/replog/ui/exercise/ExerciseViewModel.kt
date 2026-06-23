@@ -6,6 +6,8 @@ import com.replog.data.model.Exercise
 import com.replog.data.model.ExerciseInsight
 import com.replog.data.repository.ExerciseRepository
 import com.replog.data.repository.WorkoutRepository
+import com.replog.domain.swap.ExerciseSwap
+import com.replog.domain.swap.ExerciseSwapEngine
 import com.replog.util.PreferencesManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -80,6 +82,15 @@ class ExerciseViewModel @Inject constructor(
             }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** Smart Exercise Swap: alternatives for the currently-selected exercise. */
+    val swapSuggestions: StateFlow<List<ExerciseSwap>> = combine(
+        selectedExercise,
+        exerciseRepository.getAllExercises()
+    ) { selected, library ->
+        if (selected == null) emptyList()
+        else ExerciseSwapEngine.alternatives(selected, library, limit = 5)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun onSearchQueryChanged(value: String) { query.value = value }
     fun onCategorySelected(value: String) { category.value = value }

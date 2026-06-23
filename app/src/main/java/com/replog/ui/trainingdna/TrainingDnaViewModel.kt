@@ -15,6 +15,8 @@ import com.replog.domain.forecast.ProgressionForecast
 import com.replog.domain.forecast.ProgressionForecaster
 import com.replog.domain.musclegap.MuscleGapAnalyzer
 import com.replog.domain.musclegap.MuscleGapSuggestion
+import com.replog.domain.recovery.RecoveryCalendar
+import com.replog.domain.recovery.RecoveryCalendarDay
 import com.replog.domain.volume.VolumeLandmark
 import com.replog.domain.volume.VolumeLandmarks
 import com.replog.domain.recommendation.RecoveryAnalyzer
@@ -53,6 +55,7 @@ data class TrainingDnaUiState(
     // Priority 2 (#8) — muscle gap suggestions
     val muscleGaps: List<MuscleGapSuggestion> = emptyList(),
     val volumeLandmarks: List<VolumeLandmark> = emptyList(),
+    val recoveryCalendar: List<RecoveryCalendarDay> = emptyList(),
     val hasData: Boolean = false
 )
 
@@ -80,8 +83,15 @@ class TrainingDnaViewModel @Inject constructor(
             RecoveryAnalyzer.overallRecovery(completed, bodyweights, now)
         )
 
+        // Recovery calendar — green/yellow/red days from training density.
+        val calendar = RecoveryCalendar.build(
+            completed.map { c -> c.session.startTime to c.exercises.sumOf { e -> e.sets.sumOf { it.weight * it.reps } } },
+            now,
+            days = 14
+        )
+
         if (snapshot == null) {
-            return@combine TrainingDnaUiState(recovery = recovery, hasData = false)
+            return@combine TrainingDnaUiState(recovery = recovery, recoveryCalendar = calendar, hasData = false)
         }
 
         val exById = exercises.associateBy { it.id }
@@ -126,6 +136,7 @@ class TrainingDnaViewModel @Inject constructor(
             adaptiveSwaps = swaps,
             muscleGaps = gaps,
             volumeLandmarks = landmarks,
+            recoveryCalendar = calendar,
             hasData = true
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TrainingDnaUiState())

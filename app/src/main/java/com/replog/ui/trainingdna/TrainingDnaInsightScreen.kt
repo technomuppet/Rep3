@@ -1,7 +1,10 @@
 package com.replog.ui.trainingdna
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -90,6 +93,11 @@ fun TrainingDnaInsightScreen(
             item { RecoveryDashboardCard(rec) }
         }
 
+        // Recovery calendar — green/yellow/red day strip.
+        if (state.recoveryCalendar.any { it.state != com.replog.domain.recovery.RecoveryDay.REST_NO_DATA }) {
+            item { RecoveryCalendarCard(state.recoveryCalendar) }
+        }
+
         if (!state.hasData) {
             item { EmptyState("Not enough data yet", "Finish a few more workouts and RepLog will calculate your training DNA.") }
         } else {
@@ -139,6 +147,7 @@ fun TrainingDnaInsightScreen(
             // Priority 3 (#12) — Weekly volume landmarks per muscle group.
             val trainedLandmarks = state.volumeLandmarks.filter { it.status != com.replog.domain.volume.VolumeStatus.NONE }
             if (trainedLandmarks.isNotEmpty()) {
+                item { VolumeHeatmapCard(state.volumeLandmarks) }
                 item {
                     Text("Weekly volume", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Text("Working sets per muscle this week vs the optimal range.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -435,4 +444,63 @@ private fun VolumeLandmarkCard(lm: com.replog.domain.volume.VolumeLandmark) = Re
     Spacer(Modifier.height(8.dp))
     val progress = (lm.weeklySets / lm.optimalHigh.toFloat().coerceAtLeast(1f)).toFloat().coerceIn(0f, 1f)
     LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().height(6.dp), color = statusColor)
+}
+
+@Composable
+private fun RecoveryCalendarCard(days: List<com.replog.domain.recovery.RecoveryCalendarDay>) = RepLogCard {
+    Text("Recovery calendar", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+    Text("Last 2 weeks — green ready, amber caution, red recovering.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Spacer(Modifier.height(10.dp))
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+        days.takeLast(14).forEach { d ->
+            val c = when (d.state) {
+                com.replog.domain.recovery.RecoveryDay.READY -> androidx.compose.ui.graphics.Color(0xFF2E7D32)
+                com.replog.domain.recovery.RecoveryDay.CAUTION -> androidx.compose.ui.graphics.Color(0xFFF9A825)
+                com.replog.domain.recovery.RecoveryDay.RECOVERING -> MaterialTheme.colorScheme.error
+                com.replog.domain.recovery.RecoveryDay.REST_NO_DATA -> MaterialTheme.colorScheme.surfaceVariant
+            }
+            Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(28.dp)
+                        .padding(horizontal = 1.dp)
+                        .then(Modifier)
+                ) {
+                    androidx.compose.material3.Surface(
+                        color = c,
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp),
+                        modifier = Modifier.fillMaxWidth().height(28.dp)
+                    ) {}
+                }
+                Spacer(Modifier.height(2.dp))
+                Text(d.dayOfMonth.toString(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun VolumeHeatmapCard(landmarks: List<com.replog.domain.volume.VolumeLandmark>) = RepLogCard {
+    Text("Volume heatmap", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+    Text("Weekly set volume per muscle group at a glance.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Spacer(Modifier.height(10.dp))
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        landmarks.forEach { lm ->
+            val c = when (lm.status) {
+                com.replog.domain.volume.VolumeStatus.IN_RANGE -> androidx.compose.ui.graphics.Color(0xFF2E7D32)
+                com.replog.domain.volume.VolumeStatus.UNDER -> androidx.compose.ui.graphics.Color(0xFFF9A825)
+                com.replog.domain.volume.VolumeStatus.ABOVE -> MaterialTheme.colorScheme.error
+                com.replog.domain.volume.VolumeStatus.NONE -> MaterialTheme.colorScheme.surfaceVariant
+            }
+            androidx.compose.material3.Surface(color = c.copy(alpha = 0.85f), shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp)) {
+                Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                    Text(lm.muscleGroup, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = androidx.compose.ui.graphics.Color.White)
+                    val sets = if (lm.weeklySets % 1.0 == 0.0) lm.weeklySets.toInt().toString() else "%.1f".format(lm.weeklySets)
+                    Text("$sets sets", style = MaterialTheme.typography.labelSmall, color = androidx.compose.ui.graphics.Color.White)
+                }
+            }
+        }
+    }
 }
