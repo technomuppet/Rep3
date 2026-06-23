@@ -5,6 +5,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.*
@@ -29,6 +31,7 @@ fun HomeScreen(
     onViewRecoveryGuidance: () -> Unit = {},
     onOpenCoachHistory: () -> Unit = {},
     onOpenGoals: () -> Unit = {},
+    onOpenTrainingDna: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
     coachViewModel: com.replog.ui.coach.CoachViewModel = hiltViewModel()
 ) {
@@ -68,6 +71,16 @@ fun HomeScreen(
             }
         }
 
+        // Top goal progress (P6) — tap to open Goals.
+        state.topGoal?.let { goal ->
+            item { HomeGoalCard(goal, onClick = onOpenGoals) }
+        }
+
+        // Training Genome headline (P2) — tap to open Training DNA.
+        state.genomeHeadline?.let { headline ->
+            item { HomeGenomeCard(headline, onClick = onOpenTrainingDna) }
+        }
+
         // Coaching insight + last PR (single, not a full feed — that lives in History/Progress)
         item { HomeInsightCard(state.insight) }
         item { Text("Last PR", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
@@ -99,6 +112,32 @@ fun HomeScreen(
                     footnote = state.recentPRs.firstOrNull()?.let { "Latest PR: ${formatWeight(it.weight)} × ${it.reps}" }
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun HomeGoalCard(goal: HomeGoal, onClick: () -> Unit) = RepLogCard(onClick = onClick) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Default.Flag, null, tint = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.width(10.dp))
+        Text(goal.title, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+        Text(goal.etaText, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+    }
+    Spacer(Modifier.height(8.dp))
+    LinearProgressIndicator(progress = { goal.progressPercent / 100f }, modifier = Modifier.fillMaxWidth().height(8.dp))
+    Spacer(Modifier.height(6.dp))
+    Text("${goal.progressPercent}% • ${goal.summaryLine}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+@Composable
+private fun HomeGenomeCard(headline: String, onClick: () -> Unit) = RepLogCard(onClick = onClick) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Default.Insights, null, tint = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text("Your Training Genome", fontWeight = FontWeight.Bold)
+            Text("You grow best with $headline. Tap for the full picture.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

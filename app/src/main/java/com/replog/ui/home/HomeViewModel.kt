@@ -4,12 +4,17 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.replog.data.model.SessionWithExercises
 import com.replog.data.model.SetLog
+import com.replog.data.repository.GoalRepository
 import com.replog.data.repository.WorkoutRepository
+import com.replog.domain.genome.TrainingGenomeEngine
+import com.replog.domain.goals.GoalForecast
+import com.replog.util.PreferencesManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -17,6 +22,14 @@ import javax.inject.Inject
 data class HomeInsight(
     val title: String = "Start your training signal",
     val message: String = "Log a few workouts and RepLog will surface recovery, plateau and progression insights here."
+)
+
+/** A compact goal summary for the Home dashboard. */
+data class HomeGoal(
+    val title: String,
+    val progressPercent: Int,
+    val etaText: String,
+    val summaryLine: String
 )
 
 data class HomeUiState(
@@ -28,19 +41,26 @@ data class HomeUiState(
     val sessionsThisWeek: Int = 0,
     val volumeThisWeek: Double = 0.0,
     val dayStreak: Int = 0,
+    val topGoal: HomeGoal? = null,
+    val genomeHeadline: String? = null,
     val isLoading: Boolean = true
 )
 
 @HiltViewModel
-class HomeViewModel @Inject constructor(private val repo: WorkoutRepository) : ViewModel() {
+class HomeViewModel @Inject constructor(
+    private val repo: WorkoutRepository,
+    private val goalRepository: GoalRepository,
+    private val prefs: PreferencesManager
+) : ViewModel() {
     private val stats = MutableStateFlow(0 to 0.0)
 
     val uiState: StateFlow<HomeUiState> = combine(
         stats,
         repo.getRecentSessions(3),
         repo.getRecentPRs(),
-        repo.getAllSessions()
-    ) { s, sessions, prs, allSessions ->
+        repo.getAllSessions(),
+        goalRepository.getActive()
+    ) { s, sessions, prs, allSessions, activeGoals ->
         val completed = allSessions.filter { it.session.endTime != null }
         val now = System.currentTimeMillis()
         val startTimes = completed.map { it.session.startTime }
@@ -48,6 +68,21 @@ class HomeViewModel @Inject constructor(private val repo: WorkoutRepository) : V
             c.session.startTime to c.exercises.sumOf { e -> e.sets.sumOf { it.weight * it.reps } }
         }
         val weekly = com.replog.domain.home.HomeDashboardStats.weeklyProgress(startTimesToVolume, now)
+
+        // Top active goal with a live forecast (best-effort).
+        val useKg = prefs.useKg.first()
+        val topGoal = activeGoals.firstOrNull()?.let { goal ->
+            runCatching {
+                val f: GoalForecast = goalRepository.forecastFor(goal, useKg)
+                HomeGoal(goal.title, f.progressPercent, f.etaText, f.summaryLine)
+            }.getOrNull()
+        }
+
+        // Training Genome headline (only when it has learned something).
+        val genome = TrainingGenomeEngine.analyze(completed, now)
+        val genomeHeadline = genome.takeIf { it.hasEnoughData }?.traits?.firstOrNull()
+            ?.let { "${it.dimension}: ${it.bestValue}" }
+
         HomeUiState(
             sessionCount = s.first,
             totalVolume = s.second,
@@ -57,6 +92,8 @@ class HomeViewModel @Inject constructor(private val repo: WorkoutRepository) : V
             sessionsThisWeek = weekly.sessionsThisWeek,
             volumeThisWeek = weekly.volumeThisWeek,
             dayStreak = com.replog.domain.home.HomeDashboardStats.dayStreak(startTimes, now),
+            topGoal = topGoal,
+            genomeHeadline = genomeHeadline,
             isLoading = false
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HomeUiState())
