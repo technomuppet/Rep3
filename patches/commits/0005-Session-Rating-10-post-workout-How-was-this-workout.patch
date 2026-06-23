@@ -1,0 +1,224 @@
+From 961e9b53b250fe149c343f35436b46272a8554dc Mon Sep 17 00:00:00 2001
+From: RepLog Dev <dev@replog.local>
+Date: Tue, 23 Jun 2026 06:08:48 +0000
+Subject: [PATCH 05/15] Session Rating (#10): post-workout 'How was this
+ workout?'
+
+Captures a 1-5 subjective rating after each workout to enrich the Training
+DNA signal.
+
+- WorkoutSession.sessionRating: Int? added; new MIGRATION_11_12 (DB v11->12)
+  adds the nullable column. Migration registered; nullable+default keeps
+  backup/restore and existing inserts compatible.
+- WorkoutRepository.setSessionRating(sessionId, rating).
+- ActiveWorkoutViewModel: WorkoutSummary now carries sessionId; rateWorkout()
+  persists the rating (coerced 1-5) and regenerates Training DNA so the signal
+  feeds future recommendations.
+- WorkoutCompletionDialog: 'How was this workout?' chips
+  (Amazing/Good/Average/Poor/Terrible -> 5..1); @OptIn added for FlowRow.
+- Migration test: migrate11To12_addsSessionRating + assertColumnExists helper.
+
+Verified: model+domain compile clean on kotlinc 1.9.22 (167 classes); all
+references resolve; no conflict markers.
+---
+ .../data/db/AppDatabaseMigrationTest.kt       | 29 +++++++++++++++++++
+ .../java/com/replog/data/db/AppDatabase.kt    | 12 ++++++--
+ .../com/replog/data/model/WorkoutSession.kt   |  4 ++-
+ .../data/repository/WorkoutRepository.kt      |  3 ++
+ .../replog/ui/workout/ActiveWorkoutScreen.kt  | 18 ++++++++++--
+ .../ui/workout/ActiveWorkoutViewModel.kt      | 15 ++++++++++
+ 6 files changed, 76 insertions(+), 5 deletions(-)
+
+diff --git a/app/src/androidTest/java/com/replog/data/db/AppDatabaseMigrationTest.kt b/app/src/androidTest/java/com/replog/data/db/AppDatabaseMigrationTest.kt
+index f147223..22bb49d 100644
+--- a/app/src/androidTest/java/com/replog/data/db/AppDatabaseMigrationTest.kt
++++ b/app/src/androidTest/java/com/replog/data/db/AppDatabaseMigrationTest.kt
+@@ -91,6 +91,24 @@ class AppDatabaseMigrationTest {
+         db.close()
+     }
+ 
++    @Test
++    fun migrate11To12_addsSessionRating() {
++        helper.createDatabase(testDb, 11).apply {
++            // Minimal workout_sessions shape as of v11 (scoring columns from 9->10).
++            execSQL(
++                "CREATE TABLE IF NOT EXISTS workout_sessions (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
++                    "templateName TEXT, startTime INTEGER NOT NULL, endTime INTEGER, notes TEXT, " +
++                    "qualityScore INTEGER, totalVolume REAL NOT NULL DEFAULT 0, totalSets INTEGER NOT NULL DEFAULT 0, " +
++                    "totalReps INTEGER NOT NULL DEFAULT 0, prCount INTEGER NOT NULL DEFAULT 0)"
++            )
++            close()
++        }
++
++        val db = helper.runMigrationsAndValidate(testDb, 12, true, AppDatabase.MIGRATION_11_12)
++        assertColumnExists(db, "workout_sessions", "sessionRating")
++        db.close()
++    }
++
+     private fun createVersion6Schema(db: SupportSQLiteDatabase) {
+         db.execSQL("CREATE TABLE IF NOT EXISTS exercises (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, name TEXT NOT NULL, category TEXT NOT NULL, equipment TEXT NOT NULL, type TEXT NOT NULL, muscles TEXT NOT NULL, primaryMuscles TEXT NOT NULL, secondaryMuscles TEXT NOT NULL, movementPattern TEXT NOT NULL, difficulty TEXT NOT NULL, mediaAsset TEXT NOT NULL, isCustom INTEGER NOT NULL)")
+         db.execSQL("CREATE TABLE IF NOT EXISTS workout_sessions (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, templateName TEXT, startTime INTEGER NOT NULL, endTime INTEGER, notes TEXT)")
+@@ -169,4 +187,15 @@ class AppDatabaseMigrationTest {
+             check(cursor.moveToFirst()) { "Missing table $tableName" }
+         }
+     }
++
++    private fun assertColumnExists(db: SupportSQLiteDatabase, tableName: String, columnName: String) {
++        db.query("PRAGMA table_info($tableName)").use { cursor ->
++            var found = false
++            val nameIdx = cursor.getColumnIndex("name")
++            while (cursor.moveToNext()) {
++                if (cursor.getString(nameIdx) == columnName) { found = true; break }
++            }
++            check(found) { "Missing column $columnName on $tableName" }
++        }
++    }
+ }
+diff --git a/app/src/main/java/com/replog/data/db/AppDatabase.kt b/app/src/main/java/com/replog/data/db/AppDatabase.kt
+index bc63f17..4e6ef87 100644
+--- a/app/src/main/java/com/replog/data/db/AppDatabase.kt
++++ b/app/src/main/java/com/replog/data/db/AppDatabase.kt
+@@ -40,7 +40,7 @@ import com.replog.data.model.WorkoutTemplate
+         PlateauEvent::class,
+         RecommendationHistory::class
+     ],
+-    version = 11,
++    version = 12,
+     exportSchema = false
+ )
+ abstract class AppDatabase : RoomDatabase() {
+@@ -318,11 +318,19 @@ abstract class AppDatabase : RoomDatabase() {
+             }
+         }
+ 
++        // Session Rating (#10): user's post-workout 1–5 rating on WorkoutSession.
++        val MIGRATION_11_12 = object : Migration(11, 12) {
++            override fun migrate(database: SupportSQLiteDatabase) {
++                database.execSQL("ALTER TABLE workout_sessions ADD COLUMN sessionRating INTEGER")
++            }
++        }
++
+         fun getDatabase(context: Context): AppDatabase = INSTANCE ?: synchronized(this) {
+             Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "replog_database")
+                 .addMigrations(
+                     MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
+-                    MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11
++                    MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11,
++                    MIGRATION_11_12
+                 )
+                 .build()
+                 .also { INSTANCE = it }
+diff --git a/app/src/main/java/com/replog/data/model/WorkoutSession.kt b/app/src/main/java/com/replog/data/model/WorkoutSession.kt
+index 9e73711..dc2d4c8 100644
+--- a/app/src/main/java/com/replog/data/model/WorkoutSession.kt
++++ b/app/src/main/java/com/replog/data/model/WorkoutSession.kt
+@@ -18,5 +18,7 @@ data class WorkoutSession(
+     val totalVolume: Double = 0.0,
+     val totalSets: Int = 0,
+     val totalReps: Int = 0,
+-    val prCount: Int = 0
++    val prCount: Int = 0,
++    /** User's post-workout session rating, 1 (Terrible) – 5 (Amazing); null if unrated. */
++    val sessionRating: Int? = null
+ )
+diff --git a/app/src/main/java/com/replog/data/repository/WorkoutRepository.kt b/app/src/main/java/com/replog/data/repository/WorkoutRepository.kt
+index ec463ff..c4dd189 100644
+--- a/app/src/main/java/com/replog/data/repository/WorkoutRepository.kt
++++ b/app/src/main/java/com/replog/data/repository/WorkoutRepository.kt
+@@ -31,6 +31,9 @@ class WorkoutRepository @Inject constructor(
+     suspend fun getSessionEntity(sessionId: Int): WorkoutSession? = sessionDao.getSessionEntity(sessionId)
+     suspend fun insertSession(session: WorkoutSession): Long = sessionDao.insertSession(session)
+     suspend fun updateSession(session: WorkoutSession) = sessionDao.updateSession(session)
++    suspend fun setSessionRating(sessionId: Int, rating: Int) {
++        sessionDao.getSessionEntity(sessionId)?.let { sessionDao.updateSession(it.copy(sessionRating = rating)) }
++    }
+     suspend fun deleteSession(session: WorkoutSession) = sessionDao.deleteSession(session)
+     suspend fun deleteSessionById(sessionId: Int) = sessionDao.deleteSessionById(sessionId)
+     suspend fun insertSessionExercise(sessionExercise: SessionExercise): Long = sessionDao.insertSessionExercise(sessionExercise)
+diff --git a/app/src/main/java/com/replog/ui/workout/ActiveWorkoutScreen.kt b/app/src/main/java/com/replog/ui/workout/ActiveWorkoutScreen.kt
+index 8eca8c6..3a386b2 100644
+--- a/app/src/main/java/com/replog/ui/workout/ActiveWorkoutScreen.kt
++++ b/app/src/main/java/com/replog/ui/workout/ActiveWorkoutScreen.kt
+@@ -323,7 +323,7 @@ fun ActiveWorkoutScreen(
+ 
+     // Sprint 3 – Workout Completion Screen
+     state.summary?.let { summary ->
+-        WorkoutCompletionDialog(summary = summary, useKg = state.useKg, onDismiss = viewModel::dismissSummary)
++        WorkoutCompletionDialog(summary = summary, useKg = state.useKg, onRate = viewModel::rateWorkout, onDismiss = viewModel::dismissSummary)
+     }
+ }
+ 
+@@ -929,8 +929,12 @@ private fun ExercisePickerDialog(
+     )
+ }
+ 
++@OptIn(ExperimentalLayoutApi::class)
+ @Composable
+-private fun WorkoutCompletionDialog(summary: WorkoutSummary, useKg: Boolean, onDismiss: () -> Unit) {
++private fun WorkoutCompletionDialog(summary: WorkoutSummary, useKg: Boolean, onRate: (Int) -> Unit, onDismiss: () -> Unit) {
++    // Session Rating (#10): 5 = Amazing ... 1 = Terrible.
++    var rating by remember(summary.sessionId) { mutableStateOf(0) }
++    val ratingLabels = listOf(5 to "Amazing", 4 to "Good", 3 to "Average", 2 to "Poor", 1 to "Terrible")
+     AlertDialog(
+         onDismissRequest = onDismiss,
+         icon = { Icon(Icons.Default.Star, null, tint = MaterialTheme.colorScheme.primary) },
+@@ -938,6 +942,16 @@ private fun WorkoutCompletionDialog(summary: WorkoutSummary, useKg: Boolean, onD
+         text = {
+             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                 Text(summary.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
++                Text("How was this workout?", fontWeight = FontWeight.SemiBold)
++                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
++                    ratingLabels.forEach { (value, label) ->
++                        FilterChip(
++                            selected = rating == value,
++                            onClick = { rating = value; onRate(value) },
++                            label = { Text(label) }
++                        )
++                    }
++                }
+                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                     StatCard("Duration", formatDuration(summary.durationMillis), Modifier.weight(1f))
+                     StatCard("Sets", summary.setCount.toString(), Modifier.weight(1f))
+diff --git a/app/src/main/java/com/replog/ui/workout/ActiveWorkoutViewModel.kt b/app/src/main/java/com/replog/ui/workout/ActiveWorkoutViewModel.kt
+index cc48087..81dd34e 100644
+--- a/app/src/main/java/com/replog/ui/workout/ActiveWorkoutViewModel.kt
++++ b/app/src/main/java/com/replog/ui/workout/ActiveWorkoutViewModel.kt
+@@ -64,6 +64,7 @@ data class ProgressionSuggestionUi(
+ )
+ 
+ data class WorkoutSummary(
++    val sessionId: Int = 0,
+     val name: String,
+     val durationMillis: Long,
+     val exerciseCount: Int,
+@@ -221,6 +222,19 @@ class ActiveWorkoutViewModel @Inject constructor(
+     fun dismissRestoredBanner() { restored.value = false }
+     fun dismissSummary() { summary.value = null }
+ 
++    /**
++     * Session Rating (#10): persist the user's 1–5 rating for the just-finished
++     * session and refresh Training DNA so the signal feeds future recommendations.
++     */
++    fun rateWorkout(rating: Int) {
++        val id = summary.value?.sessionId ?: return
++        if (id <= 0) return
++        viewModelScope.launch {
++            workouts.setSessionRating(id, rating.coerceIn(1, 5))
++            try { trainingDnaRepository.generateDNA() } catch (_: Exception) {}
++        }
++    }
++
+     fun skipRestTimer() = viewModelScope.launch { restTimer.skip() }
+     fun addRestSeconds(seconds: Int) = viewModelScope.launch { restTimer.addSeconds(seconds) }
+     fun restartRestTimer() = viewModelScope.launch { restTimer.restart() }
+@@ -444,6 +458,7 @@ class ActiveWorkoutViewModel @Inject constructor(
+         val hits = evaluations.count { it.second }
+         val misses = evaluations.count { !it.second }
+         return WorkoutSummary(
++            sessionId = session.id,
+             name = session.templateName ?: "Workout",
+             durationMillis = endTime - session.startTime,
+             exerciseCount = exercises.size,
+-- 
+2.47.3
+

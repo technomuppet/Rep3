@@ -1,0 +1,330 @@
+From 6e68bc9fba6f05b2c6228da09951112ebee89806 Mon Sep 17 00:00:00 2001
+From: RepLog Dev <dev@replog.local>
+Date: Tue, 23 Jun 2026 05:58:48 +0000
+Subject: [PATCH 04/15] Muscle Gap Analysis with one-tap Add to template (#8)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Closes the last outstanding roadmap item. Uses existing Training DNA
+(weakest muscles) + the muscle-tagged 516-exercise library; no new
+analytics, no schema change.
+
+- domain/musclegap/MuscleGapAnalyzer.kt: for each weak muscle, suggests
+  exercises that primarily train it, ranked compound/beginner-first and
+  diversified by equipment (with a secondary-muscle fallback).
+- TrainingDnaViewModel: computes muscleGaps from snapshot.weakestMuscles +
+  library; adds addMuscleGapToTemplate() that creates a '<Muscle> Focus'
+  template from the suggestions, plus a one-shot status message flow.
+- Training DNA screen: 'Close the gaps' section under Weakest muscles —
+  each weak muscle lists suggested exercises with a one-tap 'Add to
+  template' button; transient confirmation banner.
+
+Verified: full domain compiles on kotlinc 1.9.22 (167 classes); 4 logic
+tests pass in-sandbox (suggestions, equipment diversification, blank/
+missing filtering, secondary fallback). No tests committed.
+---
+ .../domain/musclegap/MuscleGapAnalyzer.kt     | 93 +++++++++++++++++++
+ .../trainingdna/TrainingDnaInsightScreen.kt   | 59 ++++++++++++
+ .../ui/trainingdna/TrainingDnaViewModel.kt    | 46 +++++++++
+ 3 files changed, 198 insertions(+)
+ create mode 100644 app/src/main/java/com/replog/domain/musclegap/MuscleGapAnalyzer.kt
+
+diff --git a/app/src/main/java/com/replog/domain/musclegap/MuscleGapAnalyzer.kt b/app/src/main/java/com/replog/domain/musclegap/MuscleGapAnalyzer.kt
+new file mode 100644
+index 0000000..850f3c6
+--- /dev/null
++++ b/app/src/main/java/com/replog/domain/musclegap/MuscleGapAnalyzer.kt
+@@ -0,0 +1,93 @@
++package com.replog.domain.musclegap
++
++import com.replog.data.model.Exercise
++
++/**
++ * Priority 2 (#8) — Muscle Gap Analysis.
++ *
++ * For each weak muscle the Training DNA already identified, suggest exercises
++ * from the existing library that primarily train it. Pure library lookup + a
++ * little ranking; no new analytics and no schema change. The UI offers a
++ * one-tap "add to template" using the suggested exercises.
++ */
++data class MuscleGapSuggestion(
++    val muscle: String,
++    val exercises: List<Exercise>
++)
++
++object MuscleGapAnalyzer {
++
++    /**
++     * @param weakMuscles muscle names from TrainingDnaSnapshot.weakestMuscles
++     * @param library the full exercise library
++     * @param perMuscle how many suggestions to surface per weak muscle
++     */
++    fun analyze(
++        weakMuscles: List<String>,
++        library: List<Exercise>,
++        perMuscle: Int = 3
++    ): List<MuscleGapSuggestion> {
++        return weakMuscles
++            .map { it.trim() }
++            .filter { it.isNotBlank() }
++            .distinct()
++            .map { muscle ->
++                MuscleGapSuggestion(
++                    muscle = muscle,
++                    exercises = suggestionsFor(muscle, library, perMuscle)
++                )
++            }
++            .filter { it.exercises.isNotEmpty() }
++    }
++
++    /** Suggestions for a single muscle (also usable directly from a tapped muscle). */
++    fun suggestionsFor(muscle: String, library: List<Exercise>, limit: Int = 3): List<Exercise> {
++        val target = muscle.trim().lowercase()
++        if (target.isBlank()) return emptyList()
++
++        // Prefer exercises where the muscle is PRIMARY; fall back to secondary.
++        val primaryHits = library.filter { ex ->
++            ex.primaryMuscles.split(",").any { it.trim().lowercase() == target }
++        }
++        val secondaryHits = library.filter { ex ->
++            ex.secondaryMuscles.split(",").any { it.trim().lowercase() == target } &&
++                ex.primaryMuscles.split(",").none { it.trim().lowercase() == target }
++        }
++
++        // Rank: compound (more muscles worked) and beginner-friendly first, then
++        // diversify equipment so a user isn't shown four cable variations.
++        val ranked = (primaryHits + secondaryHits)
++            .sortedWith(
++                compareByDescending<Exercise> { it.primaryMuscles.split(",").any { m -> m.trim().lowercase() == target } }
++                    .thenByDescending { it.muscles.split(",").count { m -> m.isNotBlank() } }
++                    .thenBy { difficultyRank(it.difficulty) }
++            )
++
++        return diversifyByEquipment(ranked, limit)
++    }
++
++    private fun diversifyByEquipment(ranked: List<Exercise>, limit: Int): List<Exercise> {
++        val seenEquipment = mutableSetOf<String>()
++        val chosen = mutableListOf<Exercise>()
++        // First pass: one per equipment type for variety.
++        for (ex in ranked) {
++            if (chosen.size >= limit) break
++            if (seenEquipment.add(ex.equipment)) chosen += ex
++        }
++        // Second pass: fill remaining slots with the best remaining.
++        if (chosen.size < limit) {
++            for (ex in ranked) {
++                if (chosen.size >= limit) break
++                if (ex !in chosen) chosen += ex
++            }
++        }
++        return chosen
++    }
++
++    private fun difficultyRank(difficulty: String): Int = when (difficulty.lowercase()) {
++        "beginner" -> 0
++        "intermediate" -> 1
++        "advanced" -> 2
++        else -> 1
++    }
++}
+diff --git a/app/src/main/java/com/replog/ui/trainingdna/TrainingDnaInsightScreen.kt b/app/src/main/java/com/replog/ui/trainingdna/TrainingDnaInsightScreen.kt
+index 83e3200..c8383ed 100644
+--- a/app/src/main/java/com/replog/ui/trainingdna/TrainingDnaInsightScreen.kt
++++ b/app/src/main/java/com/replog/ui/trainingdna/TrainingDnaInsightScreen.kt
+@@ -22,12 +22,17 @@ import androidx.compose.material.icons.filled.Schedule
+ import androidx.compose.material.icons.filled.Speed
+ import androidx.compose.material.icons.filled.Star
+ import androidx.compose.material.icons.filled.Warning
++import androidx.compose.material.icons.filled.Add
++import androidx.compose.material.icons.filled.CheckCircle
+ import androidx.compose.material.icons.filled.HealthAndSafety
+ import androidx.compose.material.icons.filled.SwapHoriz
++import androidx.compose.material.icons.filled.TrackChanges
+ import androidx.compose.material.icons.filled.TrendingUp
+ import androidx.compose.material3.Icon
+ import androidx.compose.material3.LinearProgressIndicator
+ import androidx.compose.material3.Surface
++import androidx.compose.material3.TextButton
++import com.replog.ui.components.SecondaryButton
+ import androidx.compose.material3.MaterialTheme
+ import androidx.compose.material3.Text
+ import androidx.compose.runtime.Composable
+@@ -50,6 +55,7 @@ fun TrainingDnaInsightScreen(
+     viewModel: TrainingDnaViewModel = hiltViewModel()
+ ) {
+     val state by viewModel.uiState.collectAsState()
++    val message by viewModel.message.collectAsState()
+     LaunchedEffect(Unit) { viewModel.refresh() }
+ 
+     LazyColumn(
+@@ -64,6 +70,20 @@ fun TrainingDnaInsightScreen(
+             Text("Your personal training signature, built from every workout.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+         }
+ 
++        // Transient confirmation (e.g. after adding a muscle-gap template).
++        message?.let { msg ->
++            item {
++                Surface(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
++                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(12.dp)) {
++                        Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.primary)
++                        Spacer(Modifier.width(10.dp))
++                        Text(msg, modifier = Modifier.weight(1f))
++                        TextButton(onClick = { viewModel.clearMessage() }) { Text("Dismiss") }
++                    }
++                }
++            }
++        }
++
+         // Priority 3 (#13) — Recovery dashboard (shown even before full DNA exists).
+         state.recovery?.let { rec ->
+             item { RecoveryDashboardCard(rec) }
+@@ -115,6 +135,17 @@ fun TrainingDnaInsightScreen(
+                 )
+             }
+ 
++            // Priority 2 (#8) — Muscle gap analysis: fix-it suggestions + one-tap add.
++            if (state.muscleGaps.isNotEmpty()) {
++                item {
++                    Text("Close the gaps", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
++                    Spacer(Modifier.height(8.dp))
++                }
++                items(state.muscleGaps) { gap ->
++                    MuscleGapCard(gap = gap, onAddToTemplate = { viewModel.addMuscleGapToTemplate(gap.muscle, gap.exercises) })
++                }
++            }
++
+             item {
+                 Text("Best progressing lifts", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                 Spacer(Modifier.height(8.dp))
+@@ -342,3 +373,31 @@ private fun AdaptiveSwapCard(swap: com.replog.domain.adaptive.AdaptiveSwap) = Re
+     Spacer(Modifier.height(6.dp))
+     Text(swap.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+ }
++
++@Composable
++private fun MuscleGapCard(
++    gap: com.replog.domain.musclegap.MuscleGapSuggestion,
++    onAddToTemplate: () -> Unit
++) = RepLogCard {
++    Row(verticalAlignment = Alignment.CenterVertically) {
++        Icon(Icons.Default.TrackChanges, null, tint = MaterialTheme.colorScheme.primary)
++        Spacer(Modifier.width(12.dp))
++        Column(Modifier.weight(1f)) {
++            Text("Weak: ${gap.muscle}", fontWeight = FontWeight.Bold)
++            Text("Suggested exercises to bring it up", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
++        }
++    }
++    Spacer(Modifier.height(8.dp))
++    gap.exercises.forEach { ex ->
++        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
++            Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
++            Spacer(Modifier.width(8.dp))
++            Column {
++                Text(ex.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
++                Text("${ex.equipment} • ${ex.primaryMuscles}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
++            }
++        }
++    }
++    Spacer(Modifier.height(10.dp))
++    SecondaryButton("Add to template") { onAddToTemplate() }
++}
+diff --git a/app/src/main/java/com/replog/ui/trainingdna/TrainingDnaViewModel.kt b/app/src/main/java/com/replog/ui/trainingdna/TrainingDnaViewModel.kt
+index 1c5eb36..15f0f33 100644
+--- a/app/src/main/java/com/replog/ui/trainingdna/TrainingDnaViewModel.kt
++++ b/app/src/main/java/com/replog/ui/trainingdna/TrainingDnaViewModel.kt
+@@ -2,6 +2,9 @@ package com.replog.ui.trainingdna
+ 
+ import androidx.lifecycle.ViewModel
+ import androidx.lifecycle.viewModelScope
++import com.replog.data.model.Exercise
++import com.replog.data.model.TemplateExercise
++import com.replog.data.model.WorkoutTemplate
+ import com.replog.data.repository.BodyweightRepository
+ import com.replog.data.repository.ExerciseRepository
+ import com.replog.data.repository.TrainingDNARepository
+@@ -10,12 +13,16 @@ import com.replog.domain.adaptive.AdaptiveSwap
+ import com.replog.domain.adaptive.AdaptiveTemplateAdvisor
+ import com.replog.domain.forecast.ProgressionForecast
+ import com.replog.domain.forecast.ProgressionForecaster
++import com.replog.domain.musclegap.MuscleGapAnalyzer
++import com.replog.domain.musclegap.MuscleGapSuggestion
+ import com.replog.domain.recommendation.RecoveryAnalyzer
+ import com.replog.domain.recovery.RecoveryDashboard
+ import com.replog.domain.recovery.RecoveryDashboardState
+ import dagger.hilt.android.lifecycle.HiltViewModel
++import kotlinx.coroutines.flow.MutableStateFlow
+ import kotlinx.coroutines.flow.SharingStarted
+ import kotlinx.coroutines.flow.StateFlow
++import kotlinx.coroutines.flow.asStateFlow
+ import kotlinx.coroutines.flow.combine
+ import kotlinx.coroutines.flow.stateIn
+ import kotlinx.coroutines.launch
+@@ -41,6 +48,8 @@ data class TrainingDnaUiState(
+     val recovery: RecoveryDashboardState? = null,
+     val forecasts: List<NamedForecast> = emptyList(),
+     val adaptiveSwaps: List<AdaptiveSwap> = emptyList(),
++    // Priority 2 (#8) — muscle gap suggestions
++    val muscleGaps: List<MuscleGapSuggestion> = emptyList(),
+     val hasData: Boolean = false
+ )
+ 
+@@ -88,6 +97,10 @@ class TrainingDnaViewModel @Inject constructor(
+         // Adaptive template swaps (#14) for stalled lifts.
+         val swaps = AdaptiveTemplateAdvisor.suggestSwaps(plateaus, exercises)
+ 
++        // Muscle gap suggestions (#8) from the weakest muscles DNA already found.
++        val weak = snapshot.weakestMuscles.split(",").map { it.trim() }.filter { it.isNotBlank() }
++        val gaps = MuscleGapAnalyzer.analyze(weak, exercises)
++
+         TrainingDnaUiState(
+             preferredRepRange = snapshot.preferredRepRange,
+             preferredVolumeRange = snapshot.preferredVolumeRange,
+@@ -105,10 +118,43 @@ class TrainingDnaViewModel @Inject constructor(
+             recovery = recovery,
+             forecasts = forecasts,
+             adaptiveSwaps = swaps,
++            muscleGaps = gaps,
+             hasData = true
+         )
+     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TrainingDnaUiState())
+ 
++    /** One-shot status message (e.g. after adding a muscle-gap template). */
++    private val _message = MutableStateFlow<String?>(null)
++    val message: StateFlow<String?> = _message.asStateFlow()
++    fun clearMessage() { _message.value = null }
++
++    /**
++     * Priority 2 (#8) — one-tap "Add to template": create a built-in-style
++     * template that targets a weak muscle using its suggested exercises.
++     */
++    fun addMuscleGapToTemplate(muscle: String, exercises: List<Exercise>) = viewModelScope.launch {
++        if (exercises.isEmpty()) {
++            _message.value = "No exercises to add."
++            return@launch
++        }
++        val name = "$muscle Focus"
++        val templateId = workoutRepository.insertTemplate(
++            WorkoutTemplate(name = name, isBuiltIn = false)
++        ).toInt()
++        exercises.forEachIndexed { index, ex ->
++            workoutRepository.insertTemplateExercise(
++                TemplateExercise(
++                    templateId = templateId,
++                    exerciseId = ex.id,
++                    defaultSets = 3,
++                    orderIndex = index,
++                    targetReps = 10
++                )
++            )
++        }
++        _message.value = "Added \"$name\" template (${exercises.size} exercises)."
++    }
++
+     fun refresh() = viewModelScope.launch {
+         trainingDNARepository.generateDNA()
+     }
+-- 
+2.47.3
+

@@ -1,0 +1,450 @@
+From 95569d28a8b528b7f6e0cf0a3a8506c5e4b41402 Mon Sep 17 00:00:00 2001
+From: RepLog Dev <dev@replog.local>
+Date: Tue, 23 Jun 2026 10:38:09 +0000
+Subject: [PATCH 10/15] Coach Dashboard: unified 'Good morning' advisor on Home
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Assembles existing intelligence (recommendation + recovery + goals +
+progression + plateaus) into one persistent advisor view. No new analytics.
+
+- domain/coachdash/CoachBriefing.kt: pure builder that composes a single
+  briefing — greeting (time-of-day), recovery score+directive, train line,
+  focus (stalled lift/weakest muscle), progression line ('Bench: +Xkg next
+  session'), estimated minutes, top-goal forecast, confidence.
+- CoachViewModel: now also builds the briefing on load, pulling recovery
+  (RecoveryAnalyzer), weakest muscle (latest DNA snapshot) and the top active
+  goal forecast (GoalRepository). Injects TrainingDNARepository,
+  BodyweightRepository, GoalRepository.
+- ui/coach/CoachDashboardCard.kt: the rich Home card (greeting + recovery
+  chip + headline + briefing lines + Start/Not-today + 'Why this plan?').
+- HomeScreen now shows CoachDashboardCard instead of the simpler SmartCoachCard
+  (SmartCoachCard retained, unused, for reuse). Reuses the existing accept /
+  Smart Start / dismiss flow unchanged.
+
+Verified: model+domain compile clean on kotlinc 1.9.22 (179 classes); 4
+CoachBriefing logic tests pass in-sandbox (full train briefing, rest-day
+suppression, no-recommendation greeting, progression fallback). All new
+CoachViewModel deps are Hilt-injectable; no conflict markers.
+---
+ .../replog/domain/coachdash/CoachBriefing.kt  | 119 +++++++++++++
+ .../com/replog/ui/coach/CoachDashboardCard.kt | 164 ++++++++++++++++++
+ .../com/replog/ui/coach/CoachViewModel.kt     |  51 ++++++
+ .../java/com/replog/ui/home/HomeScreen.kt     |   5 +-
+ 4 files changed, 337 insertions(+), 2 deletions(-)
+ create mode 100644 app/src/main/java/com/replog/domain/coachdash/CoachBriefing.kt
+ create mode 100644 app/src/main/java/com/replog/ui/coach/CoachDashboardCard.kt
+
+diff --git a/app/src/main/java/com/replog/domain/coachdash/CoachBriefing.kt b/app/src/main/java/com/replog/domain/coachdash/CoachBriefing.kt
+new file mode 100644
+index 0000000..4492aab
+--- /dev/null
++++ b/app/src/main/java/com/replog/domain/coachdash/CoachBriefing.kt
+@@ -0,0 +1,119 @@
++package com.replog.domain.coachdash
++
++import com.replog.domain.recommendation.PlannedExercise
++import com.replog.domain.recommendation.ProgressionDecision
++import com.replog.domain.recommendation.Recommendation
++import com.replog.domain.recommendation.RecommendationType
++import kotlin.math.roundToInt
++
++/**
++ * Coach Dashboard — assembles a single "Good morning" briefing from the
++ * intelligence the app already produces (recommendation + recovery + goals).
++ *
++ * Pure, deterministic, offline. No new analytics — it only restates existing
++ * outputs into one persistent-advisor view.
++ */
++data class CoachBriefing(
++    val greeting: String,
++    val recoveryScore: Int?,
++    val recoveryDirective: String?,
++    val trainLine: String,          // e.g. "Train Push" / "Rest day" / "Repeat last workout"
++    val isRestDay: Boolean,
++    val focusLine: String?,         // e.g. "Focus: Upper Chest" (weakest muscle / stalled lift)
++    val progressionLine: String?,   // e.g. "Bench Press: +2.5kg next session"
++    val estimatedMinutes: Int?,     // e.g. 58
++    val goalLine: String?,          // e.g. "Bench 100kg → in ~9 weeks"
++    val confidence: Int?
++)
++
++object CoachBriefingBuilder {
++
++    fun build(
++        recommendation: Recommendation?,
++        recoveryScore: Int?,
++        recoveryDirective: String?,
++        weakestMuscle: String?,
++        topGoalSummary: String?,
++        useKg: Boolean = true,
++        hourOfDay: Int = 12,
++        userName: String? = null
++    ): CoachBriefing {
++        val greeting = greeting(hourOfDay, userName)
++
++        if (recommendation == null) {
++            return CoachBriefing(
++                greeting = greeting,
++                recoveryScore = recoveryScore,
++                recoveryDirective = recoveryDirective,
++                trainLine = "Log a workout to start coaching",
++                isRestDay = false,
++                focusLine = weakestMuscle?.let { "Focus: $it" },
++                progressionLine = null,
++                estimatedMinutes = null,
++                goalLine = topGoalSummary,
++                confidence = null
++            )
++        }
++
++        val isRest = recommendation.type == RecommendationType.REST
++        val trainLine = if (isRest) "Rest day recommended" else recommendation.title
++
++        // Focus = first stalled/undertrained signal from the recommendation, else weakest muscle.
++        val focus = focusFrom(recommendation) ?: weakestMuscle
++        val focusLine = focus?.let { "Focus: $it" }
++
++        // Progression = the most meaningful planned-exercise progression in the plan.
++        val progressionLine = if (isRest) null else progressionFrom(recommendation, useKg)
++
++        return CoachBriefing(
++            greeting = greeting,
++            recoveryScore = recoveryScore,
++            recoveryDirective = recoveryDirective,
++            trainLine = trainLine,
++            isRestDay = isRest,
++            focusLine = focusLine,
++            progressionLine = progressionLine,
++            estimatedMinutes = recommendation.estimatedDurationMinutes.takeIf { it > 0 && !isRest },
++            goalLine = topGoalSummary,
++            confidence = recommendation.confidenceScore.roundToInt().takeIf { it > 0 }
++        )
++    }
++
++    private fun greeting(hour: Int, name: String?): String {
++        val tod = when (hour) {
++            in 5..11 -> "Good morning"
++            in 12..17 -> "Good afternoon"
++            else -> "Good evening"
++        }
++        return if (name.isNullOrBlank()) tod else "$tod, $name"
++    }
++
++    /** Pull a "focus" muscle/lift from the recommendation's existing dataUsed lines. */
++    private fun focusFrom(rec: Recommendation): String? {
++        val stalled = rec.dataUsed.firstOrNull { it.startsWith("Stalled lifts") }
++            ?.substringAfter(":")?.split(",")?.firstOrNull()?.trim()
++        if (!stalled.isNullOrBlank()) return stalled
++        val under = rec.dataUsed.firstOrNull { it.startsWith("Undertrained muscles") }
++            ?.substringAfter(":")?.split(",")?.firstOrNull()?.trim()
++        return under?.takeIf { it.isNotBlank() }
++    }
++
++    /** Build a "X: +Ykg next session" line from the most progressable planned exercise. */
++    private fun progressionFrom(rec: Recommendation, useKg: Boolean): String? {
++        val plan = rec.workoutPlan ?: return null
++        val unit = if (useKg) "kg" else "lb"
++        // Prefer a load increase with a concrete weight; else first exercise with a target.
++        val loadUp = plan.exercises.firstOrNull { it.progression == ProgressionDecision.INCREASE_LOAD && it.targetWeight != null }
++        if (loadUp != null) {
++            return "${loadUp.exerciseName}: ${fmt(loadUp.targetWeight!!)}$unit next session"
++        }
++        val firstTargeted: PlannedExercise? = plan.exercises.firstOrNull { it.targetWeight != null }
++            ?: plan.exercises.firstOrNull()
++        return firstTargeted?.let { ex ->
++            val weight = ex.targetWeight?.let { "${fmt(it)}$unit" } ?: "bodyweight"
++            "${ex.exerciseName}: $weight × ${ex.targetReps}"
++        }
++    }
++
++    private fun fmt(v: Double): String = if (v % 1.0 == 0.0) v.toInt().toString() else "%.1f".format(v)
++}
+diff --git a/app/src/main/java/com/replog/ui/coach/CoachDashboardCard.kt b/app/src/main/java/com/replog/ui/coach/CoachDashboardCard.kt
+new file mode 100644
+index 0000000..c4e1ee9
+--- /dev/null
++++ b/app/src/main/java/com/replog/ui/coach/CoachDashboardCard.kt
+@@ -0,0 +1,164 @@
++package com.replog.ui.coach
++
++import androidx.compose.animation.AnimatedVisibility
++import androidx.compose.foundation.layout.Arrangement
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.Row
++import androidx.compose.foundation.layout.Spacer
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.height
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.layout.size
++import androidx.compose.foundation.layout.width
++import androidx.compose.foundation.shape.RoundedCornerShape
++import androidx.compose.material.icons.Icons
++import androidx.compose.material.icons.filled.Bolt
++import androidx.compose.material.icons.filled.CenterFocusStrong
++import androidx.compose.material.icons.filled.ExpandLess
++import androidx.compose.material.icons.filled.ExpandMore
++import androidx.compose.material.icons.filled.Flag
++import androidx.compose.material.icons.filled.HealthAndSafety
++import androidx.compose.material.icons.filled.Schedule
++import androidx.compose.material.icons.filled.TrendingUp
++import androidx.compose.material3.CircularProgressIndicator
++import androidx.compose.material3.Icon
++import androidx.compose.material3.MaterialTheme
++import androidx.compose.material3.Surface
++import androidx.compose.material3.Text
++import androidx.compose.material3.TextButton
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.remember
++import androidx.compose.runtime.setValue
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.graphics.vector.ImageVector
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.text.font.FontWeight
++import androidx.compose.ui.unit.dp
++import com.replog.domain.coachdash.CoachBriefing
++import com.replog.ui.components.PrimaryButton
++import com.replog.ui.components.RepLogCard
++import com.replog.ui.components.SecondaryButton
++
++/**
++ * Coach Dashboard — the persistent "Good morning" advisor that unifies
++ * recommendation + recovery + goals + progression into one card on Home.
++ */
++@Composable
++fun CoachDashboardCard(
++    state: CoachUiState,
++    onStart: () -> Unit,
++    onDismiss: () -> Unit,
++    onRefresh: () -> Unit
++) = RepLogCard {
++    when {
++        state.isLoading -> {
++            Row(verticalAlignment = Alignment.CenterVertically) {
++                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
++                Spacer(Modifier.width(12.dp))
++                Text("Your coach is reading your training data…", color = MaterialTheme.colorScheme.onSurfaceVariant)
++            }
++        }
++        state.error != null -> {
++            Text("Coach", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
++            Spacer(Modifier.height(6.dp))
++            Text(state.error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
++            Spacer(Modifier.height(8.dp))
++            SecondaryButton("Try again", onClick = onRefresh)
++        }
++        state.briefing != null -> BriefingBody(state, onStart, onDismiss)
++        else -> Text("Log a workout and your coach will tell you what to train next.", color = MaterialTheme.colorScheme.onSurfaceVariant)
++    }
++}
++
++@Composable
++private fun BriefingBody(state: CoachUiState, onStart: () -> Unit, onDismiss: () -> Unit) {
++    val b: CoachBriefing = state.briefing!!
++    var showWhy by remember { mutableStateOf(false) }
++
++    // Greeting + recovery chip
++    Row(verticalAlignment = Alignment.CenterVertically) {
++        Text(b.greeting, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
++        b.recoveryScore?.let { score ->
++            Surface(color = recoveryColor(score).copy(alpha = 0.15f), shape = RoundedCornerShape(999.dp)) {
++                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
++                    Icon(Icons.Default.HealthAndSafety, null, tint = recoveryColor(score), modifier = Modifier.size(16.dp))
++                    Spacer(Modifier.width(4.dp))
++                    Text("$score%", fontWeight = FontWeight.Bold, color = recoveryColor(score))
++                }
++            }
++        }
++    }
++    b.recoveryDirective?.let {
++        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
++    }
++
++    Spacer(Modifier.height(12.dp))
++
++    // The headline directive
++    Text(b.trainLine, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
++
++    Spacer(Modifier.height(10.dp))
++
++    // Briefing lines
++    b.focusLine?.let { BriefingLine(Icons.Default.CenterFocusStrong, it) }
++    b.progressionLine?.let { BriefingLine(Icons.Default.TrendingUp, it) }
++    b.estimatedMinutes?.let { BriefingLine(Icons.Default.Schedule, "Estimated workout: $it min") }
++    b.goalLine?.let { BriefingLine(Icons.Default.Flag, it) }
++    b.confidence?.let { BriefingLine(Icons.Default.Bolt, "Confidence: $it%") }
++
++    Spacer(Modifier.height(14.dp))
++
++    // Actions
++    if (state.accepted && !b.isRestDay) {
++        Text("Workout staged — opening your session…", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
++        Spacer(Modifier.height(6.dp))
++    }
++    PrimaryButton(if (b.isRestDay) "View recovery guidance" else "Start Recommended Workout", onClick = onStart)
++    Spacer(Modifier.height(6.dp))
++    SecondaryButton("Not today", onClick = onDismiss)
++
++    // Why? (reuse existing explanation contributions)
++    if (state.contributions.isNotEmpty()) {
++        Spacer(Modifier.height(8.dp))
++        TextButton(onClick = { showWhy = !showWhy }, modifier = Modifier.fillMaxWidth()) {
++            Text(if (showWhy) "Hide explanation" else "Why this plan?", fontWeight = FontWeight.Bold)
++            Spacer(Modifier.width(6.dp))
++            Icon(if (showWhy) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null)
++        }
++        AnimatedVisibility(visible = showWhy) {
++            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
++                state.contributions.forEach { c ->
++                    Surface(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
++                        Column(Modifier.padding(12.dp)) {
++                            Text(c.label, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
++                            Spacer(Modifier.height(4.dp))
++                            c.lines.forEach { line ->
++                                Text("• $line", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
++                            }
++                        }
++                    }
++                }
++            }
++        }
++    }
++}
++
++@Composable
++private fun BriefingLine(icon: ImageVector, text: String) {
++    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 3.dp)) {
++        Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
++        Spacer(Modifier.width(10.dp))
++        Text(text, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
++    }
++}
++
++@Composable
++private fun recoveryColor(score: Int): Color = when {
++    score >= 80 -> Color(0xFF2E7D32)
++    score >= 60 -> MaterialTheme.colorScheme.primary
++    score >= 40 -> MaterialTheme.colorScheme.tertiary
++    else -> MaterialTheme.colorScheme.error
++}
+diff --git a/app/src/main/java/com/replog/ui/coach/CoachViewModel.kt b/app/src/main/java/com/replog/ui/coach/CoachViewModel.kt
+index 943baf8..74e95f4 100644
+--- a/app/src/main/java/com/replog/ui/coach/CoachViewModel.kt
++++ b/app/src/main/java/com/replog/ui/coach/CoachViewModel.kt
+@@ -3,13 +3,21 @@ package com.replog.ui.coach
+ import androidx.lifecycle.ViewModel
+ import androidx.lifecycle.viewModelScope
+ import com.replog.data.model.RecommendationHistory
++import com.replog.data.repository.BodyweightRepository
++import com.replog.data.repository.GoalRepository
+ import com.replog.data.repository.RecommendationRepository
++import com.replog.data.repository.TrainingDNARepository
+ import com.replog.data.repository.WorkoutRepository
++import com.replog.domain.coachdash.CoachBriefing
++import com.replog.domain.coachdash.CoachBriefingBuilder
+ import com.replog.domain.recommendation.ExplanationContribution
+ import com.replog.domain.recommendation.Recommendation
+ import com.replog.domain.recommendation.RecommendationExplanation
+ import com.replog.domain.recommendation.RecommendationType
++import com.replog.domain.recommendation.RecoveryAnalyzer
++import com.replog.domain.recovery.RecoveryDashboard
+ import com.replog.util.PreferencesManager
++import java.util.Calendar
+ import dagger.hilt.android.lifecycle.HiltViewModel
+ import kotlinx.coroutines.flow.MutableStateFlow
+ import kotlinx.coroutines.flow.SharingStarted
+@@ -26,6 +34,7 @@ data class CoachUiState(
+     val isLoading: Boolean = true,
+     val recommendation: Recommendation? = null,
+     val contributions: List<ExplanationContribution> = emptyList(),
++    val briefing: CoachBriefing? = null,
+     val accepted: Boolean = false,
+     val error: String? = null
+ )
+@@ -34,6 +43,9 @@ data class CoachUiState(
+ class CoachViewModel @Inject constructor(
+     private val recommendationRepository: RecommendationRepository,
+     private val workoutRepository: WorkoutRepository,
++    private val trainingDNARepository: TrainingDNARepository,
++    private val bodyweightRepository: BodyweightRepository,
++    private val goalRepository: GoalRepository,
+     private val handoff: CoachHandoff,
+     private val prefs: PreferencesManager
+ ) : ViewModel() {
+@@ -76,6 +88,7 @@ class CoachViewModel @Inject constructor(
+                 isLoading = false,
+                 recommendation = rec,
+                 contributions = RecommendationExplanation.contributions(rec),
++                briefing = buildBriefing(rec),
+                 accepted = false
+             )
+         }.onFailure { e ->
+@@ -83,6 +96,44 @@ class CoachViewModel @Inject constructor(
+         }
+     }
+ 
++    /** Assemble the unified Coach Dashboard briefing from existing intelligence. */
++    private suspend fun buildBriefing(rec: Recommendation): CoachBriefing {
++        val useKg = prefs.useKg.first()
++        val now = System.currentTimeMillis()
++
++        // Recovery (reuse the existing analyzer + dashboard mapping).
++        val recoveryState = runCatching {
++            val sessions = workoutRepository.getAllSessions().first().filter { it.session.endTime != null }
++            val bodyweights = bodyweightRepository.getAllBodyweights().first()
++            RecoveryDashboard.from(RecoveryAnalyzer.overallRecovery(sessions, bodyweights, now))
++        }.getOrNull()
++
++        // Weakest muscle from the latest DNA snapshot (best-effort).
++        val weakest = runCatching {
++            trainingDNARepository.getLatestDNA().first()
++                ?.weakestMuscles?.split(",")?.map { it.trim() }?.firstOrNull { it.isNotBlank() }
++        }.getOrNull()
++
++        // Top active goal forecast (best-effort).
++        val goalLine = runCatching {
++            goalRepository.getActive().first().firstOrNull()?.let { goal ->
++                goalRepository.forecastFor(goal, useKg).summaryLine
++            }
++        }.getOrNull()
++
++        val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
++
++        return CoachBriefingBuilder.build(
++            recommendation = rec,
++            recoveryScore = recoveryState?.score,
++            recoveryDirective = recoveryState?.directive,
++            weakestMuscle = weakest,
++            topGoalSummary = goalLine,
++            useKg = useKg,
++            hourOfDay = hour
++        )
++    }
++
+     private suspend fun shouldRecompute(): Boolean {
+         val today = todayEpochDay()
+         val lastDay = prefs.coachLastGenDay.first()
+diff --git a/app/src/main/java/com/replog/ui/home/HomeScreen.kt b/app/src/main/java/com/replog/ui/home/HomeScreen.kt
+index c9d6919..e9eff6a 100644
+--- a/app/src/main/java/com/replog/ui/home/HomeScreen.kt
++++ b/app/src/main/java/com/replog/ui/home/HomeScreen.kt
+@@ -38,9 +38,10 @@ fun HomeScreen(
+     LazyColumn(Modifier.fillMaxSize().padding(contentPadding), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+         item { Text("Today", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.ExtraBold); Text("Your training dashboard.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+ 
+-        // What to train today (recommendation + recovery) — the core of the dashboard.
++        // Coach Dashboard — the unified "Good morning" advisor (recommendation +
++        // recovery + focus + progression + goal + estimated time).
+         item {
+-            com.replog.ui.coach.SmartCoachCard(
++            com.replog.ui.coach.CoachDashboardCard(
+                 state = coachState,
+                 onStart = {
+                     coachViewModel.acceptRecommendation(
+-- 
+2.47.3
+

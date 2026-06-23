@@ -1,0 +1,25 @@
+From cd1ab35484d65d84d392ae314627bdf312d289c6 Mon Sep 17 00:00:00 2001
+From: RepLog Dev <dev@replog.local>
+Date: Tue, 23 Jun 2026 11:26:38 +0000
+Subject: [PATCH 15/15] changelog: correct bundle fetch ref to HEAD
+
+---
+ CHANGELOG_SINCE_APK.md | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/CHANGELOG_SINCE_APK.md b/CHANGELOG_SINCE_APK.md
+index d0b25a1..4f67711 100644
+--- a/CHANGELOG_SINCE_APK.md
++++ b/CHANGELOG_SINCE_APK.md
+@@ -131,7 +131,7 @@ A git **bundle** is provided at `patches/replog-improvements.bundle` (covers `79
+ 
+ ```bash
+ # 1) fetch the commits from the bundle
+-git fetch /path/to/replog-improvements.bundle sync/apply-improvements:bundle/improvements
++git fetch /path/to/replog-improvements.bundle HEAD:bundle/improvements
+ 
+ # 2) merge onto main (fast-forward, since they sit on top of 79debc5)
+ git checkout main
+-- 
+2.47.3
+

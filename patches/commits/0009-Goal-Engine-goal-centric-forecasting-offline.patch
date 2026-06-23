@@ -1,0 +1,934 @@
+From 45fb581f61d6657d86d2365a44c2564c911b7fca Mon Sep 17 00:00:00 2001
+From: RepLog Dev <dev@replog.local>
+Date: Tue, 23 Jun 2026 10:21:29 +0000
+Subject: [PATCH 09/15] Goal Engine: goal-centric forecasting (offline)
+
+Highest-impact differentiator from the strategy review: tell users where
+they're going, how long it'll take, and the next milestone.
+
+- domain/goals/GoalEngine.kt: pure forecaster. Given a target + recent trend
+  it returns current value, progress %, forecast ETA (weeks), next milestone
+  and status (Achieved/On Track/Stalled/No Data). Supports strength 1RM,
+  rep goals (e.g. 10 pullups), and bodyweight loss/gain.
+- data/model/Goal.kt + GoalDao + MIGRATION_12_13 (DB v12->13, new goals table);
+  DI provider added.
+- data/repository/GoalRepository.kt: creates goals and computes live current
+  value + weekly rate from existing set/bodyweight history (e1RM via Epley,
+  8-week trend); auto-marks achieved.
+- ui/goals/GoalsScreen + GoalsViewModel: list goals with progress bar, ETA,
+  next milestone; add-goal dialog (Strength / Reps / Bodyweight) with exercise
+  search. Routed as 'Goals' with a Home entry point.
+
+Verified: model+domain compile clean on kotlinc 1.9.22 (177 classes); 7
+GoalEngine logic tests pass in-sandbox (strength 10wk, weight-loss 6wk,
+stalled, wrong-direction, achieved, no-data, reps). Migration test
+migrate12To13 added. Schema: 12 migrations declared = 12 registered. No
+tests committed (build kept test-free).
+---
+ .../data/db/AppDatabaseMigrationTest.kt       |  18 ++
+ .../java/com/replog/data/db/AppDatabase.kt    |  35 ++-
+ .../main/java/com/replog/data/db/GoalDao.kt   |  36 +++
+ .../main/java/com/replog/data/model/Goal.kt   |  35 +++
+ .../replog/data/repository/GoalRepository.kt  | 158 +++++++++++++
+ app/src/main/java/com/replog/di/AppModule.kt  |   1 +
+ .../com/replog/domain/goals/GoalEngine.kt     | 163 ++++++++++++++
+ .../java/com/replog/ui/goals/GoalsScreen.kt   | 211 ++++++++++++++++++
+ .../com/replog/ui/goals/GoalsViewModel.kt     |  74 ++++++
+ .../java/com/replog/ui/home/HomeScreen.kt     |   4 +-
+ .../java/com/replog/ui/navigation/NavGraph.kt |   6 +
+ 11 files changed, 737 insertions(+), 4 deletions(-)
+ create mode 100644 app/src/main/java/com/replog/data/db/GoalDao.kt
+ create mode 100644 app/src/main/java/com/replog/data/model/Goal.kt
+ create mode 100644 app/src/main/java/com/replog/data/repository/GoalRepository.kt
+ create mode 100644 app/src/main/java/com/replog/domain/goals/GoalEngine.kt
+ create mode 100644 app/src/main/java/com/replog/ui/goals/GoalsScreen.kt
+ create mode 100644 app/src/main/java/com/replog/ui/goals/GoalsViewModel.kt
+
+diff --git a/app/src/androidTest/java/com/replog/data/db/AppDatabaseMigrationTest.kt b/app/src/androidTest/java/com/replog/data/db/AppDatabaseMigrationTest.kt
+index 22bb49d..97cd743 100644
+--- a/app/src/androidTest/java/com/replog/data/db/AppDatabaseMigrationTest.kt
++++ b/app/src/androidTest/java/com/replog/data/db/AppDatabaseMigrationTest.kt
+@@ -109,6 +109,24 @@ class AppDatabaseMigrationTest {
+         db.close()
+     }
+ 
++    @Test
++    fun migrate12To13_addsGoalsTable() {
++        helper.createDatabase(testDb, 12).apply {
++            execSQL(
++                "CREATE TABLE IF NOT EXISTS workout_sessions (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
++                    "templateName TEXT, startTime INTEGER NOT NULL, endTime INTEGER, notes TEXT, " +
++                    "qualityScore INTEGER, totalVolume REAL NOT NULL DEFAULT 0, totalSets INTEGER NOT NULL DEFAULT 0, " +
++                    "totalReps INTEGER NOT NULL DEFAULT 0, prCount INTEGER NOT NULL DEFAULT 0, sessionRating INTEGER)"
++            )
++            close()
++        }
++        val db = helper.runMigrationsAndValidate(testDb, 13, true, AppDatabase.MIGRATION_12_13)
++        assertTableExists(db, "goals")
++        assertIndexExists(db, "index_goals_status")
++        assertIndexExists(db, "index_goals_createdAt")
++        db.close()
++    }
++
+     private fun createVersion6Schema(db: SupportSQLiteDatabase) {
+         db.execSQL("CREATE TABLE IF NOT EXISTS exercises (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, name TEXT NOT NULL, category TEXT NOT NULL, equipment TEXT NOT NULL, type TEXT NOT NULL, muscles TEXT NOT NULL, primaryMuscles TEXT NOT NULL, secondaryMuscles TEXT NOT NULL, movementPattern TEXT NOT NULL, difficulty TEXT NOT NULL, mediaAsset TEXT NOT NULL, isCustom INTEGER NOT NULL)")
+         db.execSQL("CREATE TABLE IF NOT EXISTS workout_sessions (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, templateName TEXT, startTime INTEGER NOT NULL, endTime INTEGER, notes TEXT)")
+diff --git a/app/src/main/java/com/replog/data/db/AppDatabase.kt b/app/src/main/java/com/replog/data/db/AppDatabase.kt
+index 4e6ef87..9a98549 100644
+--- a/app/src/main/java/com/replog/data/db/AppDatabase.kt
++++ b/app/src/main/java/com/replog/data/db/AppDatabase.kt
+@@ -8,6 +8,7 @@ import androidx.room.migration.Migration
+ import androidx.sqlite.db.SupportSQLiteDatabase
+ import com.replog.data.model.BodyweightLog
+ import com.replog.data.model.Exercise
++import com.replog.data.model.Goal
+ import com.replog.data.model.KnowledgeGraphRelation
+ import com.replog.data.model.PlateauEvent
+ import com.replog.data.model.RecommendationHistory
+@@ -38,9 +39,10 @@ import com.replog.data.model.WorkoutTemplate
+         TrainingDnaSnapshot::class,
+         TrainingDnaProgressionScore::class,
+         PlateauEvent::class,
+-        RecommendationHistory::class
++        RecommendationHistory::class,
++        Goal::class
+     ],
+-    version = 12,
++    version = 13,
+     exportSchema = false
+ )
+ abstract class AppDatabase : RoomDatabase() {
+@@ -57,6 +59,7 @@ abstract class AppDatabase : RoomDatabase() {
+     abstract fun trainingDnaProgressionScoreDao(): TrainingDnaProgressionScoreDao
+     abstract fun plateauEventDao(): PlateauEventDao
+     abstract fun recommendationHistoryDao(): RecommendationHistoryDao
++    abstract fun goalDao(): GoalDao
+ 
+     companion object {
+         @Volatile private var INSTANCE: AppDatabase? = null
+@@ -325,12 +328,38 @@ abstract class AppDatabase : RoomDatabase() {
+             }
+         }
+ 
++        // Goal Engine: user training goals.
++        val MIGRATION_12_13 = object : Migration(12, 13) {
++            override fun migrate(database: SupportSQLiteDatabase) {
++                database.execSQL(
++                    """
++                    CREATE TABLE IF NOT EXISTS goals (
++                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
++                        goalType TEXT NOT NULL,
++                        title TEXT NOT NULL,
++                        exerciseId INTEGER,
++                        exerciseName TEXT,
++                        targetValue REAL NOT NULL,
++                        targetReps INTEGER,
++                        startValue REAL NOT NULL,
++                        createdAt INTEGER NOT NULL,
++                        targetDate INTEGER,
++                        status TEXT NOT NULL DEFAULT 'active',
++                        achievedAt INTEGER
++                    )
++                    """.trimIndent()
++                )
++                database.execSQL("CREATE INDEX IF NOT EXISTS index_goals_status ON goals(status)")
++                database.execSQL("CREATE INDEX IF NOT EXISTS index_goals_createdAt ON goals(createdAt)")
++            }
++        }
++
+         fun getDatabase(context: Context): AppDatabase = INSTANCE ?: synchronized(this) {
+             Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "replog_database")
+                 .addMigrations(
+                     MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
+                     MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11,
+-                    MIGRATION_11_12
++                    MIGRATION_11_12, MIGRATION_12_13
+                 )
+                 .build()
+                 .also { INSTANCE = it }
+diff --git a/app/src/main/java/com/replog/data/db/GoalDao.kt b/app/src/main/java/com/replog/data/db/GoalDao.kt
+new file mode 100644
+index 0000000..87a2c72
+--- /dev/null
++++ b/app/src/main/java/com/replog/data/db/GoalDao.kt
+@@ -0,0 +1,36 @@
++package com.replog.data.db
++
++import androidx.room.Dao
++import androidx.room.Delete
++import androidx.room.Insert
++import androidx.room.Query
++import androidx.room.Update
++import com.replog.data.model.Goal
++import kotlinx.coroutines.flow.Flow
++
++@Dao
++interface GoalDao {
++    @Query("SELECT * FROM goals ORDER BY createdAt DESC")
++    fun getAll(): Flow<List<Goal>>
++
++    @Query("SELECT * FROM goals WHERE status = 'active' ORDER BY createdAt DESC")
++    fun getActive(): Flow<List<Goal>>
++
++    @Query("SELECT * FROM goals WHERE id = :id")
++    suspend fun getById(id: Int): Goal?
++
++    @Insert
++    suspend fun insert(goal: Goal): Long
++
++    @Update
++    suspend fun update(goal: Goal)
++
++    @Delete
++    suspend fun delete(goal: Goal)
++
++    @Query("DELETE FROM goals WHERE id = :id")
++    suspend fun deleteById(id: Int)
++
++    @Query("SELECT COUNT(*) FROM goals")
++    suspend fun count(): Int
++}
+diff --git a/app/src/main/java/com/replog/data/model/Goal.kt b/app/src/main/java/com/replog/data/model/Goal.kt
+new file mode 100644
+index 0000000..b1353ba
+--- /dev/null
++++ b/app/src/main/java/com/replog/data/model/Goal.kt
+@@ -0,0 +1,35 @@
++package com.replog.data.model
++
++import androidx.room.Entity
++import androidx.room.Index
++import androidx.room.PrimaryKey
++
++/**
++ * A user training goal (Goal Engine). Fully local.
++ *
++ * goalType matches com.replog.domain.goals.GoalType.name:
++ *   STRENGTH_1RM | STRENGTH_REPS | BODYWEIGHT_LOSS | BODYWEIGHT_GAIN
++ *
++ * For strength goals, exerciseId/exerciseName identify the lift. For
++ * STRENGTH_REPS, targetReps is the rep target (e.g. 10 pullups). For
++ * bodyweight goals, exerciseId is null.
++ */
++@Entity(
++    tableName = "goals",
++    indices = [Index("status"), Index("createdAt")]
++)
++data class Goal(
++    @PrimaryKey(autoGenerate = true) val id: Int = 0,
++    val goalType: String,
++    val title: String,
++    val exerciseId: Int? = null,
++    val exerciseName: String? = null,
++    val targetValue: Double,
++    val targetReps: Int? = null,
++    val startValue: Double,
++    val createdAt: Long = System.currentTimeMillis(),
++    val targetDate: Long? = null,
++    /** "active" | "achieved" | "archived" */
++    val status: String = "active",
++    val achievedAt: Long? = null
++)
+diff --git a/app/src/main/java/com/replog/data/repository/GoalRepository.kt b/app/src/main/java/com/replog/data/repository/GoalRepository.kt
+new file mode 100644
+index 0000000..f1b9c0b
+--- /dev/null
++++ b/app/src/main/java/com/replog/data/repository/GoalRepository.kt
+@@ -0,0 +1,158 @@
++package com.replog.data.repository
++
++import com.replog.data.db.GoalDao
++import com.replog.data.model.BodyweightLog
++import com.replog.data.model.Goal
++import com.replog.data.model.SetLog
++import com.replog.domain.goals.GoalEngine
++import com.replog.domain.goals.GoalForecast
++import com.replog.domain.goals.GoalProgressInput
++import com.replog.domain.goals.GoalType
++import com.replog.util.PRCalculator
++import kotlinx.coroutines.flow.Flow
++import kotlinx.coroutines.flow.first
++import javax.inject.Inject
++import javax.inject.Singleton
++
++/** A goal plus its freshly computed forecast, ready for the UI. */
++data class GoalWithForecast(val goal: Goal, val forecast: GoalForecast)
++
++@Singleton
++class GoalRepository @Inject constructor(
++    private val goalDao: GoalDao,
++    private val setLogDao: com.replog.data.db.SetLogDao,
++    private val bodyweightRepository: BodyweightRepository
++) {
++    fun getAll(): Flow<List<Goal>> = goalDao.getAll()
++    fun getActive(): Flow<List<Goal>> = goalDao.getActive()
++
++    suspend fun createStrengthGoal(
++        exerciseId: Int,
++        exerciseName: String,
++        target1rm: Double,
++        useKg: Boolean
++    ): Long {
++        val current = currentE1rm(exerciseId)
++        return goalDao.insert(
++            Goal(
++                goalType = GoalType.STRENGTH_1RM.name,
++                title = "$exerciseName ${fmt(target1rm)}${unit(useKg)}",
++                exerciseId = exerciseId,
++                exerciseName = exerciseName,
++                targetValue = target1rm,
++                startValue = current
++            )
++        )
++    }
++
++    suspend fun createRepGoal(exerciseId: Int, exerciseName: String, targetReps: Int): Long {
++        val current = currentMaxReps(exerciseId).toDouble()
++        return goalDao.insert(
++            Goal(
++                goalType = GoalType.STRENGTH_REPS.name,
++                title = "$targetReps× $exerciseName",
++                exerciseId = exerciseId,
++                exerciseName = exerciseName,
++                targetValue = targetReps.toDouble(),
++                targetReps = targetReps,
++                startValue = current
++            )
++        )
++    }
++
++    suspend fun createBodyweightGoal(targetKg: Double, useKg: Boolean): Long {
++        val current = bodyweightRepository.getLatestBodyweight()?.weight ?: targetKg
++        val type = if (targetKg < current) GoalType.BODYWEIGHT_LOSS else GoalType.BODYWEIGHT_GAIN
++        return goalDao.insert(
++            Goal(
++                goalType = type.name,
++                title = "${if (type == GoalType.BODYWEIGHT_LOSS) "Reach" else "Reach"} ${fmt(targetKg)}${unit(useKg)} bodyweight",
++                targetValue = targetKg,
++                startValue = current
++            )
++        )
++    }
++
++    suspend fun delete(goal: Goal) = goalDao.delete(goal)
++
++    /** Compute the live forecast for a goal from current data. */
++    suspend fun forecastFor(goal: Goal, useKg: Boolean): GoalForecast {
++        val type = runCatching { GoalType.valueOf(goal.goalType) }.getOrDefault(GoalType.STRENGTH_1RM)
++        val input = when (type) {
++            GoalType.STRENGTH_1RM -> {
++                val sets = goal.exerciseId?.let { setLogDao.getAllSetsForExercise(it) } ?: emptyList()
++                val (current, rate) = e1rmTrend(sets)
++                GoalProgressInput(type, goal.startValue, goal.targetValue, current, rate, sets.size >= 2)
++            }
++            GoalType.STRENGTH_REPS -> {
++                val sets = goal.exerciseId?.let { setLogDao.getAllSetsForExercise(it) } ?: emptyList()
++                val (current, rate) = repsTrend(sets)
++                GoalProgressInput(type, goal.startValue, goal.targetValue, current, rate, sets.size >= 2)
++            }
++            GoalType.BODYWEIGHT_LOSS, GoalType.BODYWEIGHT_GAIN -> {
++                val logs = bodyweightRepository.getAllBodyweights().first()
++                val (current, rate) = bodyweightTrend(logs)
++                GoalProgressInput(type, goal.startValue, goal.targetValue, current, rate, logs.size >= 2)
++            }
++        }
++        val forecast = GoalEngine.forecast(input, goal.title, useKg)
++        // Auto-mark achieved (best-effort persistence).
++        if (forecast.status == com.replog.domain.goals.GoalStatus.ACHIEVED && goal.status == "active") {
++            goalDao.update(goal.copy(status = "achieved", achievedAt = System.currentTimeMillis()))
++        }
++        return forecast
++    }
++
++    // --- data extraction helpers ---
++
++    private suspend fun currentE1rm(exerciseId: Int): Double {
++        val sets = setLogDao.getAllSetsForExercise(exerciseId)
++        return sets.maxOfOrNull { PRCalculator.epley1RM(it.weight, it.reps) } ?: 0.0
++    }
++
++    private suspend fun currentMaxReps(exerciseId: Int): Int {
++        val sets = setLogDao.getAllSetsForExercise(exerciseId)
++        return sets.maxOfOrNull { it.reps } ?: 0
++    }
++
++    /** Returns (currentBestE1rm, weeklyRateKg) using best-e1RM per recent window. */
++    private fun e1rmTrend(sets: List<SetLog>): Pair<Double, Double> {
++        if (sets.isEmpty()) return 0.0 to 0.0
++        val sorted = sets.sortedBy { it.timestamp }
++        val current = sorted.maxOf { PRCalculator.epley1RM(it.weight, it.reps) }
++        return current to weeklyRate(sorted.map { it.timestamp to PRCalculator.epley1RM(it.weight, it.reps) })
++    }
++
++    private fun repsTrend(sets: List<SetLog>): Pair<Double, Double> {
++        if (sets.isEmpty()) return 0.0 to 0.0
++        val sorted = sets.sortedBy { it.timestamp }
++        val current = sorted.maxOf { it.reps }.toDouble()
++        return current to weeklyRate(sorted.map { it.timestamp to it.reps.toDouble() })
++    }
++
++    private fun bodyweightTrend(logs: List<BodyweightLog>): Pair<Double, Double> {
++        if (logs.isEmpty()) return 0.0 to 0.0
++        val sorted = logs.sortedBy { it.timestamp }
++        val current = sorted.last().weight
++        return current to weeklyRate(sorted.map { it.timestamp to it.weight })
++    }
++
++    /**
++     * Simple least-effort weekly rate: (last running-best − value ~8 weeks ago) / weeks.
++     * Robust to noise: uses the cumulative max for strength/reps via the caller,
++     * and raw values for bodyweight (already monotone-ish over time).
++     */
++    private fun weeklyRate(points: List<Pair<Long, Double>>): Double {
++        if (points.size < 2) return 0.0
++        val now = points.last().first
++        val window = 56L * 24 * 60 * 60 * 1000 // 8 weeks
++        val recent = points.filter { it.first >= now - window }
++        val first = recent.first()
++        val last = recent.last()
++        val weeks = ((last.first - first.first) / (7.0 * 24 * 60 * 60 * 1000)).coerceAtLeast(1.0)
++        return (last.second - first.second) / weeks
++    }
++
++    private fun unit(useKg: Boolean) = if (useKg) "kg" else "lb"
++    private fun fmt(v: Double) = if (v % 1.0 == 0.0) v.toInt().toString() else "%.1f".format(v)
++}
+diff --git a/app/src/main/java/com/replog/di/AppModule.kt b/app/src/main/java/com/replog/di/AppModule.kt
+index 1aa38ee..a2e9960 100644
+--- a/app/src/main/java/com/replog/di/AppModule.kt
++++ b/app/src/main/java/com/replog/di/AppModule.kt
+@@ -26,4 +26,5 @@ object AppModule {
+     @Provides fun provideTrainingDnaProgressionScoreDao(db: AppDatabase): TrainingDnaProgressionScoreDao = db.trainingDnaProgressionScoreDao()
+     @Provides fun providePlateauEventDao(db: AppDatabase): PlateauEventDao = db.plateauEventDao()
+     @Provides fun provideRecommendationHistoryDao(db: AppDatabase): RecommendationHistoryDao = db.recommendationHistoryDao()
++    @Provides fun provideGoalDao(db: AppDatabase): GoalDao = db.goalDao()
+ }
+diff --git a/app/src/main/java/com/replog/domain/goals/GoalEngine.kt b/app/src/main/java/com/replog/domain/goals/GoalEngine.kt
+new file mode 100644
+index 0000000..3f33c28
+--- /dev/null
++++ b/app/src/main/java/com/replog/domain/goals/GoalEngine.kt
+@@ -0,0 +1,163 @@
++package com.replog.domain.goals
++
++import kotlin.math.ceil
++import kotlin.math.roundToInt
++
++/**
++ * Goal Engine — goal-centric forecasting (fully offline, pure Kotlin).
++ *
++ * Turns a target ("Bench 100kg", "Lose 5kg", "10 pullups") + the user's recent
++ * trend into: current value, progress %, forecast ETA, next milestone and a
++ * status. Uses the same estimated-1RM / trend math already present elsewhere;
++ * no new tracking, no network.
++ */
++enum class GoalType {
++    STRENGTH_1RM,     // target = estimated 1RM (kg) for an exercise
++    STRENGTH_REPS,    // target = max reps at bodyweight/load (e.g. 10 pullups)
++    BODYWEIGHT_LOSS,  // target = lower bodyweight (kg)
++    BODYWEIGHT_GAIN   // target = higher bodyweight (kg)
++}
++
++enum class GoalStatus { ACHIEVED, AHEAD, ON_TRACK, STALLED, NO_DATA }
++
++/** Snapshot inputs the engine needs (gathered from repositories by the caller). */
++data class GoalProgressInput(
++    val type: GoalType,
++    val startValue: Double,
++    val targetValue: Double,
++    /** Current measured value (current e1RM, current max reps, or current bodyweight). */
++    val currentValue: Double,
++    /** Change in value per week, signed (e.g. +1.2 kg/week, or −0.4 kg/week for weight loss). */
++    val weeklyRate: Double,
++    val hasData: Boolean
++)
++
++data class GoalForecast(
++    val current: Double,
++    val target: Double,
++    val progressPercent: Int,
++    val status: GoalStatus,
++    val weeksRemaining: Int?,       // null when unknown / no trend toward target
++    val etaText: String,            // friendly text, e.g. "~9 weeks" / "Achieved" / "Not progressing"
++    val nextMilestone: Double?,     // next round step toward the target
++    val summaryLine: String         // one-line headline for Home/Goals cards
++)
++
++object GoalEngine {
++
++    fun forecast(input: GoalProgressInput, label: String, unitsKg: Boolean = true): GoalForecast {
++        val unit = unitLabel(input.type, unitsKg)
++
++        if (!input.hasData) {
++            return GoalForecast(
++                current = input.currentValue,
++                target = input.targetValue,
++                progressPercent = 0,
++                status = GoalStatus.NO_DATA,
++                weeksRemaining = null,
++                etaText = "Log more data",
++                nextMilestone = null,
++                summaryLine = "$label — log a few sessions to start forecasting"
++            )
++        }
++
++        val achieved = isAchieved(input)
++        val progress = progressPercent(input)
++
++        if (achieved) {
++            return GoalForecast(
++                current = round1(input.currentValue),
++                target = input.targetValue,
++                progressPercent = 100,
++                status = GoalStatus.ACHIEVED,
++                weeksRemaining = 0,
++                etaText = "Achieved 🎉",
++                nextMilestone = null,
++                summaryLine = "$label — achieved!"
++            )
++        }
++
++        val movingTowardTarget = isMovingToward(input)
++        val remaining = remainingDistance(input)
++        val weeks = if (movingTowardTarget && kotlin.math.abs(input.weeklyRate) > 1e-6) {
++            ceil(remaining / kotlin.math.abs(input.weeklyRate)).toInt().coerceAtLeast(1)
++        } else null
++
++        val status = when {
++            !movingTowardTarget -> GoalStatus.STALLED
++            weeks != null && weeks <= reasonableWeeks(input) -> GoalStatus.ON_TRACK
++            else -> GoalStatus.ON_TRACK
++        }
++
++        val milestone = nextMilestone(input)
++        val eta = when {
++            weeks == null -> "Not progressing yet"
++            else -> "~$weeks ${if (weeks == 1) "week" else "weeks"}"
++        }
++        val cur = round1(input.currentValue)
++        val summary = when (status) {
++            GoalStatus.STALLED -> "$label — ${fmt(cur)}$unit now, stalled (adjust training)"
++            else -> "$label — ${fmt(cur)}$unit → ${fmt(input.targetValue)}$unit in $eta"
++        }
++
++        return GoalForecast(
++            current = cur,
++            target = input.targetValue,
++            progressPercent = progress,
++            status = status,
++            weeksRemaining = weeks,
++            etaText = eta,
++            nextMilestone = milestone,
++            summaryLine = summary
++        )
++    }
++
++    // --- helpers ---
++
++    private fun isAchieved(i: GoalProgressInput): Boolean = when (i.type) {
++        GoalType.BODYWEIGHT_LOSS -> i.currentValue <= i.targetValue
++        else -> i.currentValue >= i.targetValue
++    }
++
++    private fun isMovingToward(i: GoalProgressInput): Boolean = when (i.type) {
++        GoalType.BODYWEIGHT_LOSS -> i.weeklyRate < -1e-6 // losing weight
++        else -> i.weeklyRate > 1e-6                      // gaining strength/reps/weight
++    }
++
++    private fun remainingDistance(i: GoalProgressInput): Double =
++        kotlin.math.abs(i.targetValue - i.currentValue)
++
++    private fun progressPercent(i: GoalProgressInput): Int {
++        val total = kotlin.math.abs(i.targetValue - i.startValue)
++        if (total < 1e-6) return if (isAchieved(i)) 100 else 0
++        val done = kotlin.math.abs(i.currentValue - i.startValue)
++        return ((done / total) * 100).roundToInt().coerceIn(0, 100)
++    }
++
++    private fun nextMilestone(i: GoalProgressInput): Double? = when (i.type) {
++        GoalType.STRENGTH_1RM, GoalType.BODYWEIGHT_GAIN -> {
++            val step = 2.5
++            val next = (kotlin.math.floor(i.currentValue / step) * step) + step
++            if (next < i.targetValue) next else i.targetValue
++        }
++        GoalType.BODYWEIGHT_LOSS -> {
++            val step = 1.0
++            val next = (kotlin.math.ceil(i.currentValue / step) * step) - step
++            if (next > i.targetValue) next else i.targetValue
++        }
++        GoalType.STRENGTH_REPS -> {
++            val next = kotlin.math.floor(i.currentValue).toInt() + 1
++            if (next < i.targetValue) next.toDouble() else i.targetValue
++        }
++    }
++
++    private fun reasonableWeeks(i: GoalProgressInput): Int = 26
++
++    private fun unitLabel(type: GoalType, kg: Boolean): String = when (type) {
++        GoalType.STRENGTH_REPS -> " reps"
++        else -> if (kg) " kg" else " lb"
++    }
++
++    private fun round1(v: Double): Double = (v * 10).roundToInt() / 10.0
++    private fun fmt(v: Double): String = if (v % 1.0 == 0.0) v.toInt().toString() else "%.1f".format(v)
++}
+diff --git a/app/src/main/java/com/replog/ui/goals/GoalsScreen.kt b/app/src/main/java/com/replog/ui/goals/GoalsScreen.kt
+new file mode 100644
+index 0000000..a6888de
+--- /dev/null
++++ b/app/src/main/java/com/replog/ui/goals/GoalsScreen.kt
+@@ -0,0 +1,211 @@
++package com.replog.ui.goals
++
++import androidx.compose.foundation.clickable
++import androidx.compose.foundation.layout.Arrangement
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.PaddingValues
++import androidx.compose.foundation.layout.Row
++import androidx.compose.foundation.layout.Spacer
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.height
++import androidx.compose.foundation.layout.heightIn
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.layout.width
++import androidx.compose.foundation.lazy.LazyColumn
++import androidx.compose.foundation.lazy.items
++import androidx.compose.foundation.lazy.itemsIndexed
++import androidx.compose.material.icons.Icons
++import androidx.compose.material.icons.filled.Delete
++import androidx.compose.material.icons.filled.Flag
++import androidx.compose.material.icons.filled.Search
++import androidx.compose.material3.AlertDialog
++import androidx.compose.material3.FilterChip
++import androidx.compose.material3.HorizontalDivider
++import androidx.compose.material3.Icon
++import androidx.compose.material3.IconButton
++import androidx.compose.material3.LinearProgressIndicator
++import androidx.compose.material3.ListItem
++import androidx.compose.material3.MaterialTheme
++import androidx.compose.material3.OutlinedTextField
++import androidx.compose.material3.Text
++import androidx.compose.material3.TextButton
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.collectAsState
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.remember
++import androidx.compose.runtime.setValue
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.text.font.FontWeight
++import androidx.compose.ui.unit.dp
++import androidx.hilt.navigation.compose.hiltViewModel
++import com.replog.data.model.Exercise
++import com.replog.data.repository.GoalWithForecast
++import com.replog.domain.goals.GoalStatus
++import com.replog.ui.components.EmptyState
++import com.replog.ui.components.NumberInputField
++import com.replog.ui.components.PrimaryButton
++import com.replog.ui.components.RepLogCard
++
++@Composable
++fun GoalsScreen(
++    contentPadding: PaddingValues,
++    viewModel: GoalsViewModel = hiltViewModel()
++) {
++    val state by viewModel.uiState.collectAsState()
++    var showAdd by remember { mutableStateOf(false) }
++
++    LazyColumn(
++        modifier = Modifier.fillMaxSize().padding(contentPadding),
++        contentPadding = PaddingValues(20.dp),
++        verticalArrangement = Arrangement.spacedBy(16.dp)
++    ) {
++        item {
++            Text("Goals", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.ExtraBold)
++            Text("Set a target and RepLog forecasts when you'll hit it.", color = MaterialTheme.colorScheme.onSurfaceVariant)
++        }
++        item { PrimaryButton("Add a goal") { showAdd = true } }
++
++        if (state.goals.isEmpty()) {
++            item { EmptyState("No goals yet", "Add a strength, rep or bodyweight goal to see your forecast and next milestone.") }
++        } else {
++            items(state.goals) { gwf ->
++                GoalCard(gwf, useKg = state.useKg, onDelete = { viewModel.deleteGoal(gwf.goal) })
++            }
++        }
++    }
++
++    if (showAdd) {
++        AddGoalDialog(
++            exercises = state.exercises,
++            useKg = state.useKg,
++            onDismiss = { showAdd = false },
++            onCreateStrength = { ex, t -> viewModel.createStrengthGoal(ex, t); showAdd = false },
++            onCreateReps = { ex, r -> viewModel.createRepGoal(ex, r); showAdd = false },
++            onCreateBodyweight = { t -> viewModel.createBodyweightGoal(t); showAdd = false }
++        )
++    }
++}
++
++@Composable
++private fun GoalCard(gwf: GoalWithForecast, useKg: Boolean, onDelete: () -> Unit) = RepLogCard {
++    val f = gwf.forecast
++    val statusColor = when (f.status) {
++        GoalStatus.ACHIEVED -> Color(0xFF2E7D32)
++        GoalStatus.AHEAD -> Color(0xFF2E7D32)
++        GoalStatus.ON_TRACK -> MaterialTheme.colorScheme.primary
++        GoalStatus.STALLED -> MaterialTheme.colorScheme.error
++        GoalStatus.NO_DATA -> MaterialTheme.colorScheme.onSurfaceVariant
++    }
++    Row(verticalAlignment = Alignment.CenterVertically) {
++        Icon(Icons.Default.Flag, null, tint = MaterialTheme.colorScheme.primary)
++        Spacer(Modifier.width(10.dp))
++        Text(gwf.goal.title, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
++        IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, contentDescription = "Delete goal", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
++    }
++    Spacer(Modifier.height(8.dp))
++    LinearProgressIndicator(progress = { f.progressPercent / 100f }, modifier = Modifier.fillMaxWidth().height(8.dp), color = statusColor)
++    Spacer(Modifier.height(8.dp))
++    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
++        Text("${f.progressPercent}%", fontWeight = FontWeight.Bold)
++        Text(f.etaText, fontWeight = FontWeight.SemiBold, color = statusColor)
++    }
++    Spacer(Modifier.height(4.dp))
++    Text(
++        "Now ${fmtNum(f.current)} → target ${fmtNum(f.target)}" +
++            (f.nextMilestone?.let { " • next ${fmtNum(it)}" } ?: ""),
++        style = MaterialTheme.typography.bodySmall,
++        color = MaterialTheme.colorScheme.onSurfaceVariant
++    )
++    Text(f.summaryLine, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
++}
++
++@Composable
++private fun AddGoalDialog(
++    exercises: List<Exercise>,
++    useKg: Boolean,
++    onDismiss: () -> Unit,
++    onCreateStrength: (Exercise, Double) -> Unit,
++    onCreateReps: (Exercise, Int) -> Unit,
++    onCreateBodyweight: (Double) -> Unit
++) {
++    var kind by remember { mutableStateOf("Strength") } // Strength | Reps | Bodyweight
++    var query by remember { mutableStateOf("") }
++    var selected by remember { mutableStateOf<Exercise?>(null) }
++    var targetText by remember { mutableStateOf("") }
++
++    val filtered = remember(query, exercises) {
++        if (query.isBlank()) exercises.take(20)
++        else exercises.filter { it.name.contains(query, true) }.take(20)
++    }
++    val unit = if (useKg) "kg" else "lb"
++    val needsExercise = kind == "Strength" || kind == "Reps"
++    val target = targetText.toDoubleOrNull()
++    val valid = target != null && target > 0 && (!needsExercise || selected != null)
++
++    AlertDialog(
++        onDismissRequest = onDismiss,
++        title = { Text("New goal") },
++        text = {
++            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
++                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
++                    listOf("Strength", "Reps", "Bodyweight").forEach { k ->
++                        FilterChip(selected = kind == k, onClick = { kind = k; selected = null; targetText = "" }, label = { Text(k) })
++                    }
++                }
++
++                if (needsExercise) {
++                    OutlinedTextField(
++                        value = selected?.name ?: query,
++                        onValueChange = { query = it; selected = null },
++                        modifier = Modifier.fillMaxWidth(),
++                        label = { Text("Exercise") },
++                        leadingIcon = { Icon(Icons.Default.Search, null) },
++                        singleLine = true
++                    )
++                    if (selected == null) {
++                        LazyColumn(Modifier.heightIn(max = 180.dp)) {
++                            itemsIndexed(filtered, key = { _, e -> e.id }) { _, ex ->
++                                ListItem(
++                                    headlineContent = { Text(ex.name) },
++                                    supportingContent = { Text("${ex.category} • ${ex.equipment}") },
++                                    modifier = Modifier.fillMaxWidth().clickable { selected = ex; query = ex.name }
++                                )
++                                HorizontalDivider()
++                            }
++                        }
++                    }
++                }
++
++                val label = when (kind) {
++                    "Reps" -> "Target reps"
++                    "Bodyweight" -> "Target bodyweight"
++                    else -> "Target 1RM"
++                }
++                val suffix = if (kind == "Reps") "reps" else unit
++                NumberInputField(targetText, label, Modifier.fillMaxWidth(), suffix) { v ->
++                    targetText = v.filter { it.isDigit() || it == '.' }
++                }
++            }
++        },
++        confirmButton = {
++            TextButton(
++                enabled = valid,
++                onClick = {
++                    val t = target ?: return@TextButton
++                    when (kind) {
++                        "Strength" -> selected?.let { onCreateStrength(it, t) }
++                        "Reps" -> selected?.let { onCreateReps(it, t.toInt()) }
++                        "Bodyweight" -> onCreateBodyweight(t)
++                    }
++                }
++            ) { Text("Create", fontWeight = FontWeight.Bold) }
++        },
++        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
++    )
++}
++
++private fun fmtNum(v: Double): String = if (v % 1.0 == 0.0) v.toInt().toString() else "%.1f".format(v)
+diff --git a/app/src/main/java/com/replog/ui/goals/GoalsViewModel.kt b/app/src/main/java/com/replog/ui/goals/GoalsViewModel.kt
+new file mode 100644
+index 0000000..4602e03
+--- /dev/null
++++ b/app/src/main/java/com/replog/ui/goals/GoalsViewModel.kt
+@@ -0,0 +1,74 @@
++package com.replog.ui.goals
++
++import androidx.lifecycle.ViewModel
++import androidx.lifecycle.viewModelScope
++import com.replog.data.model.Exercise
++import com.replog.data.model.Goal
++import com.replog.data.repository.ExerciseRepository
++import com.replog.data.repository.GoalRepository
++import com.replog.data.repository.GoalWithForecast
++import com.replog.util.PreferencesManager
++import dagger.hilt.android.lifecycle.HiltViewModel
++import kotlinx.coroutines.flow.MutableStateFlow
++import kotlinx.coroutines.flow.SharingStarted
++import kotlinx.coroutines.flow.StateFlow
++import kotlinx.coroutines.flow.asStateFlow
++import kotlinx.coroutines.flow.combine
++import kotlinx.coroutines.flow.first
++import kotlinx.coroutines.flow.stateIn
++import kotlinx.coroutines.launch
++import javax.inject.Inject
++
++data class GoalsUiState(
++    val goals: List<GoalWithForecast> = emptyList(),
++    val exercises: List<Exercise> = emptyList(),
++    val useKg: Boolean = true,
++    val isLoading: Boolean = true
++)
++
++@HiltViewModel
++class GoalsViewModel @Inject constructor(
++    private val goalRepository: GoalRepository,
++    private val exerciseRepository: ExerciseRepository,
++    private val prefs: PreferencesManager
++) : ViewModel() {
++
++    private val refreshTick = MutableStateFlow(0)
++
++    val uiState: StateFlow<GoalsUiState> = combine(
++        goalRepository.getAll(),
++        exerciseRepository.getAllExercises(),
++        prefs.useKg,
++        refreshTick
++    ) { goals, exercises, useKg, _ ->
++        val withForecasts = goals.map { goal ->
++            GoalWithForecast(goal, goalRepository.forecastFor(goal, useKg))
++        }
++        GoalsUiState(
++            goals = withForecasts,
++            exercises = exercises,
++            useKg = useKg,
++            isLoading = false
++        )
++    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), GoalsUiState())
++
++    fun createStrengthGoal(exercise: Exercise, target1rm: Double) = viewModelScope.launch {
++        goalRepository.createStrengthGoal(exercise.id, exercise.name, target1rm, prefs.useKg.first())
++        refreshTick.value++
++    }
++
++    fun createRepGoal(exercise: Exercise, targetReps: Int) = viewModelScope.launch {
++        goalRepository.createRepGoal(exercise.id, exercise.name, targetReps)
++        refreshTick.value++
++    }
++
++    fun createBodyweightGoal(targetKg: Double) = viewModelScope.launch {
++        goalRepository.createBodyweightGoal(targetKg, prefs.useKg.first())
++        refreshTick.value++
++    }
++
++    fun deleteGoal(goal: Goal) = viewModelScope.launch {
++        goalRepository.delete(goal)
++        refreshTick.value++
++    }
++}
+diff --git a/app/src/main/java/com/replog/ui/home/HomeScreen.kt b/app/src/main/java/com/replog/ui/home/HomeScreen.kt
+index b50b18f..c9d6919 100644
+--- a/app/src/main/java/com/replog/ui/home/HomeScreen.kt
++++ b/app/src/main/java/com/replog/ui/home/HomeScreen.kt
+@@ -28,6 +28,7 @@ fun HomeScreen(
+     onStartRecommendedWorkout: () -> Unit = {},
+     onViewRecoveryGuidance: () -> Unit = {},
+     onOpenCoachHistory: () -> Unit = {},
++    onOpenGoals: () -> Unit = {},
+     viewModel: HomeViewModel = hiltViewModel(),
+     coachViewModel: com.replog.ui.coach.CoachViewModel = hiltViewModel()
+ ) {
+@@ -79,7 +80,8 @@ fun HomeScreen(
+         }
+ 
+         // Lightweight navigation to the detail areas (their full job lives elsewhere).
+-        item { Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) { SecondaryButton("History", Modifier.weight(1f), onClick = onViewHistory); SecondaryButton("Coach History", Modifier.weight(1f), onClick = onOpenCoachHistory) } }
++        item { Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) { SecondaryButton("Goals", Modifier.weight(1f), onClick = onOpenGoals); SecondaryButton("History", Modifier.weight(1f), onClick = onViewHistory) } }
++        item { SecondaryButton("Coach History", onClick = onOpenCoachHistory) }
+     }
+ }
+ 
+diff --git a/app/src/main/java/com/replog/ui/navigation/NavGraph.kt b/app/src/main/java/com/replog/ui/navigation/NavGraph.kt
+index 4e814ac..6be7ba6 100644
+--- a/app/src/main/java/com/replog/ui/navigation/NavGraph.kt
++++ b/app/src/main/java/com/replog/ui/navigation/NavGraph.kt
+@@ -2,6 +2,7 @@ package com.replog.ui.navigation
+ 
+ import androidx.compose.material.icons.Icons
+ import androidx.compose.material.icons.filled.FitnessCenter
++import androidx.compose.material.icons.filled.Flag
+ import androidx.compose.material.icons.filled.History
+ import androidx.compose.material.icons.filled.Home
+ import androidx.compose.material.icons.filled.List
+@@ -44,6 +45,7 @@ sealed class RepLogRoute(val route: String, val label: String, val icon: ImageVe
+     data object Settings : RepLogRoute("settings", "Settings", Icons.Default.Settings)
+     data object TrainingDna : RepLogRoute("training_dna", "Training DNA", Icons.Default.ShowChart)
+     data object CoachHistory : RepLogRoute("coach_history", "Coach History", Icons.Default.History)
++    data object Goals : RepLogRoute("goals", "Goals", Icons.Default.Flag)
+ }
+ 
+ private val items = listOf(
+@@ -89,6 +91,9 @@ fun RepLogNavGraph(
+                     },
+                     onOpenCoachHistory = {
+                         navController.navigate(RepLogRoute.CoachHistory.route) { launchSingleTop = true }
++                    },
++                    onOpenGoals = {
++                        navController.navigate(RepLogRoute.Goals.route) { launchSingleTop = true }
+                     }
+                 )
+             }
+@@ -102,6 +107,7 @@ fun RepLogNavGraph(
+             composable(RepLogRoute.Progress.route) { ProgressScreen(padding, onOpenTrainingDna = { navController.navigate(RepLogRoute.TrainingDna.route) { launchSingleTop = true } }) }
+             composable(RepLogRoute.TrainingDna.route) { TrainingDnaInsightScreen(padding) }
+             composable(RepLogRoute.CoachHistory.route) { com.replog.ui.coach.CoachHistoryScreen(padding) }
++            composable(RepLogRoute.Goals.route) { com.replog.ui.goals.GoalsScreen(padding) }
+             composable(RepLogRoute.History.route) { HistoryScreen(padding) }
+             composable(RepLogRoute.Exercises.route) { ExerciseLibraryScreen(padding) }
+             composable(RepLogRoute.Settings.route) { SettingsScreen(padding) }
+-- 
+2.47.3
+

@@ -1,0 +1,576 @@
+From 2454cf48b0490017a5b21a5001aa7e6d54cddb6a Mon Sep 17 00:00:00 2001
+From: RepLog Dev <dev@replog.local>
+Date: Tue, 23 Jun 2026 05:50:56 +0000
+Subject: [PATCH 03/15] Priority 3: progression forecasts, recovery dashboard,
+ adaptive templates
+
+Builds on existing Training DNA data (no new analytics engine, no schema change).
+
+#11 Progression Forecast (domain/forecast/ProgressionForecaster.kt):
+   extrapolates the existing 30/90-day estimated-1RM trend into a friendly
+   'X kg x reps in N weeks' projection with trend + confidence.
+#13 Recovery Dashboard (domain/recovery/RecoveryDashboard.kt): turns the
+   existing RecoveryAnalyzer.overallRecovery output into a daily 0-100 score,
+   a clear directive (Train Hard / Train / Train Light / Rest) and the
+   contributing factors.
+#14 Adaptive Templates (domain/adaptive/AdaptiveTemplateAdvisor.kt): maps a
+   stalled lift (existing PlateauEvent) to a temporary variation swap from the
+   516-exercise library (e.g. Bench Press -> Paused Bench Press for 4 weeks),
+   with a same-muscle fallback.
+
+UI: Training DNA screen now shows a Recovery card (top, shown even before full
+DNA exists), Suggested swaps, and Progression forecast sections.
+TrainingDnaViewModel combines DNA snapshot + plateaus + progression scores +
+exercise library + sessions/bodyweight to produce all three.
+
+Verified: full domain compiles on kotlinc 1.9.22 (162 classes); 6 logic tests
+pass in-sandbox (forecaster trend/projection, recovery directives, bench->paused
+swap, same-muscle fallback). No tests committed (build kept test-free).
+---
+ .../adaptive/AdaptiveTemplateAdvisor.kt       | 114 ++++++++++++++++++
+ .../domain/forecast/ProgressionForecaster.kt  | 103 ++++++++++++++++
+ .../domain/recovery/RecoveryDashboard.kt      |  55 +++++++++
+ .../trainingdna/TrainingDnaInsightScreen.kt   |  84 +++++++++++++
+ .../ui/trainingdna/TrainingDnaViewModel.kt    |  93 ++++++++++----
+ 5 files changed, 428 insertions(+), 21 deletions(-)
+ create mode 100644 app/src/main/java/com/replog/domain/adaptive/AdaptiveTemplateAdvisor.kt
+ create mode 100644 app/src/main/java/com/replog/domain/forecast/ProgressionForecaster.kt
+ create mode 100644 app/src/main/java/com/replog/domain/recovery/RecoveryDashboard.kt
+
+diff --git a/app/src/main/java/com/replog/domain/adaptive/AdaptiveTemplateAdvisor.kt b/app/src/main/java/com/replog/domain/adaptive/AdaptiveTemplateAdvisor.kt
+new file mode 100644
+index 0000000..9f04ef7
+--- /dev/null
++++ b/app/src/main/java/com/replog/domain/adaptive/AdaptiveTemplateAdvisor.kt
+@@ -0,0 +1,114 @@
++package com.replog.domain.adaptive
++
++import com.replog.data.model.Exercise
++import com.replog.data.model.PlateauEvent
++
++/**
++ * Priority 3 (#14) — Adaptive Templates.
++ *
++ * When a lift stalls (existing PlateauEvent), suggest a temporary variation
++ * swap drawn from the existing exercise library, e.g. "Bench Press -> Paused
++ * Bench Press for 4 weeks". Pure rules + library lookup; no new analytics and
++ * no schema change. The UI/repository decides whether to apply the swap.
++ */
++data class AdaptiveSwap(
++    val fromExerciseId: Int,
++    val fromName: String,
++    val toExerciseId: Int,
++    val toName: String,
++    val durationWeeks: Int,
++    val reason: String
++)
++
++object AdaptiveTemplateAdvisor {
++
++    private const val DEFAULT_WEEKS = 4
++
++    /**
++     * Ranked variation keywords to try for a stalled lift, most-preferred first.
++     * These read as deliberate overload tweaks a coach would prescribe.
++     */
++    private val VARIATION_PREFIXES = listOf(
++        "Paused", "Paused 3 Second", "Tempo", "Close Grip", "Deficit", "Pin", "Pause"
++    )
++
++    /** Build a swap suggestion for a single plateau event, if a good match exists. */
++    fun suggestSwap(
++        plateau: PlateauEvent,
++        library: List<Exercise>,
++        nowWeeks: Int = DEFAULT_WEEKS
++    ): AdaptiveSwap? {
++        val from = library.firstOrNull { it.id == plateau.exerciseId }
++            ?: library.firstOrNull { it.name.equals(plateau.exerciseName, ignoreCase = true) }
++            ?: return null
++
++        val candidate = pickVariation(from, library) ?: pickSameMuscleAlternative(from, library) ?: return null
++
++        return AdaptiveSwap(
++            fromExerciseId = from.id,
++            fromName = from.name,
++            toExerciseId = candidate.id,
++            toName = candidate.name,
++            durationWeeks = nowWeeks,
++            reason = "${from.name} has stalled (${humanReason(plateau.reason)}). " +
++                "Swap to ${candidate.name} for $nowWeeks weeks to change the stimulus, then return."
++        )
++    }
++
++    /** Suggest swaps for all current plateaus (deduplicated by stalled exercise). */
++    fun suggestSwaps(
++        plateaus: List<PlateauEvent>,
++        library: List<Exercise>,
++        nowWeeks: Int = DEFAULT_WEEKS
++    ): List<AdaptiveSwap> =
++        plateaus.distinctBy { it.exerciseId }
++            .mapNotNull { suggestSwap(it, library, nowWeeks) }
++
++    /** Prefer a named variation of the same base lift (e.g. "Paused Bench Press"). */
++    private fun pickVariation(from: Exercise, library: List<Exercise>): Exercise? {
++        val base = baseName(from.name)
++        for (prefix in VARIATION_PREFIXES) {
++            val target = "$prefix $base"
++            library.firstOrNull { it.id != from.id && it.name.equals(target, ignoreCase = true) }?.let { return it }
++        }
++        // Any library exercise that contains the base name plus an extra qualifier.
++        return library.firstOrNull {
++            it.id != from.id &&
++                it.name != from.name &&
++                it.name.contains(base, ignoreCase = true) &&
++                VARIATION_PREFIXES.any { p -> it.name.startsWith(p, ignoreCase = true) }
++        }
++    }
++
++    /** Fallback: a different exercise hitting the same primary muscle + movement pattern. */
++    private fun pickSameMuscleAlternative(from: Exercise, library: List<Exercise>): Exercise? {
++        val primary = from.primaryMuscles.split(",").firstOrNull()?.trim()?.lowercase().orEmpty()
++        if (primary.isBlank()) return null
++        return library.firstOrNull {
++            it.id != from.id &&
++                it.movementPattern == from.movementPattern &&
++                it.primaryMuscles.lowercase().contains(primary)
++        } ?: library.firstOrNull {
++            it.id != from.id && it.primaryMuscles.lowercase().contains(primary)
++        }
++    }
++
++    /** Strip a known variation prefix to recover the base lift name. */
++    private fun baseName(name: String): String {
++        var n = name
++        for (prefix in VARIATION_PREFIXES.sortedByDescending { it.length }) {
++            if (n.startsWith("$prefix ", ignoreCase = true)) {
++                n = n.substring(prefix.length).trim()
++            }
++        }
++        return n
++    }
++
++    private fun humanReason(reason: String): String = when {
++        reason.contains("LOAD", true) -> "no load increase"
++        reason.contains("REP", true) -> "no rep increase"
++        reason.contains("VOLUME", true) -> "no volume increase"
++        reason.isBlank() -> "no recent progress"
++        else -> reason.lowercase().replace("_", " ")
++    }
++}
+diff --git a/app/src/main/java/com/replog/domain/forecast/ProgressionForecaster.kt b/app/src/main/java/com/replog/domain/forecast/ProgressionForecaster.kt
+new file mode 100644
+index 0000000..0e54836
+--- /dev/null
++++ b/app/src/main/java/com/replog/domain/forecast/ProgressionForecaster.kt
+@@ -0,0 +1,103 @@
++package com.replog.domain.forecast
++
++import com.replog.data.model.TrainingDnaProgressionScore
++import kotlin.math.roundToInt
++
++/**
++ * Priority 3 (#11) — Exercise Progression Forecast.
++ *
++ * Pure projection built ENTIRELY from the existing TrainingDnaProgressionScore
++ * rows (estimated 1RM at 30/90 day windows + lifetime). No new analytics engine;
++ * this just extrapolates the recent trend into a friendly "where you're headed".
++ */
++data class ProgressionForecast(
++    val exerciseId: Int,
++    val currentE1rm: Double,
++    val projectedE1rm: Double,
++    val horizonWeeks: Int,
++    val weeklyGainKg: Double,
++    /** Plain-English headline, e.g. "85 kg × 5 in 4 weeks". */
++    val projectionLabel: String,
++    val trend: ForecastTrend,
++    val confidence: ForecastConfidence,
++    val explanation: String
++)
++
++enum class ForecastTrend { RISING, FLAT, DECLINING }
++enum class ForecastConfidence { LOW, MEDIUM, HIGH }
++
++object ProgressionForecaster {
++
++    /**
++     * @param score the latest progression score for an exercise
++     * @param targetReps reps to express the projected working weight at (default 5)
++     * @param horizonWeeks how far ahead to project (default 4)
++     * @param roundingKg barbell rounding increment (default 2.5)
++     */
++    fun forecast(
++        score: TrainingDnaProgressionScore,
++        targetReps: Int = 5,
++        horizonWeeks: Int = 4,
++        roundingKg: Double = 2.5
++    ): ProgressionForecast {
++        val current = score.estimatedOneRm30Day.takeIf { it > 0 }
++            ?: score.estimatedOneRm90Day.takeIf { it > 0 }
++            ?: score.estimatedOneRmLifetime
++
++        // Recent weekly rate from the 30-day window (≈4.3 weeks); fall back to 90-day.
++        val weeklyGain = when {
++            score.estimatedOneRm90Day > 0 && score.estimatedOneRm30Day > 0 ->
++                (score.estimatedOneRm30Day - score.estimatedOneRm90Day) / 8.0 // 90→30d span ≈ 8 weeks
++            else -> 0.0
++        }
++
++        val rawProjected = (current + weeklyGain * horizonWeeks).coerceAtLeast(current * 0.9)
++        val projected = roundTo(rawProjected, roundingKg)
++        val workingWeight = roundTo(projected / epleyFactor(targetReps), roundingKg)
++
++        val trend = when {
++            weeklyGain > 0.05 -> ForecastTrend.RISING
++            weeklyGain < -0.05 -> ForecastTrend.DECLINING
++            else -> ForecastTrend.FLAT
++        }
++
++        val confidence = when {
++            score.estimatedOneRm90Day > 0 && score.estimatedOneRm30Day > 0 -> ForecastConfidence.MEDIUM
++            current > 0 -> ForecastConfidence.LOW
++            else -> ForecastConfidence.LOW
++        }.let { base ->
++            // Strong, steady rise with both windows present → high.
++            if (base == ForecastConfidence.MEDIUM && trend == ForecastTrend.RISING) ForecastConfidence.HIGH else base
++        }
++
++        val label = "${fmt(workingWeight)} kg × $targetReps in $horizonWeeks weeks"
++        val explanation = when (trend) {
++            ForecastTrend.RISING -> "You're trending up about ${fmt(weeklyGain)} kg/week on estimated 1RM. Keep progressing."
++            ForecastTrend.FLAT -> "Your estimated 1RM has been steady. A small overload nudge could restart progress."
++            ForecastTrend.DECLINING -> "Estimated 1RM has dipped recently — likely fatigue or a deload. Projection assumes a gentle recovery."
++        }
++
++        return ProgressionForecast(
++            exerciseId = score.exerciseId,
++            currentE1rm = roundTo(current, 0.5),
++            projectedE1rm = projected,
++            horizonWeeks = horizonWeeks,
++            weeklyGainKg = weeklyGain,
++            projectionLabel = label,
++            trend = trend,
++            confidence = confidence,
++            explanation = explanation
++        )
++    }
++
++    /** Epley factor: 1RM ≈ weight × (1 + reps/30) ⇒ weight ≈ 1RM / factor. */
++    private fun epleyFactor(reps: Int): Double = 1.0 + reps.coerceAtLeast(1) / 30.0
++
++    private fun roundTo(value: Double, increment: Double): Double {
++        if (increment <= 0) return value
++        return (value / increment).roundToInt() * increment
++    }
++
++    private fun fmt(v: Double): String =
++        if (v % 1.0 == 0.0) v.toInt().toString() else "%.1f".format(v)
++}
+diff --git a/app/src/main/java/com/replog/domain/recovery/RecoveryDashboard.kt b/app/src/main/java/com/replog/domain/recovery/RecoveryDashboard.kt
+new file mode 100644
+index 0000000..8a31be1
+--- /dev/null
++++ b/app/src/main/java/com/replog/domain/recovery/RecoveryDashboard.kt
+@@ -0,0 +1,55 @@
++package com.replog.domain.recovery
++
++import com.replog.domain.recommendation.OverallRecovery
++
++/**
++ * Priority 3 (#13) — Recovery Dashboard.
++ *
++ * Presentation layer over the existing RecoveryAnalyzer.overallRecovery output.
++ * Produces a daily score (0–100), a clear training directive, and the
++ * contributing factors already computed by the analyzer (frequency, volume
++ * jumps, RPE, rest). No new scoring engine.
++ */
++data class RecoveryDashboardState(
++    val score: Int,
++    val statusLabel: String,
++    val directive: String,
++    val directiveDetail: String,
++    val factors: List<String>
++)
++
++enum class RecoveryDirective(val label: String) {
++    TRAIN_HARD("Train Hard"),
++    TRAIN_NORMAL("Train"),
++    TRAIN_LIGHT("Train Light"),
++    REST("Rest Day Recommended")
++}
++
++object RecoveryDashboard {
++
++    fun from(recovery: OverallRecovery): RecoveryDashboardState {
++        val score = recovery.score.toInt().coerceIn(0, 100)
++        val directive = directiveFor(score)
++        return RecoveryDashboardState(
++            score = score,
++            statusLabel = recovery.label,
++            directive = directive.label,
++            directiveDetail = detailFor(directive),
++            factors = recovery.reasons.ifEmpty { listOf("Recovery looks normal — no strong signals either way.") }
++        )
++    }
++
++    fun directiveFor(score: Int): RecoveryDirective = when {
++        score >= 80 -> RecoveryDirective.TRAIN_HARD
++        score >= 60 -> RecoveryDirective.TRAIN_NORMAL
++        score >= 40 -> RecoveryDirective.TRAIN_LIGHT
++        else -> RecoveryDirective.REST
++    }
++
++    private fun detailFor(d: RecoveryDirective): String = when (d) {
++        RecoveryDirective.TRAIN_HARD -> "You're well recovered. A good day to push intensity or attack a PR."
++        RecoveryDirective.TRAIN_NORMAL -> "Recovery is solid. Train as planned and progress where it feels right."
++        RecoveryDirective.TRAIN_LIGHT -> "Recovery is a bit low. Keep volume moderate and leave a rep in reserve."
++        RecoveryDirective.REST -> "Fatigue signals are high. Rest or do light mobility — you'll come back stronger."
++    }
++}
+diff --git a/app/src/main/java/com/replog/ui/trainingdna/TrainingDnaInsightScreen.kt b/app/src/main/java/com/replog/ui/trainingdna/TrainingDnaInsightScreen.kt
+index fb1edcf..83e3200 100644
+--- a/app/src/main/java/com/replog/ui/trainingdna/TrainingDnaInsightScreen.kt
++++ b/app/src/main/java/com/replog/ui/trainingdna/TrainingDnaInsightScreen.kt
+@@ -22,7 +22,12 @@ import androidx.compose.material.icons.filled.Schedule
+ import androidx.compose.material.icons.filled.Speed
+ import androidx.compose.material.icons.filled.Star
+ import androidx.compose.material.icons.filled.Warning
++import androidx.compose.material.icons.filled.HealthAndSafety
++import androidx.compose.material.icons.filled.SwapHoriz
++import androidx.compose.material.icons.filled.TrendingUp
+ import androidx.compose.material3.Icon
++import androidx.compose.material3.LinearProgressIndicator
++import androidx.compose.material3.Surface
+ import androidx.compose.material3.MaterialTheme
+ import androidx.compose.material3.Text
+ import androidx.compose.runtime.Composable
+@@ -59,6 +64,11 @@ fun TrainingDnaInsightScreen(
+             Text("Your personal training signature, built from every workout.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+         }
+ 
++        // Priority 3 (#13) — Recovery dashboard (shown even before full DNA exists).
++        state.recovery?.let { rec ->
++            item { RecoveryDashboardCard(rec) }
++        }
++
+         if (!state.hasData) {
+             item { EmptyState("Not enough data yet", "Finish a few more workouts and RepLog will calculate your training DNA.") }
+         } else {
+@@ -144,6 +154,24 @@ fun TrainingDnaInsightScreen(
+                 }
+             }
+ 
++            // Priority 3 (#14) — Adaptive template swaps for stalled lifts.
++            if (state.adaptiveSwaps.isNotEmpty()) {
++                item {
++                    Text("Suggested swaps", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
++                    Spacer(Modifier.height(8.dp))
++                }
++                items(state.adaptiveSwaps) { swap -> AdaptiveSwapCard(swap) }
++            }
++
++            // Priority 3 (#11) — Progression forecasts.
++            if (state.forecasts.isNotEmpty()) {
++                item {
++                    Text("Progression forecast", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
++                    Spacer(Modifier.height(8.dp))
++                }
++                items(state.forecasts) { nf -> ForecastCard(nf) }
++            }
++
+             item {
+                 Text("Recovery trends", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                 Spacer(Modifier.height(8.dp))
+@@ -258,3 +286,59 @@ private fun DnaMeaningCard(interpretation: com.replog.domain.trainingdna.DnaInte
+         }
+     }
+ }
++
++@Composable
++private fun RecoveryDashboardCard(state: com.replog.domain.recovery.RecoveryDashboardState) = RepLogCard {
++    Row(verticalAlignment = Alignment.CenterVertically) {
++        Icon(Icons.Default.HealthAndSafety, null, tint = MaterialTheme.colorScheme.primary)
++        Spacer(Modifier.width(10.dp))
++        Text("Recovery", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
++        Spacer(Modifier.weight(1f))
++        Text("${state.score}%", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
++    }
++    Spacer(Modifier.height(8.dp))
++    LinearProgressIndicator(progress = { (state.score / 100f) }, modifier = Modifier.fillMaxWidth().height(8.dp))
++    Spacer(Modifier.height(10.dp))
++    Text(state.directive, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
++    Text(state.directiveDetail, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
++    if (state.factors.isNotEmpty()) {
++        Spacer(Modifier.height(8.dp))
++        state.factors.take(4).forEach { factor ->
++            Text("• $factor", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
++        }
++    }
++}
++
++@Composable
++private fun ForecastCard(nf: NamedForecast) = RepLogCard {
++    val f = nf.forecast
++    Row(verticalAlignment = Alignment.CenterVertically) {
++        Icon(Icons.Default.TrendingUp, null, tint = MaterialTheme.colorScheme.primary)
++        Spacer(Modifier.width(12.dp))
++        Column(Modifier.weight(1f)) {
++            Text(nf.exerciseName, fontWeight = FontWeight.Bold)
++            Text(
++                "Now ~${if (f.currentE1rm % 1.0 == 0.0) f.currentE1rm.toInt().toString() else "%.1f".format(f.currentE1rm)} kg 1RM",
++                style = MaterialTheme.typography.bodySmall,
++                color = MaterialTheme.colorScheme.onSurfaceVariant
++            )
++        }
++    }
++    Spacer(Modifier.height(6.dp))
++    Text("Projected: ${f.projectionLabel}", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
++    Text(f.explanation, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
++}
++
++@Composable
++private fun AdaptiveSwapCard(swap: com.replog.domain.adaptive.AdaptiveSwap) = RepLogCard {
++    Row(verticalAlignment = Alignment.CenterVertically) {
++        Icon(Icons.Default.SwapHoriz, null, tint = MaterialTheme.colorScheme.primary)
++        Spacer(Modifier.width(12.dp))
++        Column(Modifier.weight(1f)) {
++            Text("${swap.fromName} → ${swap.toName}", fontWeight = FontWeight.Bold)
++            Text("for ${swap.durationWeeks} weeks", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
++        }
++    }
++    Spacer(Modifier.height(6.dp))
++    Text(swap.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
++}
+diff --git a/app/src/main/java/com/replog/ui/trainingdna/TrainingDnaViewModel.kt b/app/src/main/java/com/replog/ui/trainingdna/TrainingDnaViewModel.kt
+index 0ae8b39..1c5eb36 100644
+--- a/app/src/main/java/com/replog/ui/trainingdna/TrainingDnaViewModel.kt
++++ b/app/src/main/java/com/replog/ui/trainingdna/TrainingDnaViewModel.kt
+@@ -2,7 +2,17 @@ package com.replog.ui.trainingdna
+ 
+ import androidx.lifecycle.ViewModel
+ import androidx.lifecycle.viewModelScope
++import com.replog.data.repository.BodyweightRepository
++import com.replog.data.repository.ExerciseRepository
+ import com.replog.data.repository.TrainingDNARepository
++import com.replog.data.repository.WorkoutRepository
++import com.replog.domain.adaptive.AdaptiveSwap
++import com.replog.domain.adaptive.AdaptiveTemplateAdvisor
++import com.replog.domain.forecast.ProgressionForecast
++import com.replog.domain.forecast.ProgressionForecaster
++import com.replog.domain.recommendation.RecoveryAnalyzer
++import com.replog.domain.recovery.RecoveryDashboard
++import com.replog.domain.recovery.RecoveryDashboardState
+ import dagger.hilt.android.lifecycle.HiltViewModel
+ import kotlinx.coroutines.flow.SharingStarted
+ import kotlinx.coroutines.flow.StateFlow
+@@ -11,6 +21,9 @@ import kotlinx.coroutines.flow.stateIn
+ import kotlinx.coroutines.launch
+ import javax.inject.Inject
+ 
++/** A forecast paired with the exercise name, ready for display. */
++data class NamedForecast(val exerciseName: String, val forecast: ProgressionForecast)
++
+ data class TrainingDnaUiState(
+     val preferredRepRange: String = "—",
+     val preferredVolumeRange: String = "—",
+@@ -24,38 +37,76 @@ data class TrainingDnaUiState(
+     val monthlyPRCount: Int = 0,
+     val volumeToleranceScore: Double = 0.0,
+     val interpretation: com.replog.domain.trainingdna.DnaInterpretation? = null,
++    // Priority 3 additions
++    val recovery: RecoveryDashboardState? = null,
++    val forecasts: List<NamedForecast> = emptyList(),
++    val adaptiveSwaps: List<AdaptiveSwap> = emptyList(),
+     val hasData: Boolean = false
+ )
+ 
+ @HiltViewModel
+ class TrainingDnaViewModel @Inject constructor(
+-    private val trainingDNARepository: TrainingDNARepository
++    private val trainingDNARepository: TrainingDNARepository,
++    private val workoutRepository: WorkoutRepository,
++    private val exerciseRepository: ExerciseRepository,
++    private val bodyweightRepository: BodyweightRepository
+ ) : ViewModel() {
+ 
+     val uiState: StateFlow<TrainingDnaUiState> = combine(
+         trainingDNARepository.getLatestDNA(),
+-        trainingDNARepository.getPlateauEvents()
+-    ) { snapshot, plateaus ->
++        trainingDNARepository.getPlateauEvents(),
++        trainingDNARepository.getProgressionScores(),
++        exerciseRepository.getAllExercises(),
++        combine(workoutRepository.getAllSessions(), bodyweightRepository.getAllBodyweights()) { s, b -> s to b }
++    ) { snapshot, plateaus, scores, exercises, sessionsAndBw ->
++        val (sessions, bodyweights) = sessionsAndBw
++        val now = System.currentTimeMillis()
++
++        // Recovery dashboard (#13) from the existing analyzer.
++        val completed = sessions.filter { it.session.endTime != null }
++        val recovery = RecoveryDashboard.from(
++            RecoveryAnalyzer.overallRecovery(completed, bodyweights, now)
++        )
++
+         if (snapshot == null) {
+-            TrainingDnaUiState()
+-        } else {
+-            TrainingDnaUiState(
+-                preferredRepRange = snapshot.preferredRepRange,
+-                preferredVolumeRange = snapshot.preferredVolumeRange,
+-                preferredFrequency = snapshot.preferredFrequency,
+-                strongestMuscles = snapshot.strongestMuscles.split(",").map { it.trim() }.filter { it.isNotBlank() },
+-                weakestMuscles = snapshot.weakestMuscles.split(",").map { it.trim() }.filter { it.isNotBlank() },
+-                fastestProgressing = snapshot.fastestProgressingExercises.split(",").map { it.trim() }.filter { it.isNotBlank() },
+-                stalledExercises = plateaus.map { it.exerciseName }.distinct().takeIf { it.isNotEmpty() }
+-                    ?: snapshot.stalledExercises.split(",").map { it.trim() }.filter { it.isNotBlank() },
+-                averageWorkoutDuration = snapshot.averageWorkoutDuration,
+-                averageRecoveryHours = snapshot.averageRecoveryHours,
+-                monthlyPRCount = snapshot.monthlyPRCount,
+-                volumeToleranceScore = snapshot.volumeToleranceScore,
+-                interpretation = com.replog.domain.trainingdna.DnaInterpreter.interpret(snapshot),
+-                hasData = true
+-            )
++            return@combine TrainingDnaUiState(recovery = recovery, hasData = false)
+         }
++
++        val exById = exercises.associateBy { it.id }
++
++        // Progression forecasts (#11) — top rising/most-recent exercises.
++        val forecasts = scores
++            .filter { it.estimatedOneRm30Day > 0 || it.estimatedOneRm90Day > 0 }
++            .sortedByDescending { it.calculatedAt }
++            .distinctBy { it.exerciseId }
++            .take(5)
++            .mapNotNull { score ->
++                val name = exById[score.exerciseId]?.name ?: return@mapNotNull null
++                NamedForecast(name, ProgressionForecaster.forecast(score))
++            }
++
++        // Adaptive template swaps (#14) for stalled lifts.
++        val swaps = AdaptiveTemplateAdvisor.suggestSwaps(plateaus, exercises)
++
++        TrainingDnaUiState(
++            preferredRepRange = snapshot.preferredRepRange,
++            preferredVolumeRange = snapshot.preferredVolumeRange,
++            preferredFrequency = snapshot.preferredFrequency,
++            strongestMuscles = snapshot.strongestMuscles.split(",").map { it.trim() }.filter { it.isNotBlank() },
++            weakestMuscles = snapshot.weakestMuscles.split(",").map { it.trim() }.filter { it.isNotBlank() },
++            fastestProgressing = snapshot.fastestProgressingExercises.split(",").map { it.trim() }.filter { it.isNotBlank() },
++            stalledExercises = plateaus.map { it.exerciseName }.distinct().takeIf { it.isNotEmpty() }
++                ?: snapshot.stalledExercises.split(",").map { it.trim() }.filter { it.isNotBlank() },
++            averageWorkoutDuration = snapshot.averageWorkoutDuration,
++            averageRecoveryHours = snapshot.averageRecoveryHours,
++            monthlyPRCount = snapshot.monthlyPRCount,
++            volumeToleranceScore = snapshot.volumeToleranceScore,
++            interpretation = com.replog.domain.trainingdna.DnaInterpreter.interpret(snapshot),
++            recovery = recovery,
++            forecasts = forecasts,
++            adaptiveSwaps = swaps,
++            hasData = true
++        )
+     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TrainingDnaUiState())
+ 
+     fun refresh() = viewModelScope.launch {
+-- 
+2.47.3
+
