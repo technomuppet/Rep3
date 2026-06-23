@@ -6,6 +6,8 @@ import com.replog.data.model.Exercise
 import com.replog.data.model.ExerciseInsight
 import com.replog.data.repository.ExerciseRepository
 import com.replog.data.repository.WorkoutRepository
+import com.replog.domain.library.ExerciseFilter
+import com.replog.domain.library.ExerciseFilterState
 import com.replog.domain.swap.ExerciseSwap
 import com.replog.domain.swap.ExerciseSwapEngine
 import com.replog.util.PreferencesManager
@@ -25,9 +27,12 @@ import javax.inject.Inject
 
 data class ExerciseUiState(
     val exercises: List<Exercise> = emptyList(),
-    val categories: List<String> = listOf("All"),
-    val selectedCategory: String = "All",
-    val searchQuery: String = "",
+    val muscleGroups: List<String> = ExerciseFilter.MUSCLE_GROUPS,
+    val equipmentOptions: List<String> = emptyList(),
+    val difficultyOptions: List<String> = listOf("Beginner", "Intermediate", "Advanced"),
+    val patternOptions: List<String> = ExerciseFilter.PATTERNS,
+    val filter: ExerciseFilterState = ExerciseFilterState(),
+    val resultCount: Int = 0,
     val useKg: Boolean = true,
     val isLoading: Boolean = true
 )
@@ -39,26 +44,20 @@ class ExerciseViewModel @Inject constructor(
     private val workoutRepository: WorkoutRepository,
     private val prefs: PreferencesManager
 ) : ViewModel() {
-    private val query = MutableStateFlow("")
-    private val category = MutableStateFlow("All")
+    private val filter = MutableStateFlow(ExerciseFilterState())
     private val selectedExercise = MutableStateFlow<Exercise?>(null)
 
     val uiState: StateFlow<ExerciseUiState> = combine(
         exerciseRepository.getAllExercises(),
-        exerciseRepository.getAllCategories(),
-        query,
-        category,
+        filter,
         prefs.useKg
-    ) { exercises, categories, q, cat, useKg ->
-        val filtered = exercises.filter {
-            (cat == "All" || it.category == cat) &&
-                (q.isBlank() || it.name.contains(q, true) || it.category.contains(q, true) || it.equipment.contains(q, true) || it.muscles.contains(q, true) || it.primaryMuscles.contains(q, true) || it.secondaryMuscles.contains(q, true) || it.movementPattern.contains(q, true))
-        }
+    ) { exercises, f, useKg ->
+        val filtered = ExerciseFilter.apply(exercises, f)
         ExerciseUiState(
             exercises = filtered,
-            categories = listOf("All") + categories,
-            selectedCategory = cat,
-            searchQuery = q,
+            equipmentOptions = exercises.map { it.equipment }.distinct().sorted(),
+            filter = f,
+            resultCount = filtered.size,
             useKg = useKg,
             isLoading = false
         )
@@ -92,8 +91,17 @@ class ExerciseViewModel @Inject constructor(
         else ExerciseSwapEngine.alternatives(selected, library, limit = 5)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    fun onSearchQueryChanged(value: String) { query.value = value }
-    fun onCategorySelected(value: String) { category.value = value }
+    fun onSearchQueryChanged(value: String) { filter.value = filter.value.copy(query = value) }
+
+    private fun toggle(set: Set<String>, value: String): Set<String> =
+        if (value in set) set - value else set + value
+
+    fun toggleMuscle(value: String) { filter.value = filter.value.copy(muscles = toggle(filter.value.muscles, value)) }
+    fun toggleEquipment(value: String) { filter.value = filter.value.copy(equipment = toggle(filter.value.equipment, value)) }
+    fun toggleDifficulty(value: String) { filter.value = filter.value.copy(difficulties = toggle(filter.value.difficulties, value)) }
+    fun togglePattern(value: String) { filter.value = filter.value.copy(patterns = toggle(filter.value.patterns, value)) }
+    fun clearFilters() { filter.value = ExerciseFilterState(query = filter.value.query) }
+
     fun selectExercise(exercise: Exercise) { selectedExercise.value = exercise }
     fun clearSelectedExercise() { selectedExercise.value = null }
 

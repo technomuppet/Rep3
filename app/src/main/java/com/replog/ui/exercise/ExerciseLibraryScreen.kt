@@ -98,7 +98,7 @@ fun ExerciseLibraryScreen(
 
             item {
                 OutlinedTextField(
-                    value = state.searchQuery,
+                    value = state.filter.query,
                     onValueChange = viewModel::onSearchQueryChanged,
                     modifier = Modifier.fillMaxWidth(),
                     leadingIcon = { Icon(Icons.Default.Search, null) },
@@ -107,16 +107,16 @@ fun ExerciseLibraryScreen(
                 )
             }
 
+            // Multi-select, combinable filters (muscle / equipment / difficulty / pattern).
             item {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    state.categories.forEach { category ->
-                        FilterChip(
-                            selected = category == state.selectedCategory,
-                            onClick = { viewModel.onCategorySelected(category) },
-                            label = { Text(category) }
-                        )
-                    }
-                }
+                FilterSection(
+                    state = state,
+                    onToggleMuscle = viewModel::toggleMuscle,
+                    onToggleEquipment = viewModel::toggleEquipment,
+                    onToggleDifficulty = viewModel::toggleDifficulty,
+                    onTogglePattern = viewModel::togglePattern,
+                    onClear = viewModel::clearFilters
+                )
             }
 
             if (state.exercises.isEmpty()) {
@@ -190,7 +190,21 @@ private fun ExerciseItem(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary
                 )
-            } else if (exercise.muscles.isNotBlank()) {
+            }
+            if (exercise.primaryMuscles.isNotBlank()) {
+                Text(
+                    "Primary: ${exercise.primaryMuscles}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (exercise.secondaryMuscles.isNotBlank()) {
+                Text(
+                    "Secondary: ${exercise.secondaryMuscles}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else if (exercise.primaryMuscles.isBlank() && exercise.muscles.isNotBlank()) {
                 Text(
                     exercise.muscles,
                     style = MaterialTheme.typography.bodySmall,
@@ -409,3 +423,62 @@ private fun AddExerciseDialog(
 
 private fun formatDate(timestamp: Long): String =
     SimpleDateFormat("d MMM yyyy", Locale.getDefault()).format(Date(timestamp))
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun FilterSection(
+    state: ExerciseUiState,
+    onToggleMuscle: (String) -> Unit,
+    onToggleEquipment: (String) -> Unit,
+    onToggleDifficulty: (String) -> Unit,
+    onTogglePattern: (String) -> Unit,
+    onClear: () -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val f = state.filter
+    val activeCount = f.muscles.size + f.equipment.size + f.difficulties.size + f.patterns.size
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            TextButton(onClick = { expanded = !expanded }) {
+                Icon(Icons.Default.Search, null, modifier = Modifier.width(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(if (activeCount > 0) "Filters ($activeCount)" else "Filters", fontWeight = FontWeight.Bold)
+            }
+            Spacer(Modifier.weight(1f))
+            Text("${state.resultCount} results", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (activeCount > 0) {
+                TextButton(onClick = onClear) { Text("Clear") }
+            }
+        }
+
+        // Always show muscle chips (the primary filter); other dimensions when expanded.
+        FilterChipGroup("Muscles", state.muscleGroups, f.muscles, onToggleMuscle)
+        if (expanded) {
+            FilterChipGroup("Equipment", state.equipmentOptions, f.equipment, onToggleEquipment)
+            FilterChipGroup("Difficulty", state.difficultyOptions, f.difficulties, onToggleDifficulty)
+            FilterChipGroup("Movement", state.patternOptions, f.patterns, onTogglePattern)
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun FilterChipGroup(
+    title: String,
+    options: List<String>,
+    selected: Set<String>,
+    onToggle: (String) -> Unit
+) {
+    if (options.isEmpty()) return
+    Text(title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold)
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        options.forEach { option ->
+            FilterChip(
+                selected = option in selected,
+                onClick = { onToggle(option) },
+                label = { Text(option) }
+            )
+        }
+    }
+}
