@@ -2,6 +2,7 @@ package com.replog.ui.navigation
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.List
@@ -44,6 +45,7 @@ sealed class RepLogRoute(val route: String, val label: String, val icon: ImageVe
     data object Settings : RepLogRoute("settings", "Settings", Icons.Default.Settings)
     data object TrainingDna : RepLogRoute("training_dna", "Training DNA", Icons.Default.ShowChart)
     data object CoachHistory : RepLogRoute("coach_history", "Coach History", Icons.Default.History)
+    data object Goals : RepLogRoute("goals", "Goals", Icons.Default.Flag)
 }
 
 private val items = listOf(
@@ -89,6 +91,9 @@ fun RepLogNavGraph(
                     },
                     onOpenCoachHistory = {
                         navController.navigate(RepLogRoute.CoachHistory.route) { launchSingleTop = true }
+                    },
+                    onOpenGoals = {
+                        navController.navigate(RepLogRoute.Goals.route) { launchSingleTop = true }
                     }
                 )
             }
@@ -102,6 +107,7 @@ fun RepLogNavGraph(
             composable(RepLogRoute.Progress.route) { ProgressScreen(padding, onOpenTrainingDna = { navController.navigate(RepLogRoute.TrainingDna.route) { launchSingleTop = true } }) }
             composable(RepLogRoute.TrainingDna.route) { TrainingDnaInsightScreen(padding) }
             composable(RepLogRoute.CoachHistory.route) { com.replog.ui.coach.CoachHistoryScreen(padding) }
+            composable(RepLogRoute.Goals.route) { com.replog.ui.goals.GoalsScreen(padding) }
             composable(RepLogRoute.History.route) { HistoryScreen(padding) }
             composable(RepLogRoute.Exercises.route) { ExerciseLibraryScreen(padding) }
             composable(RepLogRoute.Settings.route) { SettingsScreen(padding) }

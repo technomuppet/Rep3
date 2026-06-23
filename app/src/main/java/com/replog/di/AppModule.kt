@@ -26,4 +26,5 @@ object AppModule {
     @Provides fun provideTrainingDnaProgressionScoreDao(db: AppDatabase): TrainingDnaProgressionScoreDao = db.trainingDnaProgressionScoreDao()
     @Provides fun providePlateauEventDao(db: AppDatabase): PlateauEventDao = db.plateauEventDao()
     @Provides fun provideRecommendationHistoryDao(db: AppDatabase): RecommendationHistoryDao = db.recommendationHistoryDao()
+    @Provides fun provideGoalDao(db: AppDatabase): GoalDao = db.goalDao()
 }

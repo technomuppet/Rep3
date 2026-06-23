@@ -8,6 +8,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.replog.data.model.BodyweightLog
 import com.replog.data.model.Exercise
+import com.replog.data.model.Goal
 import com.replog.data.model.KnowledgeGraphRelation
 import com.replog.data.model.PlateauEvent
 import com.replog.data.model.RecommendationHistory
@@ -38,9 +39,10 @@ import com.replog.data.model.WorkoutTemplate
         TrainingDnaSnapshot::class,
         TrainingDnaProgressionScore::class,
         PlateauEvent::class,
-        RecommendationHistory::class
+        RecommendationHistory::class,
+        Goal::class
     ],
-    version = 12,
+    version = 13,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -57,6 +59,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun trainingDnaProgressionScoreDao(): TrainingDnaProgressionScoreDao
     abstract fun plateauEventDao(): PlateauEventDao
     abstract fun recommendationHistoryDao(): RecommendationHistoryDao
+    abstract fun goalDao(): GoalDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
@@ -325,12 +328,38 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // Goal Engine: user training goals.
+        val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS goals (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        goalType TEXT NOT NULL,
+                        title TEXT NOT NULL,
+                        exerciseId INTEGER,
+                        exerciseName TEXT,
+                        targetValue REAL NOT NULL,
+                        targetReps INTEGER,
+                        startValue REAL NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        targetDate INTEGER,
+                        status TEXT NOT NULL DEFAULT 'active',
+                        achievedAt INTEGER
+                    )
+                    """.trimIndent()
+                )
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_goals_status ON goals(status)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_goals_createdAt ON goals(createdAt)")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase = INSTANCE ?: synchronized(this) {
             Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "replog_database")
                 .addMigrations(
                     MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
                     MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11,
-                    MIGRATION_11_12
+                    MIGRATION_11_12, MIGRATION_12_13
                 )
                 .build()
                 .also { INSTANCE = it }

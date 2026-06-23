@@ -28,6 +28,7 @@ fun HomeScreen(
     onStartRecommendedWorkout: () -> Unit = {},
     onViewRecoveryGuidance: () -> Unit = {},
     onOpenCoachHistory: () -> Unit = {},
+    onOpenGoals: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
     coachViewModel: com.replog.ui.coach.CoachViewModel = hiltViewModel()
 ) {
@@ -79,7 +80,8 @@ fun HomeScreen(
         }
 
         // Lightweight navigation to the detail areas (their full job lives elsewhere).
-        item { Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) { SecondaryButton("History", Modifier.weight(1f), onClick = onViewHistory); SecondaryButton("Coach History", Modifier.weight(1f), onClick = onOpenCoachHistory) } }
+        item { Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) { SecondaryButton("Goals", Modifier.weight(1f), onClick = onOpenGoals); SecondaryButton("History", Modifier.weight(1f), onClick = onViewHistory) } }
+        item { SecondaryButton("Coach History", onClick = onOpenCoachHistory) }
     }
 }
 

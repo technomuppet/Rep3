@@ -109,6 +109,24 @@ class AppDatabaseMigrationTest {
         db.close()
     }
 
+    @Test
+    fun migrate12To13_addsGoalsTable() {
+        helper.createDatabase(testDb, 12).apply {
+            execSQL(
+                "CREATE TABLE IF NOT EXISTS workout_sessions (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "templateName TEXT, startTime INTEGER NOT NULL, endTime INTEGER, notes TEXT, " +
+                    "qualityScore INTEGER, totalVolume REAL NOT NULL DEFAULT 0, totalSets INTEGER NOT NULL DEFAULT 0, " +
+                    "totalReps INTEGER NOT NULL DEFAULT 0, prCount INTEGER NOT NULL DEFAULT 0, sessionRating INTEGER)"
+            )
+            close()
+        }
+        val db = helper.runMigrationsAndValidate(testDb, 13, true, AppDatabase.MIGRATION_12_13)
+        assertTableExists(db, "goals")
+        assertIndexExists(db, "index_goals_status")
+        assertIndexExists(db, "index_goals_createdAt")
+        db.close()
+    }
+
     private fun createVersion6Schema(db: SupportSQLiteDatabase) {
         db.execSQL("CREATE TABLE IF NOT EXISTS exercises (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, name TEXT NOT NULL, category TEXT NOT NULL, equipment TEXT NOT NULL, type TEXT NOT NULL, muscles TEXT NOT NULL, primaryMuscles TEXT NOT NULL, secondaryMuscles TEXT NOT NULL, movementPattern TEXT NOT NULL, difficulty TEXT NOT NULL, mediaAsset TEXT NOT NULL, isCustom INTEGER NOT NULL)")
         db.execSQL("CREATE TABLE IF NOT EXISTS workout_sessions (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, templateName TEXT, startTime INTEGER NOT NULL, endTime INTEGER, notes TEXT)")
