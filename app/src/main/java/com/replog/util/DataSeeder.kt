@@ -8,6 +8,9 @@ import com.replog.data.model.TemplateExercise
 import com.replog.data.model.WorkoutTemplate
 import com.replog.data.repository.ExerciseRepository
 import com.replog.data.repository.WorkoutRepository
+import com.replog.domain.templates.BuiltInTemplate
+import com.replog.domain.templates.BuiltInTemplates
+import com.replog.domain.templates.GeneratedProgram
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
@@ -37,9 +40,15 @@ class DataSeeder @Inject constructor(
     }
 
     private suspend fun upgradeExerciseMetadataIfNeeded() {
+        val toInsert = mutableListOf<Exercise>()
         loadExerciseData().forEach { data ->
-            val existing = exercises.getExerciseByName(data.name) ?: return@forEach
-            if (existing.movementPattern.isBlank() || existing.primaryMuscles.isBlank() || existing.mediaAsset.isBlank()) {
+            val existing = exercises.getExerciseByName(data.name)
+            if (existing == null) {
+                // Bundled exercise not yet in the user's library (e.g. an expanded
+                // library shipped in an app update). Add it without touching the
+                // user's custom exercises or existing data.
+                toInsert += data.toExercise()
+            } else if (existing.movementPattern.isBlank() || existing.primaryMuscles.isBlank() || existing.mediaAsset.isBlank()) {
                 val enriched = data.toExercise().copy(
                     id = existing.id,
                     isCustom = existing.isCustom
@@ -47,6 +56,7 @@ class DataSeeder @Inject constructor(
                 exercises.updateExercise(enriched)
             }
         }
+        if (toInsert.isNotEmpty()) exercises.insertExercises(toInsert)
     }
 
     private fun loadExerciseData(): List<ExerciseData> {
@@ -69,21 +79,49 @@ class DataSeeder @Inject constructor(
     )
 
     private suspend fun seedTemplates() {
-        val templates = mapOf(
-            "Full Body A" to listOf("Barbell Back Squat", "Barbell Bench Press", "Barbell Bent Over Row"),
-            "Full Body B" to listOf("Barbell Deadlift", "Barbell Overhead Press", "Pull Ups"),
-            "Push Day" to listOf("Barbell Bench Press", "Barbell Overhead Press", "Tricep Dips", "Cable Chest Fly"),
-            "Pull Day" to listOf("Barbell Deadlift", "Pull Ups", "Lat Pulldown", "Face Pulls", "Dumbbell Bicep Curl"),
-            "Leg Day" to listOf("Barbell Back Squat", "Barbell Romanian Deadlift", "Leg Press", "Calf Raises")
-        )
-        templates.forEach { (name, names) ->
-            val templateId = workouts.insertTemplate(WorkoutTemplate(name = name, isBuiltIn = true)).toInt()
-            names.forEachIndexed { index, exerciseName ->
-                exercises.getExerciseByName(exerciseName)?.let { ex ->
-                    workouts.insertTemplateExercise(TemplateExercise(templateId = templateId, exerciseId = ex.id, defaultSets = 3, orderIndex = index))
+        // Seed only the entry-level templates by default; the full catalog is
+        // installed either via onboarding personalization or "Browse all".
+        val defaults = BuiltInTemplates.ALL.filter { it.name in BuiltInTemplates.DEFAULT_SEED_NAMES }
+        installTemplates(defaults)
+    }
+
+    /**
+     * Idempotently install a list of built-in templates. Existing built-in
+     * templates with the same name are skipped (so re-running on app update or
+     * "install all" never creates duplicates and never touches user templates).
+     */
+    suspend fun installTemplates(templates: List<BuiltInTemplate>) {
+        val existingNames = workouts.getAllTemplates().first().map { it.template.name }.toSet()
+        templates.forEach { spec ->
+            if (spec.name in existingNames) return@forEach
+            val templateId = workouts.insertTemplate(WorkoutTemplate(name = spec.name, isBuiltIn = true)).toInt()
+            spec.exercises.forEachIndexed { index, exSpec ->
+                exercises.getExerciseByName(exSpec.exerciseName)?.let { ex ->
+                    workouts.insertTemplateExercise(
+                        TemplateExercise(
+                            templateId = templateId,
+                            exerciseId = ex.id,
+                            defaultSets = exSpec.sets,
+                            orderIndex = index,
+                            targetReps = exSpec.reps
+                        )
+                    )
                 }
             }
         }
+    }
+
+    /** Install every built-in template in the catalog (e.g. "Browse all templates"). */
+    suspend fun installAllBuiltInTemplates() = installTemplates(BuiltInTemplates.ALL)
+
+    /**
+     * Apply a personalized program produced by ProgramGenerator: install the
+     * concrete templates it references (deduplicated, preserving day order).
+     */
+    suspend fun installGeneratedProgram(program: GeneratedProgram) {
+        val byName = BuiltInTemplates.ALL.associateBy { it.name }
+        val toInstall = program.templateNames.distinct().mapNotNull { byName[it] }
+        installTemplates(toInstall)
     }
 
     data class ExerciseData(

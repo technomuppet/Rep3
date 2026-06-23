@@ -63,7 +63,10 @@ fun RepLogNavGraph(
     val onboardingState by onboardingViewModel.uiState.collectAsState()
 
     if (!onboardingState.onboardingComplete) {
-        OnboardingScreen(onComplete = onboardingViewModel::finish)
+        OnboardingScreen(
+            onComplete = onboardingViewModel::finish,
+            onPersonalize = onboardingViewModel::finishWithPersonalization
+        )
         return
     }
 

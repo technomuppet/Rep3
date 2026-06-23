@@ -104,8 +104,15 @@ class ActiveWorkoutViewModel @Inject constructor(
     private val prefs: PreferencesManager,
     private val restTimer: RestTimerManager,
     private val coachHandoff: com.replog.ui.coach.CoachHandoff,
-    private val recommendationRepository: com.replog.data.repository.RecommendationRepository
+    private val recommendationRepository: com.replog.data.repository.RecommendationRepository,
+    private val dataSeeder: com.replog.util.DataSeeder
 ) : ViewModel() {
+
+    /** Install the full built-in template catalog (idempotent — no duplicates). */
+    fun installAllBuiltInTemplates() = viewModelScope.launch {
+        dataSeeder.installAllBuiltInTemplates()
+        refresh()
+    }
     // Phase 3 — recommendation accepted via the Smart Coach card and pending completion.
     private var pendingCoachRecommendation: com.replog.domain.recommendation.Recommendation? = null
     private val activeId = MutableStateFlow<Int?>(null)

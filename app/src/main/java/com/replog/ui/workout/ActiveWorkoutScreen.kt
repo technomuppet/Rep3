@@ -145,6 +145,7 @@ fun ActiveWorkoutScreen(
                 item { AdaptivePlanCard(plan = plan, useKg = state.useKg) { viewModel.startAdaptiveWorkout(plan) } }
             }
             item { SecondaryButton("Create Template") { showCreateTemplate = true } }
+            item { SecondaryButton("Add Built-in Templates") { viewModel.installAllBuiltInTemplates() } }
             item { SectionTitle("Quick start templates") }
             if (state.templates.isEmpty()) {
                 item { EmptyState("Templates loading", "Built-in templates will appear after first launch setup.") }
