@@ -83,6 +83,23 @@ fun HomeScreen(
         // Lightweight navigation to the detail areas (their full job lives elsewhere).
         item { Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) { SecondaryButton("Goals", Modifier.weight(1f), onClick = onOpenGoals); SecondaryButton("History", Modifier.weight(1f), onClick = onViewHistory) } }
         item { SecondaryButton("Coach History", onClick = onOpenCoachHistory) }
+        item {
+            val shareContext = androidx.compose.ui.platform.LocalContext.current
+            SecondaryButton("Share my progress") {
+                com.replog.util.ShareCardRenderer.renderAndShare(
+                    context = shareContext,
+                    headline = "${state.sessionCount} workouts logged",
+                    subtitle = "My RepLog training so far",
+                    stats = listOf(
+                        com.replog.util.ShareStat("Workouts", state.sessionCount.toString()),
+                        com.replog.util.ShareStat("Total volume", formatWeight(state.totalVolume)),
+                        com.replog.util.ShareStat("This week", "${state.sessionsThisWeek} sessions"),
+                        com.replog.util.ShareStat("Day streak", if (state.dayStreak > 0) "${state.dayStreak} days" else "—")
+                    ),
+                    footnote = state.recentPRs.firstOrNull()?.let { "Latest PR: ${formatWeight(it.weight)} × ${it.reps}" }
+                )
+            }
+        }
     }
 }
 

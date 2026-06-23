@@ -974,7 +974,21 @@ private fun WorkoutCompletionDialog(summary: WorkoutSummary, useKg: Boolean, onR
             TextButton(onClick = onDismiss) { Text("Done", fontWeight = FontWeight.Bold) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            val shareContext = androidx.compose.ui.platform.LocalContext.current
+            TextButton(onClick = {
+                com.replog.util.ShareCardRenderer.renderAndShare(
+                    context = shareContext,
+                    headline = "Workout Complete",
+                    subtitle = summary.name,
+                    stats = listOf(
+                        com.replog.util.ShareStat("Volume", formatWeight(summary.volume, useKg)),
+                        com.replog.util.ShareStat("Sets", summary.setCount.toString()),
+                        com.replog.util.ShareStat("Duration", formatDuration(summary.durationMillis)),
+                        com.replog.util.ShareStat("Score", "${summary.qualityScore}/100")
+                    ),
+                    footnote = if (summary.prCount > 0) "🏆 ${summary.prCount} new PR${if (summary.prCount > 1) "s" else ""}!" else null
+                )
+            }) {
                 Icon(Icons.Default.Share, null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
                 Text("Share Progress")
