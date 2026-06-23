@@ -2,6 +2,9 @@ package com.replog.ui.trainingdna
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.replog.data.model.Exercise
+import com.replog.data.model.TemplateExercise
+import com.replog.data.model.WorkoutTemplate
 import com.replog.data.repository.BodyweightRepository
 import com.replog.data.repository.ExerciseRepository
 import com.replog.data.repository.TrainingDNARepository
@@ -10,12 +13,16 @@ import com.replog.domain.adaptive.AdaptiveSwap
 import com.replog.domain.adaptive.AdaptiveTemplateAdvisor
 import com.replog.domain.forecast.ProgressionForecast
 import com.replog.domain.forecast.ProgressionForecaster
+import com.replog.domain.musclegap.MuscleGapAnalyzer
+import com.replog.domain.musclegap.MuscleGapSuggestion
 import com.replog.domain.recommendation.RecoveryAnalyzer
 import com.replog.domain.recovery.RecoveryDashboard
 import com.replog.domain.recovery.RecoveryDashboardState
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -41,6 +48,8 @@ data class TrainingDnaUiState(
     val recovery: RecoveryDashboardState? = null,
     val forecasts: List<NamedForecast> = emptyList(),
     val adaptiveSwaps: List<AdaptiveSwap> = emptyList(),
+    // Priority 2 (#8) — muscle gap suggestions
+    val muscleGaps: List<MuscleGapSuggestion> = emptyList(),
     val hasData: Boolean = false
 )
 
@@ -88,6 +97,10 @@ class TrainingDnaViewModel @Inject constructor(
         // Adaptive template swaps (#14) for stalled lifts.
         val swaps = AdaptiveTemplateAdvisor.suggestSwaps(plateaus, exercises)
 
+        // Muscle gap suggestions (#8) from the weakest muscles DNA already found.
+        val weak = snapshot.weakestMuscles.split(",").map { it.trim() }.filter { it.isNotBlank() }
+        val gaps = MuscleGapAnalyzer.analyze(weak, exercises)
+
         TrainingDnaUiState(
             preferredRepRange = snapshot.preferredRepRange,
             preferredVolumeRange = snapshot.preferredVolumeRange,
@@ -105,9 +118,42 @@ class TrainingDnaViewModel @Inject constructor(
             recovery = recovery,
             forecasts = forecasts,
             adaptiveSwaps = swaps,
+            muscleGaps = gaps,
             hasData = true
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TrainingDnaUiState())
+
+    /** One-shot status message (e.g. after adding a muscle-gap template). */
+    private val _message = MutableStateFlow<String?>(null)
+    val message: StateFlow<String?> = _message.asStateFlow()
+    fun clearMessage() { _message.value = null }
+
+    /**
+     * Priority 2 (#8) — one-tap "Add to template": create a built-in-style
+     * template that targets a weak muscle using its suggested exercises.
+     */
+    fun addMuscleGapToTemplate(muscle: String, exercises: List<Exercise>) = viewModelScope.launch {
+        if (exercises.isEmpty()) {
+            _message.value = "No exercises to add."
+            return@launch
+        }
+        val name = "$muscle Focus"
+        val templateId = workoutRepository.insertTemplate(
+            WorkoutTemplate(name = name, isBuiltIn = false)
+        ).toInt()
+        exercises.forEachIndexed { index, ex ->
+            workoutRepository.insertTemplateExercise(
+                TemplateExercise(
+                    templateId = templateId,
+                    exerciseId = ex.id,
+                    defaultSets = 3,
+                    orderIndex = index,
+                    targetReps = 10
+                )
+            )
+        }
+        _message.value = "Added \"$name\" template (${exercises.size} exercises)."
+    }
 
     fun refresh() = viewModelScope.launch {
         trainingDNARepository.generateDNA()

@@ -22,12 +22,17 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.TrackChanges
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Surface
+import androidx.compose.material3.TextButton
+import com.replog.ui.components.SecondaryButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -50,6 +55,7 @@ fun TrainingDnaInsightScreen(
     viewModel: TrainingDnaViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
+    val message by viewModel.message.collectAsState()
     LaunchedEffect(Unit) { viewModel.refresh() }
 
     LazyColumn(
@@ -62,6 +68,20 @@ fun TrainingDnaInsightScreen(
         item {
             Text("Training DNA", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.ExtraBold)
             Text("Your personal training signature, built from every workout.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+
+        // Transient confirmation (e.g. after adding a muscle-gap template).
+        message?.let { msg ->
+            item {
+                Surface(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(12.dp)) {
+                        Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(10.dp))
+                        Text(msg, modifier = Modifier.weight(1f))
+                        TextButton(onClick = { viewModel.clearMessage() }) { Text("Dismiss") }
+                    }
+                }
+            }
         }
 
         // Priority 3 (#13) — Recovery dashboard (shown even before full DNA exists).
@@ -113,6 +133,17 @@ fun TrainingDnaInsightScreen(
                     muscles = state.weakestMuscles,
                     icon = Icons.Default.Accessibility
                 )
+            }
+
+            // Priority 2 (#8) — Muscle gap analysis: fix-it suggestions + one-tap add.
+            if (state.muscleGaps.isNotEmpty()) {
+                item {
+                    Text("Close the gaps", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(8.dp))
+                }
+                items(state.muscleGaps) { gap ->
+                    MuscleGapCard(gap = gap, onAddToTemplate = { viewModel.addMuscleGapToTemplate(gap.muscle, gap.exercises) })
+                }
             }
 
             item {
@@ -341,4 +372,32 @@ private fun AdaptiveSwapCard(swap: com.replog.domain.adaptive.AdaptiveSwap) = Re
     }
     Spacer(Modifier.height(6.dp))
     Text(swap.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+@Composable
+private fun MuscleGapCard(
+    gap: com.replog.domain.musclegap.MuscleGapSuggestion,
+    onAddToTemplate: () -> Unit
+) = RepLogCard {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Default.TrackChanges, null, tint = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text("Weak: ${gap.muscle}", fontWeight = FontWeight.Bold)
+            Text("Suggested exercises to bring it up", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+    Spacer(Modifier.height(8.dp))
+    gap.exercises.forEach { ex ->
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
+            Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(8.dp))
+            Column {
+                Text(ex.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                Text("${ex.equipment} • ${ex.primaryMuscles}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+    Spacer(Modifier.height(10.dp))
+    SecondaryButton("Add to template") { onAddToTemplate() }
 }
