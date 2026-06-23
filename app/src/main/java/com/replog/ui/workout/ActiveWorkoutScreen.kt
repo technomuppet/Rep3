@@ -766,19 +766,26 @@ private fun AddOrEditSetDialog(
     var weight by remember(initialSet?.id) { mutableStateOf(initialSet?.weight?.toCleanString().orEmpty()) }
     var reps by remember(initialSet?.id) { mutableStateOf(initialSet?.reps?.toString().orEmpty()) }
     var setType by remember(initialSet?.id) { mutableStateOf(initialSet?.setType ?: SetType.WORKING) }
-    var rpe by remember(initialSet?.id) { mutableStateOf(initialSet?.rpe?.toCleanString().orEmpty()) }
-    var tempo by remember(initialSet?.id) { mutableStateOf(initialSet?.tempo.orEmpty()) }
+    var rpeValueState by remember(initialSet?.id) { mutableStateOf(initialSet?.rpe) }
+    var tempoOption by remember(initialSet?.id) { mutableStateOf(com.replog.domain.logging.TempoPresets.optionForNotation(initialSet?.tempo)) }
+    var customTempo by remember(initialSet?.id) { mutableStateOf(if (tempoOption.isCustom) initialSet?.tempo.orEmpty() else "") }
     var showAdvanced by remember { mutableStateOf(initialSet?.rpe != null || !initialSet?.tempo.isNullOrBlank() || initialSet?.setType != SetType.WORKING) }
 
     val weightValue = weight.toDoubleOrNull() ?: 0.0
     val repsValue = reps.toIntOrNull() ?: 0
     val valid = weightValue >= 0 && repsValue > 0
-    val rpeValue = rpe.toDoubleOrNull()?.coerceIn(1.0, 10.0)
+    val rpeValue = rpeValueState?.coerceIn(1.0, 10.0)
+    val tempoToSave = com.replog.domain.logging.TempoPresets.resolveNotation(tempoOption, customTempo)
 
     fun bumpWeight(delta: Double) {
         val current = weight.toDoubleOrNull() ?: 0.0
         val next = (current + delta).coerceAtLeast(0.0)
         weight = if (next % 1.0 == 0.0) next.toInt().toString() else "%.2f".format(next).trimEnd('0').trimEnd('.')
+    }
+
+    fun bumpReps(delta: Int) {
+        val current = reps.toIntOrNull() ?: 0
+        reps = (current + delta).coerceAtLeast(0).toString()
     }
 
     AlertDialog(
@@ -794,12 +801,22 @@ private fun AddOrEditSetDialog(
                         reps = v.filter { it.isDigit() }
                     }
                 }
+                // Weight quick-add
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     listOf(-2.5 to "-2.5", 1.25 to "+1.25", 2.5 to "+2.5", 5.0 to "+5").forEach { (delta, label) ->
                         TextButton(onClick = { bumpWeight(delta) }) { Text(label, fontWeight = FontWeight.Bold) }
+                    }
+                }
+                // Reps quick-add (#5)
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    listOf(-1 to "-1", 1 to "+1", 2 to "+2", 5 to "+5").forEach { (delta, label) ->
+                        TextButton(onClick = { bumpReps(delta) }) { Text("$label rep", fontWeight = FontWeight.Bold) }
                     }
                 }
 
@@ -816,16 +833,38 @@ private fun AddOrEditSetDialog(
                             )
                         }
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        NumberInputField(rpe, "RPE", Modifier.weight(1f)) { value ->
-                            rpe = value.filter { it.isDigit() || it == '.' }
+
+                    // RPE preset chips (#7)
+                    Text("Effort (RPE)", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        com.replog.domain.logging.RpePresets.OPTIONS.forEach { option ->
+                            FilterChip(
+                                selected = rpeValueState == option.value,
+                                onClick = { rpeValueState = option.value },
+                                label = { Text(option.label) }
+                            )
                         }
+                    }
+
+                    // Tempo preset chips (#6) + custom field
+                    Text("Tempo", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        com.replog.domain.logging.TempoPresets.OPTIONS.forEach { option ->
+                            val suffix = option.notation?.let { " ($it)" } ?: ""
+                            FilterChip(
+                                selected = tempoOption.key == option.key,
+                                onClick = { tempoOption = option },
+                                label = { Text(option.label + suffix) }
+                            )
+                        }
+                    }
+                    if (tempoOption.isCustom) {
                         OutlinedTextField(
-                            value = tempo,
-                            onValueChange = { tempo = it.take(12) },
-                            modifier = Modifier.weight(1f),
-                            label = { Text("Tempo") },
-                            placeholder = { Text("3-1-1") },
+                            value = customTempo,
+                            onValueChange = { customTempo = it.take(12) },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Custom tempo") },
+                            placeholder = { Text("e.g. 3-1-1") },
                             singleLine = true
                         )
                     }
@@ -835,7 +874,7 @@ private fun AddOrEditSetDialog(
         confirmButton = {
             TextButton(
                 enabled = valid,
-                onClick = { onSave(weightValue, repsValue, setType, rpeValue, tempo) }
+                onClick = { onSave(weightValue, repsValue, setType, rpeValue, tempoToSave) }
             ) { Text("Complete", fontWeight = FontWeight.Bold) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }

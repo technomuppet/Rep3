@@ -35,7 +35,9 @@ fun HomeScreen(
     val coachState by coachViewModel.state.collectAsState()
     LaunchedEffect(Unit) { viewModel.refresh(); coachViewModel.loadRecommendation(force = false) }
     LazyColumn(Modifier.fillMaxSize().padding(contentPadding), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        item { Text("RepLog", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.ExtraBold); Text("Your training coach in your pocket.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        item { Text("Today", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.ExtraBold); Text("Your training dashboard.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+
+        // What to train today (recommendation + recovery) — the core of the dashboard.
         item {
             com.replog.ui.coach.SmartCoachCard(
                 state = coachState,
@@ -49,14 +51,35 @@ fun HomeScreen(
                 onRefresh = { coachViewModel.loadRecommendation(force = true) }
             )
         }
-        item { PrimaryButton("Start Workout", onClick = onStartWorkout) }
-        item { Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) { SecondaryButton("View History", Modifier.weight(1f), onClick = onViewHistory); SecondaryButton("Coach History", Modifier.weight(1f), onClick = onOpenCoachHistory) } }
-        item { Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) { StatCard("Workouts", state.sessionCount.toString(), Modifier.weight(1f)); StatCard("Volume", formatWeight(state.totalVolume), Modifier.weight(1f)) } }
+
+        // Weekly progress + streak
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                StatCard("This week", "${state.sessionsThisWeek} workouts", Modifier.weight(1f))
+                StatCard("Week volume", formatWeight(state.volumeThisWeek), Modifier.weight(1f))
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                StatCard("Day streak", if (state.dayStreak > 0) "🔥 ${state.dayStreak}" else "—", Modifier.weight(1f))
+                StatCard("Total workouts", state.sessionCount.toString(), Modifier.weight(1f))
+            }
+        }
+
+        // Coaching insight + last PR (single, not a full feed — that lives in History/Progress)
         item { HomeInsightCard(state.insight) }
-        item { Text("Recent Workouts", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
-        if (state.recentSessions.isEmpty()) item { EmptyState("No workouts yet", "Start your first workout to build your training history.") } else items(state.recentSessions) { RecentWorkoutCard(it) }
-        item { Text("Recent PRs", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
-        if (state.recentPRs.isEmpty()) item { RepLogCard { Text("PRs will appear here when you beat previous bests.", color = MaterialTheme.colorScheme.onSurfaceVariant) } } else items(state.recentPRs) { pr -> RepLogCard { Row(verticalAlignment = Alignment.CenterVertically) { PRBadge(); Spacer(Modifier.width(10.dp)); Text("${formatWeight(pr.weight)} × ${pr.reps} reps", fontWeight = FontWeight.Bold) } } }
+        item { Text("Last PR", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+        item {
+            val lastPr = state.recentPRs.firstOrNull()
+            if (lastPr == null) {
+                RepLogCard { Text("PRs will appear here when you beat previous bests.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            } else {
+                RepLogCard { Row(verticalAlignment = Alignment.CenterVertically) { PRBadge(); Spacer(Modifier.width(10.dp)); Text("${formatWeight(lastPr.weight)} × ${lastPr.reps} reps", fontWeight = FontWeight.Bold) } }
+            }
+        }
+
+        // Lightweight navigation to the detail areas (their full job lives elsewhere).
+        item { Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) { SecondaryButton("History", Modifier.weight(1f), onClick = onViewHistory); SecondaryButton("Coach History", Modifier.weight(1f), onClick = onOpenCoachHistory) } }
     }
 }
 

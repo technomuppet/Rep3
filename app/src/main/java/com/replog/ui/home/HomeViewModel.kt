@@ -25,6 +25,9 @@ data class HomeUiState(
     val recentSessions: List<SessionWithExercises> = emptyList(),
     val recentPRs: List<SetLog> = emptyList(),
     val insight: HomeInsight = HomeInsight(),
+    val sessionsThisWeek: Int = 0,
+    val volumeThisWeek: Double = 0.0,
+    val dayStreak: Int = 0,
     val isLoading: Boolean = true
 )
 
@@ -38,12 +41,22 @@ class HomeViewModel @Inject constructor(private val repo: WorkoutRepository) : V
         repo.getRecentPRs(),
         repo.getAllSessions()
     ) { s, sessions, prs, allSessions ->
+        val completed = allSessions.filter { it.session.endTime != null }
+        val now = System.currentTimeMillis()
+        val startTimes = completed.map { it.session.startTime }
+        val startTimesToVolume = completed.map { c ->
+            c.session.startTime to c.exercises.sumOf { e -> e.sets.sumOf { it.weight * it.reps } }
+        }
+        val weekly = com.replog.domain.home.HomeDashboardStats.weeklyProgress(startTimesToVolume, now)
         HomeUiState(
             sessionCount = s.first,
             totalVolume = s.second,
             recentSessions = sessions,
             recentPRs = prs,
-            insight = buildHomeInsight(allSessions.filter { it.session.endTime != null }),
+            insight = buildHomeInsight(completed),
+            sessionsThisWeek = weekly.sessionsThisWeek,
+            volumeThisWeek = weekly.volumeThisWeek,
+            dayStreak = com.replog.domain.home.HomeDashboardStats.dayStreak(startTimes, now),
             isLoading = false
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HomeUiState())
