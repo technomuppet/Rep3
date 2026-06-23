@@ -87,7 +87,7 @@ fun HomeScreen(
         item {
             val lastPr = state.recentPRs.firstOrNull()
             if (lastPr == null) {
-                RepLogCard { Text("PRs will appear here when you beat previous bests.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                RepLogCard { InlineEmpty("PRs will appear here when you beat previous bests.") }
             } else {
                 RepLogCard { Row(verticalAlignment = Alignment.CenterVertically) { PRBadge(); Spacer(Modifier.width(10.dp)); Text("${formatWeight(lastPr.weight)} × ${lastPr.reps} reps", fontWeight = FontWeight.Bold) } }
             }

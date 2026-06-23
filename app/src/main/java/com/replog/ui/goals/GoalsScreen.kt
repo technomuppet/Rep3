@@ -46,6 +46,7 @@ import com.replog.data.model.Exercise
 import com.replog.data.repository.GoalWithForecast
 import com.replog.domain.goals.GoalStatus
 import com.replog.ui.components.EmptyState
+import com.replog.ui.components.LoadingState
 import com.replog.ui.components.NumberInputField
 import com.replog.ui.components.PrimaryButton
 import com.replog.ui.components.RepLogCard
@@ -69,7 +70,9 @@ fun GoalsScreen(
         }
         item { PrimaryButton("Add a goal") { showAdd = true } }
 
-        if (state.goals.isEmpty()) {
+        if (state.isLoading && state.goals.isEmpty()) {
+            item { LoadingState("Loading goals") }
+        } else if (state.goals.isEmpty()) {
             item { EmptyState("No goals yet", "Add a strength, rep or bodyweight goal to see your forecast and next milestone.") }
         } else {
             items(state.goals) { gwf ->

@@ -56,6 +56,8 @@ import com.replog.data.model.ExerciseInsight
 import com.replog.data.model.ExerciseSetHistory
 import com.replog.ui.components.EmptyState
 import com.replog.ui.components.ExerciseIcon
+import com.replog.ui.components.InlineEmpty
+import com.replog.ui.components.LoadingState
 import com.replog.ui.components.PRBadge
 import com.replog.ui.components.RepLogCard
 import com.replog.ui.components.StatCard
@@ -119,7 +121,9 @@ fun ExerciseLibraryScreen(
                 )
             }
 
-            if (state.exercises.isEmpty()) {
+            if (state.isLoading && state.exercises.isEmpty() && state.filter.isEmpty) {
+                item { LoadingState("Loading exercises") }
+            } else if (state.exercises.isEmpty()) {
                 item { EmptyState("No exercises found", "Try changing your search or add a custom exercise.") }
             } else {
                 items(state.exercises, key = { it.id }) { exercise ->
@@ -302,7 +306,7 @@ private fun ExerciseDetailDialog(
 
                 Text("Recent sets", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 if (insight.history.isEmpty()) {
-                    Text("No completed workout data yet. Log this exercise and finish a workout to build analytics.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    InlineEmpty("No completed workout data yet. Log this exercise and finish a workout to build analytics.")
                 } else {
                     insight.history.takeLast(8).reversed().forEach { set ->
                         HistorySetRow(set, useKg)

@@ -9,9 +9,9 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-data class HistoryUiState(val sessions: List<SessionWithExercises> = emptyList())
+data class HistoryUiState(val sessions: List<SessionWithExercises> = emptyList(), val isLoading: Boolean = true)
 @HiltViewModel
 class HistoryViewModel @Inject constructor(private val repo: WorkoutRepository) : ViewModel() {
-    val uiState = repo.getAllSessions().map { HistoryUiState(it) }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HistoryUiState())
+    val uiState = repo.getAllSessions().map { HistoryUiState(it, isLoading = false) }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HistoryUiState())
     fun deleteSession(id: Int) = viewModelScope.launch { repo.deleteSessionById(id) }
 }

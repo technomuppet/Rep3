@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.replog.data.model.SessionWithExercises
 import com.replog.ui.components.EmptyState
+import com.replog.ui.components.LoadingState
 import com.replog.ui.components.PRBadge
 import com.replog.ui.components.RepLogCard
 import com.replog.ui.components.StatCard
@@ -70,7 +71,9 @@ fun HistoryScreen(
             Text("Calendar view, session details and PRs.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
-        if (state.sessions.isEmpty()) {
+        if (state.isLoading && state.sessions.isEmpty()) {
+            item { LoadingState("Loading history") }
+        } else if (state.sessions.isEmpty()) {
             item { EmptyState("No history yet", "Finished workouts will appear here.") }
         } else {
             item { CalendarSummaryCard(sessions = completed) }

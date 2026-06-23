@@ -41,6 +41,19 @@ fun EmptyState(title: String, message: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
+fun LoadingState(message: String = "Loading", modifier: Modifier = Modifier) {
+    Column(modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+        CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 3.dp)
+        Spacer(Modifier.height(12.dp)); Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+fun InlineEmpty(message: String, modifier: Modifier = Modifier) {
+    Text(message, modifier = modifier, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+@Composable
 fun StatCard(label: String, value: String, modifier: Modifier = Modifier) = RepLogCard(modifier) {
     Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
     Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)

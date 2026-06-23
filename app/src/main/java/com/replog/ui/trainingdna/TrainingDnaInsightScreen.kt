@@ -50,6 +50,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.replog.ui.components.EmptyState
+import com.replog.ui.components.InlineEmpty
 import com.replog.ui.components.RepLogCard
 import com.replog.ui.components.StatCard
 import kotlin.math.roundToInt
@@ -178,7 +179,7 @@ fun TrainingDnaInsightScreen(
                 Spacer(Modifier.height(8.dp))
             }
             if (state.fastestProgressing.isEmpty()) {
-                item { Text("No clear progression detected yet. Keep logging consistently.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                item { InlineEmpty("No clear progression detected yet. Keep logging consistently.") }
             } else {
                 items(state.fastestProgressing) { exercise ->
                     RepLogCard {
@@ -196,7 +197,7 @@ fun TrainingDnaInsightScreen(
                 Spacer(Modifier.height(8.dp))
             }
             if (state.stalledExercises.isEmpty()) {
-                item { Text("No plateaus detected. All tracked lifts are moving forward.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                item { InlineEmpty("No plateaus detected. All tracked lifts are moving forward.") }
             } else {
                 items(state.stalledExercises) { exercise ->
                     RepLogCard {
@@ -297,7 +298,7 @@ private fun MuscleCard(
     }
     Spacer(Modifier.height(8.dp))
     if (muscles.isEmpty()) {
-        Text("No data available yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        InlineEmpty("No data available yet.")
     } else {
         Text(muscles.joinToString(" • "), fontWeight = FontWeight.SemiBold)
     }

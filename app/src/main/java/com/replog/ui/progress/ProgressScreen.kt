@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.replog.data.model.BodyweightLog
 import com.replog.ui.components.EmptyState
+import com.replog.ui.components.LoadingState
 import com.replog.ui.components.PRBadge
 import com.replog.ui.components.PrimaryButton
 import com.replog.ui.components.RepLogCard
@@ -90,7 +91,9 @@ fun ProgressScreen(
             )
         }
 
-        if (state.totalWorkouts == 0) {
+        if (state.isLoading && state.totalWorkouts == 0) {
+            item { LoadingState("Loading progress") }
+        } else if (state.totalWorkouts == 0) {
             item { EmptyState("No completed workouts yet", "Finish workouts to unlock progress charts and rankings.") }
         } else {
             item {
