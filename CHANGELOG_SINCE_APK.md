@@ -131,7 +131,7 @@ A git **bundle** is provided at `patches/replog-improvements.bundle` (covers `79
 
 ```bash
 # 1) fetch the commits from the bundle
-git fetch /path/to/replog-improvements.bundle sync/apply-improvements:bundle/improvements
+git fetch /path/to/replog-improvements.bundle HEAD:bundle/improvements
 
 # 2) merge onto main (fast-forward, since they sit on top of 79debc5)
 git checkout main
