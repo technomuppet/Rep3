@@ -38,9 +38,10 @@ fun HomeScreen(
     LazyColumn(Modifier.fillMaxSize().padding(contentPadding), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item { Text("Today", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.ExtraBold); Text("Your training dashboard.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
 
-        // What to train today (recommendation + recovery) — the core of the dashboard.
+        // Coach Dashboard — the unified "Good morning" advisor (recommendation +
+        // recovery + focus + progression + goal + estimated time).
         item {
-            com.replog.ui.coach.SmartCoachCard(
+            com.replog.ui.coach.CoachDashboardCard(
                 state = coachState,
                 onStart = {
                     coachViewModel.acceptRecommendation(

@@ -3,13 +3,21 @@ package com.replog.ui.coach
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.replog.data.model.RecommendationHistory
+import com.replog.data.repository.BodyweightRepository
+import com.replog.data.repository.GoalRepository
 import com.replog.data.repository.RecommendationRepository
+import com.replog.data.repository.TrainingDNARepository
 import com.replog.data.repository.WorkoutRepository
+import com.replog.domain.coachdash.CoachBriefing
+import com.replog.domain.coachdash.CoachBriefingBuilder
 import com.replog.domain.recommendation.ExplanationContribution
 import com.replog.domain.recommendation.Recommendation
 import com.replog.domain.recommendation.RecommendationExplanation
 import com.replog.domain.recommendation.RecommendationType
+import com.replog.domain.recommendation.RecoveryAnalyzer
+import com.replog.domain.recovery.RecoveryDashboard
 import com.replog.util.PreferencesManager
+import java.util.Calendar
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -26,6 +34,7 @@ data class CoachUiState(
     val isLoading: Boolean = true,
     val recommendation: Recommendation? = null,
     val contributions: List<ExplanationContribution> = emptyList(),
+    val briefing: CoachBriefing? = null,
     val accepted: Boolean = false,
     val error: String? = null
 )
@@ -34,6 +43,9 @@ data class CoachUiState(
 class CoachViewModel @Inject constructor(
     private val recommendationRepository: RecommendationRepository,
     private val workoutRepository: WorkoutRepository,
+    private val trainingDNARepository: TrainingDNARepository,
+    private val bodyweightRepository: BodyweightRepository,
+    private val goalRepository: GoalRepository,
     private val handoff: CoachHandoff,
     private val prefs: PreferencesManager
 ) : ViewModel() {
@@ -76,11 +88,50 @@ class CoachViewModel @Inject constructor(
                 isLoading = false,
                 recommendation = rec,
                 contributions = RecommendationExplanation.contributions(rec),
+                briefing = buildBriefing(rec),
                 accepted = false
             )
         }.onFailure { e ->
             _state.value = _state.value.copy(isLoading = false, error = e.message ?: "Could not build a recommendation.")
         }
+    }
+
+    /** Assemble the unified Coach Dashboard briefing from existing intelligence. */
+    private suspend fun buildBriefing(rec: Recommendation): CoachBriefing {
+        val useKg = prefs.useKg.first()
+        val now = System.currentTimeMillis()
+
+        // Recovery (reuse the existing analyzer + dashboard mapping).
+        val recoveryState = runCatching {
+            val sessions = workoutRepository.getAllSessions().first().filter { it.session.endTime != null }
+            val bodyweights = bodyweightRepository.getAllBodyweights().first()
+            RecoveryDashboard.from(RecoveryAnalyzer.overallRecovery(sessions, bodyweights, now))
+        }.getOrNull()
+
+        // Weakest muscle from the latest DNA snapshot (best-effort).
+        val weakest = runCatching {
+            trainingDNARepository.getLatestDNA().first()
+                ?.weakestMuscles?.split(",")?.map { it.trim() }?.firstOrNull { it.isNotBlank() }
+        }.getOrNull()
+
+        // Top active goal forecast (best-effort).
+        val goalLine = runCatching {
+            goalRepository.getActive().first().firstOrNull()?.let { goal ->
+                goalRepository.forecastFor(goal, useKg).summaryLine
+            }
+        }.getOrNull()
+
+        val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+
+        return CoachBriefingBuilder.build(
+            recommendation = rec,
+            recoveryScore = recoveryState?.score,
+            recoveryDirective = recoveryState?.directive,
+            weakestMuscle = weakest,
+            topGoalSummary = goalLine,
+            useKg = useKg,
+            hourOfDay = hour
+        )
     }
 
     private suspend fun shouldRecompute(): Boolean {
