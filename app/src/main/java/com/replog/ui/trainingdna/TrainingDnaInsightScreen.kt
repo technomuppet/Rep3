@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.AutoGraph
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.DirectionsRun
 import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Star
@@ -96,6 +97,11 @@ fun TrainingDnaInsightScreen(
         // Recovery calendar — green/yellow/red day strip.
         if (state.recoveryCalendar.any { it.state != com.replog.domain.recovery.RecoveryDay.REST_NO_DATA }) {
             item { RecoveryCalendarCard(state.recoveryCalendar) }
+        }
+
+        // Training Genome — how THIS user grows best (months of response patterns).
+        state.genome?.takeIf { it.hasEnoughData }?.let { genome ->
+            item { TrainingGenomeCard(genome) }
         }
 
         if (!state.hasData) {
@@ -503,4 +509,34 @@ private fun VolumeHeatmapCard(landmarks: List<com.replog.domain.volume.VolumeLan
             }
         }
     }
+}
+
+@Composable
+private fun TrainingGenomeCard(genome: com.replog.domain.genome.TrainingGenome) = RepLogCard {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Default.Insights, null, tint = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.width(10.dp))
+        Text("Your Training Genome", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+        val conf = genome.traits.firstOrNull()?.confidence
+        if (conf != null) {
+            val (label, color) = when (conf) {
+                com.replog.domain.genome.GenomeConfidence.STRONG -> "Strong" to androidx.compose.ui.graphics.Color(0xFF2E7D32)
+                com.replog.domain.genome.GenomeConfidence.MODERATE -> "Building" to MaterialTheme.colorScheme.primary
+                com.replog.domain.genome.GenomeConfidence.EMERGING -> "Emerging" to MaterialTheme.colorScheme.tertiary
+            }
+            Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = color)
+        }
+    }
+    Text("How you grow best, learned from your own training over time.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Spacer(Modifier.height(10.dp))
+    genome.traits.forEach { trait ->
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
+            Column(Modifier.weight(1f)) {
+                Text(trait.dimension, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(trait.bestValue, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold)
+            }
+        }
+    }
+    Spacer(Modifier.height(4.dp))
+    Text(genome.summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }

@@ -13,6 +13,8 @@ import com.replog.domain.adaptive.AdaptiveSwap
 import com.replog.domain.adaptive.AdaptiveTemplateAdvisor
 import com.replog.domain.forecast.ProgressionForecast
 import com.replog.domain.forecast.ProgressionForecaster
+import com.replog.domain.genome.TrainingGenome
+import com.replog.domain.genome.TrainingGenomeEngine
 import com.replog.domain.musclegap.MuscleGapAnalyzer
 import com.replog.domain.musclegap.MuscleGapSuggestion
 import com.replog.domain.recovery.RecoveryCalendar
@@ -56,6 +58,7 @@ data class TrainingDnaUiState(
     val muscleGaps: List<MuscleGapSuggestion> = emptyList(),
     val volumeLandmarks: List<VolumeLandmark> = emptyList(),
     val recoveryCalendar: List<RecoveryCalendarDay> = emptyList(),
+    val genome: TrainingGenome? = null,
     val hasData: Boolean = false
 )
 
@@ -90,8 +93,11 @@ class TrainingDnaViewModel @Inject constructor(
             days = 14
         )
 
+        // Training Genome — long-term response patterns (how THIS user grows best).
+        val genome = TrainingGenomeEngine.analyze(completed, now)
+
         if (snapshot == null) {
-            return@combine TrainingDnaUiState(recovery = recovery, recoveryCalendar = calendar, hasData = false)
+            return@combine TrainingDnaUiState(recovery = recovery, recoveryCalendar = calendar, genome = genome, hasData = false)
         }
 
         val exById = exercises.associateBy { it.id }
@@ -137,6 +143,7 @@ class TrainingDnaViewModel @Inject constructor(
             muscleGaps = gaps,
             volumeLandmarks = landmarks,
             recoveryCalendar = calendar,
+            genome = genome,
             hasData = true
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TrainingDnaUiState())
