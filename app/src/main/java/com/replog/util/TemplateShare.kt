@@ -9,7 +9,7 @@ import com.replog.data.model.TemplateWithExercises
  * A shared template references exercises by NAME (plus enough metadata to
  * recreate a custom exercise if the recipient does not have it), so a template
  * exported on one device imports cleanly on another. Files use the
- * ".rpltemplate" extension and are plain JSON, so they can be shared over any
+ * ".replogtemplate" extension and are plain JSON, so they can be shared over any
  * channel (chat, email, GitHub, cloud drive) with no server involved.
  */
 data class SharedTemplate(
@@ -38,7 +38,7 @@ data class SharedTemplateExercise(
 
 object TemplateShare {
 
-    const val FILE_EXTENSION = "rpltemplate"
+    const val FILE_EXTENSION = "replogtemplate"
     const val MIME_TYPE = "application/json"
 
     private val gson = GsonBuilder().setPrettyPrinting().create()

@@ -123,7 +123,7 @@ fun TrainingDnaInsightScreen(
 
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    StatCard("Monthly PRs", state.monthlyPRCount.toString(), Modifier.weight(1f))
+                    StatCard("Monthly PBs", state.monthlyPRCount.toString(), Modifier.weight(1f))
                     StatCard("Volume tolerance", "${state.volumeToleranceScore.roundToInt()}%", Modifier.weight(1f))
                 }
             }
@@ -241,15 +241,15 @@ fun TrainingDnaInsightScreen(
             }
 
             item {
-                Text("Monthly PR rate", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text("Monthly PB rate", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(8.dp))
                 RepLogCard {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Star, null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.width(12.dp))
                         Column {
-                            Text("${state.monthlyPRCount} PRs in the last 30 days", fontWeight = FontWeight.SemiBold)
-                            Text("PRs are personal-record sets logged in your workouts.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("${state.monthlyPRCount} PBs in the last 30 days", fontWeight = FontWeight.SemiBold)
+                            Text("PBs are personal-best sets logged in your workouts.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }

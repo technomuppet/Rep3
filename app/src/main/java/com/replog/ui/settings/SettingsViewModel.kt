@@ -46,6 +46,7 @@ data class SettingsUiState(
     val latestJsonFileName: String? = null,
     val latestJsonLocation: String? = null,
     val exportFolderLabel: String = "Downloads/RepLog",
+    val templateStatus: String? = null,
     val isBusy: Boolean = false
 )
 
@@ -56,6 +57,7 @@ class SettingsViewModel @Inject constructor(
     private val exerciseRepository: ExerciseRepository,
     private val bodyweightRepository: BodyweightRepository,
     private val dataResetManager: com.replog.util.DataResetManager,
+    private val dataSeeder: com.replog.util.DataSeeder,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
     // Holds the result of the most recent CSV / JSON export so the UI can show
@@ -71,6 +73,7 @@ class SettingsViewModel @Inject constructor(
 
     private val exportStatus = MutableStateFlow<String?>(null)
     private val backupStatus = MutableStateFlow<String?>(null)
+    private val templateStatus = MutableStateFlow<String?>(null)
     private val artifacts = MutableStateFlow(ExportArtifacts())
     private val isBusy = MutableStateFlow(false)
 
@@ -84,7 +87,8 @@ class SettingsViewModel @Inject constructor(
             backupStatus.map { it as Any? },
             artifacts.map { it as Any? },
             isBusy.map { it as Any? },
-            prefs.exportFolderLabel.map { it as Any? }
+            prefs.exportFolderLabel.map { it as Any? },
+            templateStatus.map { it as Any? }
         )
     ) { values ->
         val a = values[6] as ExportArtifacts
@@ -102,7 +106,8 @@ class SettingsViewModel @Inject constructor(
             latestJsonFileName = a.jsonFileName,
             latestJsonLocation = a.jsonLocation,
             isBusy = values[7] as Boolean,
-            exportFolderLabel = values[8] as String
+            exportFolderLabel = values[8] as String,
+            templateStatus = values[9] as String?
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
@@ -142,6 +147,20 @@ class SettingsViewModel @Inject constructor(
     fun resetExportFolder() = viewModelScope.launch {
         prefs.setExportFolder(null, "Downloads/RepLog")
         exportStatus.value = "Export folder reset to Downloads/RepLog."
+    }
+
+    /** P6: import a .replogtemplate file from raw JSON (validation + dedupe). */
+    fun importTemplateJson(json: String) = viewModelScope.launch {
+        isBusy.value = true
+        runCatching {
+            val shared = com.replog.util.TemplateShare.decode(json)
+            dataSeeder.importSharedTemplate(shared)
+        }.onSuccess { name ->
+            templateStatus.value = "Imported template: $name"
+        }.onFailure { error ->
+            templateStatus.value = "Import failed: ${error.message ?: "not a valid RepLog template"}"
+        }
+        isBusy.value = false
     }
 
     fun exportCsv() = viewModelScope.launch {

@@ -403,7 +403,7 @@ class ProgressViewModel @Inject constructor(
         milestone("30 workouts", "A real training block", workouts, 30),
         milestone("100 workouts", "Long-term consistency", workouts, 100),
         milestone("1,000 sets", "Serious volume banked", sets, 1_000),
-        milestone("100 PRs", "Progress keeps stacking", prs, 100),
+        milestone("100 PBs", "Progress keeps stacking", prs, 100),
         milestone("7-day streak", "Training week locked in", streak, 7),
         milestone("1,000,000 lifted", "One million total load", volume.toInt(), 1_000_000)
     )

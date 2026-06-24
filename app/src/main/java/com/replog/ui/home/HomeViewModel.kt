@@ -114,7 +114,7 @@ class HomeViewModel @Inject constructor(
             .average()
         val prCount = latest.exercises.sumOf { entry -> entry.sets.count { it.isPR } }
         return when {
-            prCount > 0 -> HomeInsight("PR momentum", "Your last workout produced $prCount PR${if (prCount == 1) "" else "s"}. Keep the next session focused and repeatable.")
+            prCount > 0 -> HomeInsight("PB momentum", "Your last workout produced $prCount personal best${if (prCount == 1) "" else "s"}. Keep the next session focused and repeatable.")
             latestVolume > avgRecentVolume * 1.25 -> HomeInsight("Volume jump detected", "Your last session was much higher volume than recent average. Watch recovery before adding more work.")
             latestVolume < avgRecentVolume * 0.7 -> HomeInsight("Lower-volume session", "Your last session was lighter than usual. Good if intentional; if not, check fatigue or schedule pressure.")
             else -> HomeInsight("Training looks steady", "Recent workload is consistent. Keep progressing one variable at a time: reps, load, sets or technique quality.")

@@ -73,6 +73,14 @@ fun SettingsScreen(
         }
     }
 
+    // P6: import a shared .replogtemplate file.
+    val importTemplateLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            val json = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+            if (json != null) viewModel.importTemplateJson(json)
+        }
+    }
+
     // Storage Access Framework: let the user choose & persist an export folder.
     val pickFolderLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
@@ -212,6 +220,27 @@ fun SettingsScreen(
             }
         }
 
+        // P6: Templates - import a shared .replogtemplate file (sharing happens
+        // from the Training screen per template).
+        RepLogCard {
+            Row {
+                Icon(Icons.Default.FileDownload, null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Templates", fontWeight = FontWeight.Bold)
+                    Text("Import a workout template shared by another RepLog user (.replogtemplate). Share your own from the Training screen.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            SecondaryButton("Import Template", enabled = !state.isBusy) {
+                importTemplateLauncher.launch(arrayOf("application/json", "application/octet-stream", "text/*", "*/*"))
+            }
+            state.templateStatus?.let {
+                Spacer(Modifier.height(8.dp))
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+
         RepLogCard {
             Row {
                 Icon(Icons.Default.BugReport, null, tint = MaterialTheme.colorScheme.primary)
@@ -219,7 +248,7 @@ fun SettingsScreen(
                 Column(Modifier.weight(1f)) {
                     Text("Screenshot demo data", fontWeight = FontWeight.Bold)
                     Text(
-                        "Generate realistic local demo workouts, PRs, supersets and bodyweight logs for QA or store screenshots.",
+                        "Generate realistic local demo workouts, personal bests, supersets and bodyweight logs for QA or store screenshots.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }

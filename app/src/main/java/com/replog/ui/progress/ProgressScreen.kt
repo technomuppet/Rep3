@@ -75,7 +75,7 @@ fun ProgressScreen(
     ) {
         item {
             Text("Progress", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.ExtraBold)
-            Text("Your training signal across volume, PRs, strength and bodyweight.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Your training signal across volume, personal bests, strength and bodyweight.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
         item { PrimaryButton("View Training DNA") { onOpenTrainingDna() } }
@@ -110,7 +110,7 @@ fun ProgressScreen(
             }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    StatCard("PRs", state.totalPRs.toString(), Modifier.weight(1f))
+                    StatCard("PBs", state.totalPRs.toString(), Modifier.weight(1f))
                     StatCard("Tonnes", "%.1f".format(state.totalVolume / 1000.0), Modifier.weight(1f))
                 }
             }

@@ -37,6 +37,7 @@ fun HomeScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val coachState by coachViewModel.state.collectAsState()
+    var showTrainAnywayDialog by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { viewModel.refresh(); coachViewModel.loadRecommendation(force = false) }
     LazyColumn(Modifier.fillMaxSize().padding(contentPadding), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item { Text("Today", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.ExtraBold); Text("Your training dashboard.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
@@ -54,11 +55,8 @@ fun HomeScreen(
                 },
                 onDismiss = { coachViewModel.dismissRecommendation() },
                 onRefresh = { coachViewModel.loadRecommendation(force = true) },
-                // Rest day override: respect the user's choice to train regardless.
-                onTrainAnyway = {
-                    coachViewModel.dismissRecommendation(reason = "train_anyway")
-                    onStartWorkout()
-                }
+                // Rest day override: confirm intent, then respect the user's choice.
+                onTrainAnyway = { showTrainAnywayDialog = true }
             )
         }
 
@@ -88,11 +86,11 @@ fun HomeScreen(
 
         // Coaching insight + last PR (single, not a full feed — that lives in History/Progress)
         item { HomeInsightCard(state.insight) }
-        item { Text("Last PR", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+        item { Text("Last PB", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
         item {
             val lastPr = state.recentPRs.firstOrNull()
             if (lastPr == null) {
-                RepLogCard { InlineEmpty("PRs will appear here when you beat previous bests.") }
+                RepLogCard { InlineEmpty("Personal bests appear here when you beat previous bests.") }
             } else {
                 RepLogCard { Row(verticalAlignment = Alignment.CenterVertically) { PRBadge(); Spacer(Modifier.width(10.dp)); Text("${formatWeight(lastPr.weight)} × ${lastPr.reps} reps", fontWeight = FontWeight.Bold) } }
             }
@@ -114,10 +112,33 @@ fun HomeScreen(
                         com.replog.util.ShareStat("This week", "${state.sessionsThisWeek} sessions"),
                         com.replog.util.ShareStat("Day streak", if (state.dayStreak > 0) "${state.dayStreak} days" else "—")
                     ),
-                    footnote = state.recentPRs.firstOrNull()?.let { "Latest PR: ${formatWeight(it.weight)} × ${it.reps}" }
+                    footnote = state.recentPRs.firstOrNull()?.let { "Latest PB: ${formatWeight(it.weight)} × ${it.reps}" }
                 )
             }
         }
+    }
+
+    if (showTrainAnywayDialog) {
+        AlertDialog(
+            onDismissRequest = { showTrainAnywayDialog = false },
+            title = { Text("Train anyway?") },
+            text = {
+                Text(
+                    "Recovery data suggests rest today. Training while fatigued may reduce performance and recovery. Continue?",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showTrainAnywayDialog = false
+                    coachViewModel.recordTrainAnywayOverride()
+                    onStartWorkout()
+                }) { Text("Train Anyway") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTrainAnywayDialog = false }) { Text("Cancel") }
+            }
+        )
     }
 }
 

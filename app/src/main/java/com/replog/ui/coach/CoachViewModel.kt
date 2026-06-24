@@ -47,8 +47,26 @@ class CoachViewModel @Inject constructor(
     private val bodyweightRepository: BodyweightRepository,
     private val goalRepository: GoalRepository,
     private val handoff: CoachHandoff,
-    private val prefs: PreferencesManager
+    private val prefs: PreferencesManager,
+    private val restDayOverrideRepository: com.replog.data.repository.RestDayOverrideRepository
 ) : ViewModel() {
+
+    /**
+     * P5: the user chose "Train Anyway" against a recommended rest day. Record
+     * the override locally (recovery score + reason) so future recovery
+     * intelligence can learn the user's true tolerance for training through
+     * fatigue. Also marks the rest recommendation as dismissed.
+     */
+    fun recordTrainAnywayOverride() {
+        val briefing = _state.value.briefing
+        viewModelScope.launch {
+            restDayOverrideRepository.record(
+                recoveryScore = briefing?.recoveryScore,
+                recommendationReason = briefing?.recoveryDirective
+            )
+        }
+        dismissRecommendation(reason = "train_anyway")
+    }
 
     private val _state = MutableStateFlow(CoachUiState())
     val state: StateFlow<CoachUiState> = _state.asStateFlow()

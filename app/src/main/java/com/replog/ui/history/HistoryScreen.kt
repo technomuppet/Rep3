@@ -68,7 +68,7 @@ fun HistoryScreen(
     ) {
         item {
             Text("History", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.ExtraBold)
-            Text("Calendar view, session details and PRs.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Calendar view, session details and personal bests.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
         if (state.isLoading && state.sessions.isEmpty()) {

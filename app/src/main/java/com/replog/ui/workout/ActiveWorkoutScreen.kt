@@ -384,7 +384,7 @@ private fun WorkoutHeader(active: Boolean, elapsed: String) {
         Column(Modifier.weight(1f)) {
             Text("Workout", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.ExtraBold)
             Text(
-                if (active) "Active • $elapsed" else "Templates, quick logging, PRs and recovery.",
+                if (active) "Active • $elapsed" else "Templates, quick logging, personal bests and recovery.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
@@ -464,7 +464,7 @@ private fun WorkoutStatsRow(entries: List<SessionExerciseWithSets>, elapsed: Str
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             StatCard("Time", elapsed, Modifier.weight(1f))
             StatCard("Sets", setCount.toString(), Modifier.weight(1f))
-            StatCard("PRs", prs.toString(), Modifier.weight(1f))
+            StatCard("PBs", prs.toString(), Modifier.weight(1f))
         }
     }
 }
@@ -677,7 +677,7 @@ private fun WorkoutExerciseCard(
                             set.setType.takeIf { it != SetType.WORKING },
                             set.rpe?.let { "RPE ${"%.1f".format(it)}" },
                             set.tempo?.takeIf { it.isNotBlank() }?.let { "Tempo $it" },
-                            set.prType?.let { "🏆 PR ${it}" }
+                            set.prType?.let { "🏆 PB ${it}" }
                         ).joinToString(" • ")
                         if (meta.isNotBlank()) {
                             Text(meta, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -997,11 +997,11 @@ private fun WorkoutCompletionDialog(summary: WorkoutSummary, useKg: Boolean, onR
                     StatCard("Volume", formatWeight(summary.volume, useKg), Modifier.weight(1f))
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    StatCard("PRs", summary.prCount.toString(), Modifier.weight(1f))
+                    StatCard("PBs", summary.prCount.toString(), Modifier.weight(1f))
                     StatCard("Score", "${summary.qualityScore}/100", Modifier.weight(1f))
                 }
                 if (summary.prCount > 0) {
-                    Text("🏆 New Personal Record${if(summary.prCount>1) "s" else ""} – strong session!", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    Text("🏆 New Personal Best${if(summary.prCount>1) "s" else ""} – strong session!", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                 }
                 Text("Exercises: ${summary.exerciseCount} • Targets hit: ${summary.targetHitCount}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -1022,7 +1022,7 @@ private fun WorkoutCompletionDialog(summary: WorkoutSummary, useKg: Boolean, onR
                         com.replog.util.ShareStat("Duration", formatDuration(summary.durationMillis)),
                         com.replog.util.ShareStat("Score", "${summary.qualityScore}/100")
                     ),
-                    footnote = if (summary.prCount > 0) "🏆 ${summary.prCount} new PR${if (summary.prCount > 1) "s" else ""}!" else null
+                    footnote = if (summary.prCount > 0) "🏆 ${summary.prCount} new PB${if (summary.prCount > 1) "s" else ""}!" else null
                 )
             }) {
                 Icon(Icons.Default.Share, null, modifier = Modifier.size(16.dp))
