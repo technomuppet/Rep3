@@ -12,6 +12,7 @@ import com.replog.data.model.Goal
 import com.replog.data.model.KnowledgeGraphRelation
 import com.replog.data.model.PlateauEvent
 import com.replog.data.model.RecommendationHistory
+import com.replog.data.model.RestDayOverride
 import com.replog.data.model.RestLog
 import com.replog.data.model.SessionExercise
 import com.replog.data.model.SetLog
@@ -40,9 +41,10 @@ import com.replog.data.model.WorkoutTemplate
         TrainingDnaProgressionScore::class,
         PlateauEvent::class,
         RecommendationHistory::class,
-        Goal::class
+        Goal::class,
+        RestDayOverride::class
     ],
-    version = 13,
+    version = 14,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -60,6 +62,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun plateauEventDao(): PlateauEventDao
     abstract fun recommendationHistoryDao(): RecommendationHistoryDao
     abstract fun goalDao(): GoalDao
+    abstract fun restDayOverrideDao(): RestDayOverrideDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
@@ -354,12 +357,28 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // Sprint 4: record "Train Anyway" rest-day overrides for future recovery intelligence.
+        val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS rest_day_overrides (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        timestamp INTEGER NOT NULL,
+                        recoveryScore INTEGER,
+                        recommendationReason TEXT
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase = INSTANCE ?: synchronized(this) {
             Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "replog_database")
                 .addMigrations(
                     MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
                     MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11,
-                    MIGRATION_11_12, MIGRATION_12_13
+                    MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14
                 )
                 .build()
                 .also { INSTANCE = it }

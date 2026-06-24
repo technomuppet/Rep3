@@ -164,14 +164,14 @@ fun SettingsScreen(
             }
             Spacer(Modifier.height(12.dp))
             PrimaryButton("Export CSV", enabled = !state.isBusy) { viewModel.exportCsv() }
-            if (state.latestCsvShareUri != null) {
-                Spacer(Modifier.height(10.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SecondaryButton("Open", Modifier.weight(1f)) { openDownloads(context) }
-                    SecondaryButton("Share", Modifier.weight(1f)) {
-                        state.latestCsvShareUri?.let { shareUri(context, it, "text/csv") }
-                    }
-                }
+            if (state.latestCsvFileName != null) {
+                ExportSuccessBlock(
+                    fileName = state.latestCsvFileName!!,
+                    location = state.latestCsvLocation ?: state.exportFolderLabel,
+                    onOpenFolder = { openDownloads(context) },
+                    onShare = { state.latestCsvShareUri?.let { shareUri(context, it, "text/csv") } },
+                    shareEnabled = state.latestCsvShareUri != null
+                )
             }
             state.exportStatus?.let {
                 Spacer(Modifier.height(8.dp))
@@ -189,15 +189,15 @@ fun SettingsScreen(
                 }
             }
             Spacer(Modifier.height(12.dp))
-            PrimaryButton("Backup", enabled = !state.isBusy) { viewModel.exportJsonBackup() }
-            if (state.latestJsonShareUri != null) {
-                Spacer(Modifier.height(10.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SecondaryButton("Open", Modifier.weight(1f)) { openDownloads(context) }
-                    SecondaryButton("Share", Modifier.weight(1f)) {
-                        state.latestJsonShareUri?.let { shareUri(context, it, "application/json") }
-                    }
-                }
+            PrimaryButton("Export JSON", enabled = !state.isBusy) { viewModel.exportJsonBackup() }
+            if (state.latestJsonFileName != null) {
+                ExportSuccessBlock(
+                    fileName = state.latestJsonFileName!!,
+                    location = state.latestJsonLocation ?: state.exportFolderLabel,
+                    onOpenFolder = { openDownloads(context) },
+                    onShare = { state.latestJsonShareUri?.let { shareUri(context, it, "application/json") } },
+                    shareEnabled = state.latestJsonShareUri != null
+                )
             }
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -234,7 +234,7 @@ fun SettingsScreen(
                 Icon(Icons.Default.Warning, null, tint = MaterialTheme.colorScheme.error)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("Danger zone", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                    Text("Advanced", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
                     Text("Permanently delete all workout history. This cannot be undone.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
@@ -315,12 +315,15 @@ private fun DeleteAllHistoryDialog(onCancel: () -> Unit, onConfirm: () -> Unit) 
         title = { Text("Delete all workout history?") },
         text = {
             Column {
-                Text("This will permanently delete:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("This removes:", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(6.dp))
-                Text("- Sessions", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("- Set logs", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("- Personal records", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("- Analytics derived from them", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("- Workouts", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("- Sets", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("- Progress records", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("- Training DNA history", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("- Recovery history", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(8.dp))
+                Text("Templates, exercises and settings are kept.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(10.dp))
                 Text("This cannot be undone. Type DELETE to confirm.", fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(8.dp))
@@ -335,7 +338,7 @@ private fun DeleteAllHistoryDialog(onCancel: () -> Unit, onConfirm: () -> Unit) 
         },
         confirmButton = {
             TextButton(onClick = onConfirm, enabled = confirmed) {
-                Text("DELETE", color = if (confirmed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Delete Everything", color = if (confirmed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
             }
         },
         dismissButton = { TextButton(onClick = onCancel) { Text("Cancel") } }
@@ -349,6 +352,33 @@ private fun folderLabelFromTreeUri(treeUri: String): String {
     return when {
         afterColon.isNotBlank() -> afterColon
         else -> "Selected folder"
+    }
+}
+
+@Composable
+private fun ExportSuccessBlock(
+    fileName: String,
+    location: String,
+    onOpenFolder: () -> Unit,
+    onShare: () -> Unit,
+    shareEnabled: Boolean
+) {
+    Spacer(Modifier.height(12.dp))
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.width(8.dp))
+        Text("Export complete", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+    }
+    Spacer(Modifier.height(6.dp))
+    Text("File saved", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text(fileName, fontWeight = FontWeight.SemiBold)
+    Spacer(Modifier.height(4.dp))
+    Text("Location", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text(location, fontWeight = FontWeight.SemiBold)
+    Spacer(Modifier.height(10.dp))
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        SecondaryButton("Open Folder", Modifier.weight(1f), onClick = onOpenFolder)
+        SecondaryButton("Share File", Modifier.weight(1f), enabled = shareEnabled, onClick = onShare)
     }
 }
 

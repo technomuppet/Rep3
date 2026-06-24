@@ -25,4 +25,7 @@ interface TrainingDnaSnapshotDao {
 
     @Query("SELECT COUNT(*) FROM training_dna_snapshots")
     suspend fun count(): Int
+
+    @Query("DELETE FROM training_dna_snapshots")
+    suspend fun deleteAll()
 }

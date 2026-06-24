@@ -29,4 +29,7 @@ interface TrainingDnaDao {
 
     @Update
     suspend fun updateMetric(metric: TrainingDnaMetric)
+
+    @Query("DELETE FROM training_dna_metrics")
+    suspend fun deleteAll()
 }

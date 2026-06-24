@@ -28,4 +28,7 @@ interface PlateauEventDao {
 
     @Query("SELECT COUNT(*) FROM plateau_events")
     suspend fun count(): Int
+
+    @Query("DELETE FROM plateau_events")
+    suspend fun deleteAll()
 }

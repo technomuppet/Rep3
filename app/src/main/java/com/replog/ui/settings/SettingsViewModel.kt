@@ -41,6 +41,10 @@ data class SettingsUiState(
     val backupStatus: String? = null,
     val latestCsvShareUri: String? = null,
     val latestJsonShareUri: String? = null,
+    val latestCsvFileName: String? = null,
+    val latestCsvLocation: String? = null,
+    val latestJsonFileName: String? = null,
+    val latestJsonLocation: String? = null,
     val exportFolderLabel: String = "Downloads/RepLog",
     val isBusy: Boolean = false
 )
@@ -51,12 +55,23 @@ class SettingsViewModel @Inject constructor(
     private val workoutRepository: WorkoutRepository,
     private val exerciseRepository: ExerciseRepository,
     private val bodyweightRepository: BodyweightRepository,
+    private val dataResetManager: com.replog.util.DataResetManager,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
+    // Holds the result of the most recent CSV / JSON export so the UI can show
+    // filename + location + Open/Share without juggling many separate flows.
+    private data class ExportArtifacts(
+        val csvShareUri: String? = null,
+        val csvFileName: String? = null,
+        val csvLocation: String? = null,
+        val jsonShareUri: String? = null,
+        val jsonFileName: String? = null,
+        val jsonLocation: String? = null
+    )
+
     private val exportStatus = MutableStateFlow<String?>(null)
     private val backupStatus = MutableStateFlow<String?>(null)
-    private val latestCsvShareUri = MutableStateFlow<String?>(null)
-    private val latestJsonShareUri = MutableStateFlow<String?>(null)
+    private val artifacts = MutableStateFlow(ExportArtifacts())
     private val isBusy = MutableStateFlow(false)
 
     val uiState: StateFlow<SettingsUiState> = combine(
@@ -67,12 +82,12 @@ class SettingsViewModel @Inject constructor(
             prefs.customLbPlates.map { it as Any? },
             exportStatus.map { it as Any? },
             backupStatus.map { it as Any? },
-            latestCsvShareUri.map { it as Any? },
-            latestJsonShareUri.map { it as Any? },
+            artifacts.map { it as Any? },
             isBusy.map { it as Any? },
             prefs.exportFolderLabel.map { it as Any? }
         )
     ) { values ->
+        val a = values[6] as ExportArtifacts
         SettingsUiState(
             useKg = values[0] as Boolean,
             restPresets = values[1] as RestPresets,
@@ -80,10 +95,14 @@ class SettingsViewModel @Inject constructor(
             customLbPlates = values[3] as String,
             exportStatus = values[4] as String?,
             backupStatus = values[5] as String?,
-            latestCsvShareUri = values[6] as String?,
-            latestJsonShareUri = values[7] as String?,
-            isBusy = values[8] as Boolean,
-            exportFolderLabel = values[9] as String
+            latestCsvShareUri = a.csvShareUri,
+            latestJsonShareUri = a.jsonShareUri,
+            latestCsvFileName = a.csvFileName,
+            latestCsvLocation = a.csvLocation,
+            latestJsonFileName = a.jsonFileName,
+            latestJsonLocation = a.jsonLocation,
+            isBusy = values[7] as Boolean,
+            exportFolderLabel = values[8] as String
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
@@ -104,7 +123,14 @@ class SettingsViewModel @Inject constructor(
     }
 
     private fun dateStamp(): String =
-        java.text.SimpleDateFormat("yyyy_MM_dd", java.util.Locale.US).format(java.util.Date())
+        java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
+
+    /** Split "Downloads/RepLog/file.csv" into (location, fileName). */
+    private fun splitPath(displayPath: String): Pair<String, String> {
+        val idx = displayPath.lastIndexOf('/')
+        return if (idx >= 0) displayPath.substring(0, idx) to displayPath.substring(idx + 1)
+        else "" to displayPath
+    }
 
     /** Persist the chosen SAF export folder (tree URI + readable label). */
     fun setExportFolder(treeUri: String, label: String) = viewModelScope.launch {
@@ -128,13 +154,18 @@ class SettingsViewModel @Inject constructor(
             val csv = WorkoutCsvExporter.toCsv(sessions, prescriptions)
             val result = FileExporter.save(
                 context = context,
-                fileName = "replog_export_${dateStamp()}.csv",
+                fileName = "WorkoutHistory_${dateStamp()}.csv",
                 mimeType = "text/csv",
                 content = csv,
                 treeUriString = prefs.exportTreeUri.first()
             )
-            latestCsvShareUri.value = result.shareUri?.toString()
-            exportStatus.value = "Saved ${sessions.size} workouts to ${result.displayPath}"
+            val (location, fileName) = splitPath(result.displayPath)
+            artifacts.value = artifacts.value.copy(
+                csvShareUri = result.shareUri?.toString(),
+                csvFileName = fileName,
+                csvLocation = location
+            )
+            exportStatus.value = "Exported ${sessions.size} workouts."
         }.onFailure { error ->
             exportStatus.value = "CSV export failed: ${error.message ?: "Unknown error"}"
         }
@@ -154,25 +185,36 @@ class SettingsViewModel @Inject constructor(
             File(context.filesDir, "replog_backup.json").writeText(json)
             val result = FileExporter.save(
                 context = context,
-                fileName = "workout_backup_${dateStamp()}.json",
+                fileName = "WorkoutBackup_${dateStamp()}.json",
                 mimeType = "application/json",
                 content = json,
                 treeUriString = prefs.exportTreeUri.first()
             )
-            latestJsonShareUri.value = result.shareUri?.toString()
-            backupStatus.value = "Backup saved to ${result.displayPath}"
+            val (location, fileName) = splitPath(result.displayPath)
+            artifacts.value = artifacts.value.copy(
+                jsonShareUri = result.shareUri?.toString(),
+                jsonFileName = fileName,
+                jsonLocation = location
+            )
+            backupStatus.value = "Backup complete."
         }.onFailure { error ->
             backupStatus.value = "JSON backup failed: ${error.message ?: "Unknown error"}"
         }
         isBusy.value = false
     }
 
-    /** P0 #4: bulk delete ALL workout history (guarded by a typed confirmation in the UI). */
+    /**
+     * Delete ALL workout history: sessions, sets, PRs, prescriptions, Training
+     * DNA, recovery/rest history, plateau and recommendation history. Templates,
+     * the exercise library, goals, bodyweight and all settings are preserved.
+     * DNA and recovery recompute from the (now empty) data on next load.
+     */
     fun deleteAllHistory() = viewModelScope.launch {
         isBusy.value = true
         runCatching {
-            workoutRepository.deleteAllSessions()
-            backupStatus.value = "All workout history deleted."
+            dataResetManager.deleteAllWorkoutHistory()
+        }.onSuccess { count ->
+            backupStatus.value = "Deleted all workout history ($count workouts). Templates, exercises and settings were kept."
         }.onFailure { error ->
             backupStatus.value = "Delete failed: ${error.message ?: "Unknown error"}"
         }

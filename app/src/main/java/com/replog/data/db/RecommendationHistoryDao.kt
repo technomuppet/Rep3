@@ -41,4 +41,7 @@ interface RecommendationHistoryDao {
 
     @Query("SELECT COUNT(*) FROM recommendation_history")
     suspend fun count(): Int
+
+    @Query("DELETE FROM recommendation_history")
+    suspend fun deleteAll()
 }

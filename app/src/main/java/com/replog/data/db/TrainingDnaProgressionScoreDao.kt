@@ -25,4 +25,7 @@ interface TrainingDnaProgressionScoreDao {
 
     @Query("SELECT COUNT(*) FROM training_dna_progression_scores")
     suspend fun count(): Int
+
+    @Query("DELETE FROM training_dna_progression_scores")
+    suspend fun deleteAll()
 }

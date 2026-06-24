@@ -27,4 +27,5 @@ object AppModule {
     @Provides fun providePlateauEventDao(db: AppDatabase): PlateauEventDao = db.plateauEventDao()
     @Provides fun provideRecommendationHistoryDao(db: AppDatabase): RecommendationHistoryDao = db.recommendationHistoryDao()
     @Provides fun provideGoalDao(db: AppDatabase): GoalDao = db.goalDao()
+    @Provides fun provideRestDayOverrideDao(db: AppDatabase): com.replog.data.db.RestDayOverrideDao = db.restDayOverrideDao()
 }
