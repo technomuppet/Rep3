@@ -53,7 +53,12 @@ fun HomeScreen(
                     )
                 },
                 onDismiss = { coachViewModel.dismissRecommendation() },
-                onRefresh = { coachViewModel.loadRecommendation(force = true) }
+                onRefresh = { coachViewModel.loadRecommendation(force = true) },
+                // Rest day override: respect the user's choice to train regardless.
+                onTrainAnyway = {
+                    coachViewModel.dismissRecommendation(reason = "train_anyway")
+                    onStartWorkout()
+                }
             )
         }
 

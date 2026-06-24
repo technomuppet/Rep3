@@ -124,6 +124,52 @@ class DataSeeder @Inject constructor(
         installTemplates(toInstall)
     }
 
+    /**
+     * Import a shared template (.rpltemplate). Exercises are resolved by name;
+     * any the user does not have are created as custom exercises from the
+     * metadata in the file. If the template name already exists, a numeric
+     * suffix is added so the import never silently overwrites or fails.
+     * Returns the final template name on success.
+     */
+    suspend fun importSharedTemplate(shared: SharedTemplate): String {
+        val existingNames = workouts.getAllTemplates().first().map { it.template.name }.toSet()
+        var name = shared.name.trim().ifBlank { "Imported template" }
+        if (name in existingNames) {
+            var n = 2
+            while ("$name ($n)" in existingNames) n++
+            name = "$name ($n)"
+        }
+        val templateId = workouts.insertTemplate(WorkoutTemplate(name = name, isBuiltIn = false)).toInt()
+        shared.exercises.sortedBy { it.orderIndex }.forEachIndexed { index, spec ->
+            val exercise = exercises.getExerciseByName(spec.exerciseName)
+                ?: exercises.insertExercise(
+                    Exercise(
+                        name = spec.exerciseName,
+                        category = spec.category.ifBlank { "Imported" },
+                        equipment = spec.equipment.ifBlank { "Other" },
+                        muscles = spec.muscles,
+                        primaryMuscles = spec.primaryMuscles,
+                        secondaryMuscles = spec.secondaryMuscles,
+                        movementPattern = spec.movementPattern,
+                        difficulty = spec.difficulty.ifBlank { "Intermediate" },
+                        isCustom = true
+                    )
+                ).let { id -> exercises.getExerciseById(id.toInt()) }
+                ?: return@forEachIndexed
+            workouts.insertTemplateExercise(
+                TemplateExercise(
+                    templateId = templateId,
+                    exerciseId = exercise.id,
+                    defaultSets = spec.sets.coerceAtLeast(1),
+                    orderIndex = index,
+                    targetReps = spec.reps.coerceAtLeast(1),
+                    targetWeight = spec.targetWeight
+                )
+            )
+        }
+        return name
+    }
+
     data class ExerciseData(
         val name: String,
         val category: String,

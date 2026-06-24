@@ -114,6 +114,37 @@ class ActiveWorkoutViewModel @Inject constructor(
         dataSeeder.installAllBuiltInTemplates()
         refresh()
     }
+
+    // --- Template sharing / import (account-free, offline) ---
+
+    /** Transient one-line confirmation for share/import actions. */
+    private val templateMessageFlow = MutableStateFlow<String?>(null)
+    val templateMessage: StateFlow<String?> = templateMessageFlow
+
+    fun clearTemplateMessage() { templateMessageFlow.value = null }
+
+    /**
+     * Serialize a template to a portable .rpltemplate file in the cache and
+     * return (fileName, json) so the screen can share it via the OS share sheet.
+     */
+    fun buildShareableTemplate(template: TemplateWithExercises): Pair<String, String> {
+        val json = com.replog.util.TemplateShare.encode(template)
+        val fileName = com.replog.util.TemplateShare.fileNameFor(template.template.name)
+        return fileName to json
+    }
+
+    /** Import a shared template from raw JSON text (read from a picked file). */
+    fun importTemplateJson(json: String) = viewModelScope.launch {
+        runCatching {
+            val shared = com.replog.util.TemplateShare.decode(json)
+            dataSeeder.importSharedTemplate(shared)
+        }.onSuccess { name ->
+            templateMessageFlow.value = "Imported template: $name"
+            refresh()
+        }.onFailure { error ->
+            templateMessageFlow.value = "Import failed: ${error.message ?: "not a valid RepLog template"}"
+        }
+    }
     // Phase 3 — recommendation accepted via the Smart Coach card and pending completion.
     private var pendingCoachRecommendation: com.replog.domain.recommendation.Recommendation? = null
     private val activeId = MutableStateFlow<Int?>(null)

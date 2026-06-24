@@ -51,7 +51,8 @@ fun CoachDashboardCard(
     state: CoachUiState,
     onStart: () -> Unit,
     onDismiss: () -> Unit,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    onTrainAnyway: () -> Unit = {}
 ) = RepLogCard {
     when {
         state.isLoading -> {
@@ -68,13 +69,13 @@ fun CoachDashboardCard(
             Spacer(Modifier.height(8.dp))
             SecondaryButton("Try again", onClick = onRefresh)
         }
-        state.briefing != null -> BriefingBody(state, onStart, onDismiss)
+        state.briefing != null -> BriefingBody(state, onStart, onDismiss, onTrainAnyway)
         else -> Text("Log a workout and your coach will tell you what to train next.", color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
 @Composable
-private fun BriefingBody(state: CoachUiState, onStart: () -> Unit, onDismiss: () -> Unit) {
+private fun BriefingBody(state: CoachUiState, onStart: () -> Unit, onDismiss: () -> Unit, onTrainAnyway: () -> Unit) {
     val b: CoachBriefing = state.briefing!!
     var showWhy by remember { mutableStateOf(false) }
 
@@ -116,9 +117,22 @@ private fun BriefingBody(state: CoachUiState, onStart: () -> Unit, onDismiss: ()
         Text("Workout staged — opening your session…", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
         Spacer(Modifier.height(6.dp))
     }
-    PrimaryButton(if (b.isRestDay) "View recovery guidance" else "Start Recommended Workout", onClick = onStart)
-    Spacer(Modifier.height(6.dp))
-    SecondaryButton("Not today", onClick = onDismiss)
+    if (b.isRestDay) {
+        // Respect the user's autonomy: rest is recommended, not enforced.
+        Text(
+            "Recovery is when muscle growth and performance gains happen. A rest day now usually means a stronger next session.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(10.dp))
+        PrimaryButton("Rest Today", onClick = onStart)
+        Spacer(Modifier.height(6.dp))
+        SecondaryButton("Train Anyway", onClick = onTrainAnyway)
+    } else {
+        PrimaryButton("Start Recommended Workout", onClick = onStart)
+        Spacer(Modifier.height(6.dp))
+        SecondaryButton("Not today", onClick = onDismiss)
+    }
 
     // Why? (reuse existing explanation contributions)
     if (state.contributions.isNotEmpty()) {

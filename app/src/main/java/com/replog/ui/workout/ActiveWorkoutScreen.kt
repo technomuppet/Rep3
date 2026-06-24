@@ -1,5 +1,8 @@
 package com.replog.ui.workout
 
+import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.core.content.FileProvider
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -97,6 +100,16 @@ fun ActiveWorkoutScreen(
         if (startFromRecommendation) viewModel.consumePendingRecommendation()
     }
     val state by viewModel.uiState.collectAsState()
+    val templateMessage by viewModel.templateMessage.collectAsState()
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val importTemplateLauncher = rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            val json = ctx.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+            if (json != null) viewModel.importTemplateJson(json)
+        }
+    }
     var addExercise by remember { mutableStateOf(false) }
     var showCreateTemplate by remember { mutableStateOf(false) }
     var editingTemplate by remember { mutableStateOf<TemplateWithExercises?>(null) }
@@ -145,7 +158,24 @@ fun ActiveWorkoutScreen(
                 item { AdaptivePlanCard(plan = plan, useKg = state.useKg) { viewModel.startAdaptiveWorkout(plan) } }
             }
             item { SecondaryButton("Create Template") { showCreateTemplate = true } }
-            item { SecondaryButton("Add Built-in Templates") { viewModel.installAllBuiltInTemplates() } }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    SecondaryButton("Add Built-in", Modifier.weight(1f)) { viewModel.installAllBuiltInTemplates() }
+                    SecondaryButton("Import Template", Modifier.weight(1f)) {
+                        importTemplateLauncher.launch(arrayOf("application/json", "application/octet-stream", "text/*", "*/*"))
+                    }
+                }
+            }
+            templateMessage?.let { msg ->
+                item {
+                    RepLogCard {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(msg, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                            TextButton(onClick = { viewModel.clearTemplateMessage() }) { Text("Dismiss") }
+                        }
+                    }
+                }
+            }
             item { SectionTitle("Quick start templates") }
             if (state.templates.isEmpty()) {
                 item { EmptyState("Templates loading", "Built-in templates will appear after first launch setup.") }
@@ -155,7 +185,11 @@ fun ActiveWorkoutScreen(
                         template = template,
                         onStart = { viewModel.startWorkoutFromTemplate(template) },
                         onEdit = { editingTemplate = template },
-                        onDelete = { templatePendingDelete = template }
+                        onDelete = { templatePendingDelete = template },
+                        onShare = {
+                            val (fileName, json) = viewModel.buildShareableTemplate(template)
+                            shareTemplateFile(ctx, fileName, json)
+                        }
                     )
                 }
             }
@@ -389,7 +423,8 @@ private fun TemplateCard(
     template: TemplateWithExercises,
     onStart: () -> Unit,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onShare: () -> Unit
 ) = RepLogCard(onClick = onStart) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Default.PlayArrow, null, tint = MaterialTheme.colorScheme.primary)
@@ -406,6 +441,7 @@ private fun TemplateCard(
                 Text("Custom template", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
             }
         }
+        IconButton(onClick = onShare) { Icon(Icons.Default.Share, "Share template") }
         if (!template.template.isBuiltIn) {
             IconButton(onClick = onEdit) { Icon(Icons.Default.Edit, "Edit template") }
             IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, "Delete template", tint = MaterialTheme.colorScheme.error) }
@@ -1010,3 +1046,18 @@ private fun formatDuration(durationMillis: Long): String {
 private fun supersetLabel(entry: SessionExerciseWithSets, entries: List<SessionExerciseWithSets>): String? { val group = entry.sessionExercise.supersetGroup ?: return null; val grouped = entries.filter { it.sessionExercise.supersetGroup == group }.sortedBy { it.sessionExercise.orderIndex }; val index = grouped.indexOfFirst { it.sessionExercise.id == entry.sessionExercise.id }.takeIf { it >= 0 } ?: 0; return "$group${index + 1}" }
 private fun elapsed(start: Long?): String { if (start == null) return "00:00"; val sec = ((System.currentTimeMillis() - start) / 1000).coerceAtLeast(0); return "%02d:%02d:%02d".format(sec / 3600, (sec % 3600) / 60, sec % 60) }
 private fun Double.toCleanString(): String = if (this % 1.0 == 0.0) toInt().toString() else "%.2f".format(this).trimEnd('0').trimEnd('.')
+
+/** Write a .rpltemplate file to the cache and open the OS share sheet. */
+private fun shareTemplateFile(context: android.content.Context, fileName: String, json: String) {
+    val dir = java.io.File(context.cacheDir, "share").apply { mkdirs() }
+    val file = java.io.File(dir, fileName)
+    file.writeText(json)
+    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "application/json"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        putExtra(Intent.EXTRA_SUBJECT, fileName)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(intent, "Share workout template"))
+}
