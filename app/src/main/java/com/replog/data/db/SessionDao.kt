@@ -14,6 +14,9 @@ interface SessionDao {
     @Update suspend fun updateSession(session: WorkoutSession)
     @Delete suspend fun deleteSession(session: WorkoutSession)
     @Query("DELETE FROM workout_sessions WHERE id = :sessionId") suspend fun deleteSessionById(sessionId: Int)
+    // Wipes all workout history. Cascading foreign keys remove the related
+    // session_exercises, set_logs (incl. PR flags) and prescriptions.
+    @Query("DELETE FROM workout_sessions") suspend fun deleteAllSessions()
     @Insert suspend fun insertSessionExercise(sessionExercise: SessionExercise): Long
     @Update suspend fun updateSessionExercise(sessionExercise: SessionExercise)
     @Query("DELETE FROM session_exercises WHERE id = :id") suspend fun deleteSessionExercise(id: Int)

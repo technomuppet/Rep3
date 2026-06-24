@@ -95,6 +95,22 @@ fun RepLogNavGraph(
     val isPrimaryTab = currentBase in tabRoutes
     val secondaryTitle = secondaryTitles[currentBase]
 
+    // Switching to a primary tab must always behave like a bottom-bar tab switch:
+    // collapse back to the single Home-rooted stack so tabs never pile up and the
+    // user can never get trapped in a navigation loop.
+    fun switchTab(route: String) {
+        navController.navigate(route) {
+            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+
+    // Opening a secondary detail screen just pushes one entry (back arrow returns).
+    fun openDetail(route: String) {
+        navController.navigate(route) { launchSingleTop = true }
+    }
+
     Scaffold(
         topBar = {
             // Secondary screens get a back arrow so users are never trapped.
@@ -117,27 +133,22 @@ fun RepLogNavGraph(
             composable(RepLogRoute.Home.route) {
                 HomeScreen(
                     contentPadding = padding,
-                    onStartWorkout = {
-                        navController.navigate(RepLogRoute.Workout.route) { launchSingleTop = true }
-                    },
-                    onViewHistory = {
-                        navController.navigate(RepLogRoute.History.route) { launchSingleTop = true }
-                    },
+                    // Primary-tab targets use tab-switch semantics (no stacking / loops).
+                    onStartWorkout = { switchTab(RepLogRoute.Workout.route) },
+                    onViewHistory = { switchTab(RepLogRoute.History.route) },
                     onStartRecommendedWorkout = {
-                        navController.navigate(RepLogRoute.Workout.route + "?fromRecommendation=true") { launchSingleTop = true }
+                        // Recommendation carries an arg, so it pushes the parameterised
+                        // Workout route rather than restoring a saved tab state.
+                        navController.navigate(RepLogRoute.Workout.route + "?fromRecommendation=true") {
+                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true
+                        }
                     },
-                    onViewRecoveryGuidance = {
-                        navController.navigate(RepLogRoute.TrainingDna.route) { launchSingleTop = true }
-                    },
-                    onOpenCoachHistory = {
-                        navController.navigate(RepLogRoute.CoachHistory.route) { launchSingleTop = true }
-                    },
-                    onOpenGoals = {
-                        navController.navigate(RepLogRoute.Goals.route) { launchSingleTop = true }
-                    },
-                    onOpenTrainingDna = {
-                        navController.navigate(RepLogRoute.TrainingDna.route) { launchSingleTop = true }
-                    }
+                    // Secondary detail targets just push one entry (back arrow returns).
+                    onViewRecoveryGuidance = { openDetail(RepLogRoute.TrainingDna.route) },
+                    onOpenCoachHistory = { openDetail(RepLogRoute.CoachHistory.route) },
+                    onOpenGoals = { openDetail(RepLogRoute.Goals.route) },
+                    onOpenTrainingDna = { openDetail(RepLogRoute.TrainingDna.route) }
                 )
             }
             composable(
@@ -150,7 +161,7 @@ fun RepLogNavGraph(
             composable(RepLogRoute.Progress.route) {
                 ProgressScreen(
                     padding,
-                    onOpenTrainingDna = { navController.navigate(RepLogRoute.TrainingDna.route) { launchSingleTop = true } }
+                    onOpenTrainingDna = { openDetail(RepLogRoute.TrainingDna.route) }
                 )
             }
             composable(RepLogRoute.TrainingDna.route) { TrainingDnaInsightScreen(padding) }

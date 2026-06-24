@@ -36,6 +36,8 @@ class WorkoutRepository @Inject constructor(
     }
     suspend fun deleteSession(session: WorkoutSession) = sessionDao.deleteSession(session)
     suspend fun deleteSessionById(sessionId: Int) = sessionDao.deleteSessionById(sessionId)
+    /** Bulk delete: removes ALL workout history (sessions, exercises, sets, PRs, prescriptions cascade). */
+    suspend fun deleteAllSessions() = sessionDao.deleteAllSessions()
     suspend fun insertSessionExercise(sessionExercise: SessionExercise): Long = sessionDao.insertSessionExercise(sessionExercise)
     suspend fun updateSessionExercise(sessionExercise: SessionExercise) = sessionDao.updateSessionExercise(sessionExercise)
     suspend fun deleteSessionExercise(id: Int) = sessionDao.deleteSessionExercise(id)

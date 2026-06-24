@@ -22,10 +22,12 @@ import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -46,14 +48,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.replog.ui.components.PrimaryButton
 import com.replog.ui.components.RepLogCard
 import com.replog.ui.components.SecondaryButton
 import com.replog.ui.components.formatWeight
 import com.replog.util.PlateCalculator
-import java.io.File
 
 @Composable
 fun SettingsScreen(
@@ -64,11 +64,26 @@ fun SettingsScreen(
     val context = LocalContext.current
     var pendingImportJson by remember { mutableStateOf<String?>(null) }
     var confirmLocalRestore by remember { mutableStateOf(false) }
+    var showDeleteAllDialog by remember { mutableStateOf(false) }
 
     val importJsonLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             val json = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
             if (json != null) pendingImportJson = json
+        }
+    }
+
+    // Storage Access Framework: let the user choose & persist an export folder.
+    val pickFolderLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+            }
+            val label = folderLabelFromTreeUri(uri.toString())
+            viewModel.setExportFolder(uri.toString(), label)
         }
     }
 
@@ -124,18 +139,38 @@ fun SettingsScreen(
 
         RepLogCard {
             Row {
-                Icon(Icons.Default.FileDownload, null, tint = MaterialTheme.colorScheme.primary)
+                Icon(Icons.Default.Folder, null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("CSV export", fontWeight = FontWeight.Bold)
-                    Text("Generate and share a spreadsheet-friendly workout export.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Export folder", fontWeight = FontWeight.Bold)
+                    Text("Current: ${state.exportFolderLabel}", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                PrimaryButton("Generate", Modifier.weight(1f), enabled = !state.isBusy) { viewModel.exportCsv() }
-                SecondaryButton("Share", Modifier.weight(1f), enabled = state.latestCsvPath != null) {
-                    state.latestCsvPath?.let { shareFile(context, it, "text/csv") }
+                PrimaryButton("Change", Modifier.weight(1f), enabled = !state.isBusy) { pickFolderLauncher.launch(null) }
+                SecondaryButton("Use Downloads", Modifier.weight(1f), enabled = !state.isBusy) { viewModel.resetExportFolder() }
+            }
+        }
+
+        RepLogCard {
+            Row {
+                Icon(Icons.Default.FileDownload, null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("CSV export", fontWeight = FontWeight.Bold)
+                    Text("Saves a spreadsheet-friendly file to ${state.exportFolderLabel}.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            PrimaryButton("Export CSV", enabled = !state.isBusy) { viewModel.exportCsv() }
+            if (state.latestCsvShareUri != null) {
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    SecondaryButton("Open", Modifier.weight(1f)) { openDownloads(context) }
+                    SecondaryButton("Share", Modifier.weight(1f)) {
+                        state.latestCsvShareUri?.let { shareUri(context, it, "text/csv") }
+                    }
                 }
             }
             state.exportStatus?.let {
@@ -150,14 +185,18 @@ fun SettingsScreen(
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text("JSON backup and restore", fontWeight = FontWeight.Bold)
-                    Text("Backup, share, import, and restore structured RepLog data.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Saves a full backup to ${state.exportFolderLabel}; import or restore later.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                PrimaryButton("Backup", Modifier.weight(1f), enabled = !state.isBusy) { viewModel.exportJsonBackup() }
-                SecondaryButton("Share", Modifier.weight(1f), enabled = state.latestJsonPath != null) {
-                    state.latestJsonPath?.let { shareFile(context, it, "application/json") }
+            PrimaryButton("Backup", enabled = !state.isBusy) { viewModel.exportJsonBackup() }
+            if (state.latestJsonShareUri != null) {
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    SecondaryButton("Open", Modifier.weight(1f)) { openDownloads(context) }
+                    SecondaryButton("Share", Modifier.weight(1f)) {
+                        state.latestJsonShareUri?.let { shareUri(context, it, "application/json") }
+                    }
                 }
             }
             Spacer(Modifier.height(10.dp))
@@ -187,6 +226,20 @@ fun SettingsScreen(
             }
             Spacer(Modifier.height(12.dp))
             SecondaryButton("Generate Demo Data", enabled = !state.isBusy) { viewModel.generateDemoData() }
+        }
+
+        // P0 #4: Danger Zone - bulk delete with a typed confirmation.
+        RepLogCard {
+            Row {
+                Icon(Icons.Default.Warning, null, tint = MaterialTheme.colorScheme.error)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Danger zone", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                    Text("Permanently delete all workout history. This cannot be undone.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            SecondaryButton("Delete All Workout History", enabled = !state.isBusy) { showDeleteAllDialog = true }
         }
 
         RepLogCard {
@@ -240,6 +293,62 @@ fun SettingsScreen(
                 confirmLocalRestore = false
             }
         )
+    }
+
+    if (showDeleteAllDialog) {
+        DeleteAllHistoryDialog(
+            onCancel = { showDeleteAllDialog = false },
+            onConfirm = {
+                viewModel.deleteAllHistory()
+                showDeleteAllDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+private fun DeleteAllHistoryDialog(onCancel: () -> Unit, onConfirm: () -> Unit) {
+    var typed by remember { mutableStateOf("") }
+    val confirmed = typed.trim().equals("DELETE", ignoreCase = false)
+    AlertDialog(
+        onDismissRequest = onCancel,
+        title = { Text("Delete all workout history?") },
+        text = {
+            Column {
+                Text("This will permanently delete:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(6.dp))
+                Text("- Sessions", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("- Set logs", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("- Personal records", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("- Analytics derived from them", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(10.dp))
+                Text("This cannot be undone. Type DELETE to confirm.", fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = typed,
+                    onValueChange = { typed = it },
+                    singleLine = true,
+                    placeholder = { Text("DELETE") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm, enabled = confirmed) {
+                Text("DELETE", color = if (confirmed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        },
+        dismissButton = { TextButton(onClick = onCancel) { Text("Cancel") } }
+    )
+}
+
+/** Best-effort human label for a SAF tree URI (e.g. "primary:Download/RepLog"). */
+private fun folderLabelFromTreeUri(treeUri: String): String {
+    val decoded = android.net.Uri.decode(treeUri)
+    val afterColon = decoded.substringAfterLast(':', "")
+    return when {
+        afterColon.isNotBlank() -> afterColon
+        else -> "Selected folder"
     }
 }
 
@@ -366,16 +475,30 @@ private fun RestTimerSettingsCard(
     }
 }
 
-private fun shareFile(context: Context, path: String, mimeType: String) {
-    val file = File(path)
-    if (!file.exists()) return
-    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+private fun shareUri(context: Context, uriString: String, mimeType: String) {
+    val uri = android.net.Uri.parse(uriString)
     val intent = Intent(Intent.ACTION_SEND).apply {
         type = mimeType
         putExtra(Intent.EXTRA_STREAM, uri)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
     context.startActivity(Intent.createChooser(intent, "Share RepLog export"))
+}
+
+/** Open the system Downloads/Files view so the user can find their export. */
+private fun openDownloads(context: Context) {
+    val intent = Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS)
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    runCatching { context.startActivity(intent) }
+        .onFailure {
+            runCatching {
+                context.startActivity(
+                    Intent(Intent.ACTION_VIEW)
+                        .setType("*/*")
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            }
+        }
 }
 
 private fun clean(value: Double): String = if (value % 1.0 == 0.0) value.toInt().toString() else "%.2f".format(value).trimEnd('0').trimEnd('.')

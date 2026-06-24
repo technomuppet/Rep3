@@ -53,6 +53,10 @@ class PreferencesManager @Inject constructor(@ApplicationContext context: Contex
         val PROFILE_EQUIPMENT = stringPreferencesKey("profile_equipment")
         val PROFILE_DAYS = intPreferencesKey("profile_days_per_week")
         val PROFILE_STYLE = stringPreferencesKey("profile_style")
+        // Export location: persisted SAF tree URI + human-readable label. When the
+        // URI is blank, exports fall back to the public Downloads/RepLog folder.
+        val EXPORT_TREE_URI = stringPreferencesKey("export_tree_uri")
+        val EXPORT_FOLDER_LABEL = stringPreferencesKey("export_folder_label")
     }
 
     val useKg: Flow<Boolean> = store.data.map { it[Keys.USE_KG] ?: true }
@@ -107,6 +111,17 @@ class PreferencesManager @Inject constructor(@ApplicationContext context: Contex
         val s = p[Keys.PROG_SUGGESTED_COUNT] ?: 0
         val a = p[Keys.PROG_ACCEPTED_COUNT] ?: 0
         ProgressionStats(s, a, if (s > 0) a.toFloat() / s else 0f)
+    }
+
+    /** Persisted SAF tree URI for exports; blank means "use Downloads/RepLog". */
+    val exportTreeUri: Flow<String?> = store.data.map { it[Keys.EXPORT_TREE_URI]?.takeIf { uri -> uri.isNotBlank() } }
+    /** Human-readable label for the export folder shown in Settings. */
+    val exportFolderLabel: Flow<String> = store.data.map { it[Keys.EXPORT_FOLDER_LABEL] ?: "Downloads/RepLog" }
+    suspend fun setExportFolder(treeUri: String?, label: String) {
+        store.edit {
+            if (treeUri.isNullOrBlank()) it.remove(Keys.EXPORT_TREE_URI) else it[Keys.EXPORT_TREE_URI] = treeUri
+            it[Keys.EXPORT_FOLDER_LABEL] = label
+        }
     }
 
     suspend fun setUseKg(value: Boolean) { store.edit { it[Keys.USE_KG] = value } }
