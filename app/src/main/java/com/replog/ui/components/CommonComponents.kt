@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FitnessCenter
@@ -14,7 +15,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 
@@ -68,6 +72,25 @@ fun PRBadge(modifier: Modifier = Modifier) = Surface(modifier, shape = RoundedCo
 fun ExerciseIcon(modifier: Modifier = Modifier) = Box(modifier.size(46.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary.copy(alpha = .18f)), contentAlignment = Alignment.Center) { Icon(Icons.Default.FitnessCenter, null, tint = MaterialTheme.colorScheme.primary) }
 
 @Composable
-fun NumberInputField(value: String, label: String, modifier: Modifier = Modifier, suffix: String? = null, onValueChange: (String) -> Unit) = OutlinedTextField(value = value, onValueChange = onValueChange, modifier = modifier, label = { Text(label) }, suffix = { if (suffix != null) Text(suffix) }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), shape = RoundedCornerShape(14.dp))
+fun NumberInputField(
+    value: String,
+    label: String,
+    modifier: Modifier = Modifier,
+    suffix: String? = null,
+    focusRequester: FocusRequester? = null,
+    imeAction: ImeAction = ImeAction.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
+    onValueChange: (String) -> Unit
+) = OutlinedTextField(
+    value = value,
+    onValueChange = onValueChange,
+    modifier = if (focusRequester != null) modifier.focusRequester(focusRequester) else modifier,
+    label = { Text(label) },
+    suffix = { if (suffix != null) Text(suffix) },
+    singleLine = true,
+    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = imeAction),
+    keyboardActions = keyboardActions,
+    shape = RoundedCornerShape(14.dp)
+)
 
 fun formatWeight(weight: Double, useKg: Boolean = true): String = (if (weight % 1.0 == 0.0) weight.toInt().toString() else "%.1f".format(weight)) + if (useKg) " kg" else " lb"

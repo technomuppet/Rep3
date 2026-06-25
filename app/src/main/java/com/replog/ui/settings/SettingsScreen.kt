@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Restore
@@ -29,6 +30,7 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -129,6 +131,23 @@ fun SettingsScreen(
                     Text(if (state.useKg) "Kilograms" else "Pounds", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Switch(state.useKg, viewModel::setUseKg)
+            }
+        }
+
+        // Phase 1: which field opens focused (with the keyboard up) when logging a set.
+        RepLogCard {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.FitnessCenter, null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Fast logging focus", fontWeight = FontWeight.Bold)
+                    Text("Which field opens focused when you log a set.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                FilterChip(selected = state.autoFocusField == "weight", onClick = { viewModel.setAutoFocusField("weight") }, label = { Text("Focus Weight") })
+                FilterChip(selected = state.autoFocusField == "reps", onClick = { viewModel.setAutoFocusField("reps") }, label = { Text("Focus Reps") })
             }
         }
 

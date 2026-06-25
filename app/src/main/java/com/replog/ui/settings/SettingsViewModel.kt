@@ -47,6 +47,7 @@ data class SettingsUiState(
     val latestJsonLocation: String? = null,
     val exportFolderLabel: String = "Downloads/RepLog",
     val templateStatus: String? = null,
+    val autoFocusField: String = "weight",
     val isBusy: Boolean = false
 )
 
@@ -88,7 +89,8 @@ class SettingsViewModel @Inject constructor(
             artifacts.map { it as Any? },
             isBusy.map { it as Any? },
             prefs.exportFolderLabel.map { it as Any? },
-            templateStatus.map { it as Any? }
+            templateStatus.map { it as Any? },
+            prefs.autoFocusField.map { it as Any? }
         )
     ) { values ->
         val a = values[6] as ExportArtifacts
@@ -107,11 +109,13 @@ class SettingsViewModel @Inject constructor(
             latestJsonLocation = a.jsonLocation,
             isBusy = values[7] as Boolean,
             exportFolderLabel = values[8] as String,
-            templateStatus = values[9] as String?
+            templateStatus = values[9] as String?,
+            autoFocusField = values[10] as String
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
     fun setUseKg(value: Boolean) = viewModelScope.launch { prefs.setUseKg(value) }
+    fun setAutoFocusField(value: String) = viewModelScope.launch { prefs.setAutoFocusField(value) }
     fun setRestPresets(value: RestPresets) = viewModelScope.launch { prefs.setRestPresets(value) }
     fun setCustomKgPlates(value: String) = viewModelScope.launch { prefs.setCustomKgPlates(value) }
     fun setCustomLbPlates(value: String) = viewModelScope.launch { prefs.setCustomLbPlates(value) }

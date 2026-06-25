@@ -244,6 +244,7 @@ fun ActiveWorkoutScreen(
                         previousSets = state.lastSetsByExerciseId[entry.exercise.id].orEmpty(),
                         progression = state.progressionByExerciseId[entry.exercise.id],
                         useKg = state.useKg,
+                        autoFocusField = state.autoFocusField,
                         onAddSet = { w, r, type, rpe, tempo -> viewModel.addSet(entry, w, r, type, rpe, tempo) },
                         onRepeatLastSet = { viewModel.repeatLastSet(entry) },
                         onQuickComplete = { w, r -> viewModel.quickCompleteSet(entry, w, r) },
@@ -576,6 +577,7 @@ private fun WorkoutExerciseCard(
     previousSets: List<SetLog>,
     progression: ProgressionSuggestionUi?,
     useKg: Boolean,
+    autoFocusField: String = "weight",
     onAddSet: (Double, Int, String, Double?, String?) -> Unit,
     onRepeatLastSet: () -> Unit,
     onQuickComplete: (Double, Int) -> Unit,
@@ -650,6 +652,17 @@ private fun WorkoutExerciseCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(target.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                // Phase 1: tap the planned set to log it instantly (no dialog) when a target load is known.
+                target.targetWeight?.let { tw ->
+                    Spacer(Modifier.height(6.dp))
+                    Button(
+                        onClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onQuickComplete(tw, target.targetReps)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("✓ Complete ${formatWeight(tw, useKg)} × ${target.targetReps}", fontWeight = FontWeight.Bold) }
+                }
             }
         }
 
@@ -751,6 +764,7 @@ private fun WorkoutExerciseCard(
             title = "Log Set",
             initialSet = suggestedSet,
             useKg = useKg,
+            autoFocusField = autoFocusField,
             onDismiss = { showSetDialog = false },
             onSave = { w, r, type, rpe, tempo ->
                 onAddSet(w, r, type, rpe, tempo)
@@ -807,11 +821,24 @@ private fun AddOrEditSetDialog(
     title: String,
     initialSet: SetLog?,
     useKg: Boolean,
+    autoFocusField: String = "",
     onDismiss: () -> Unit,
     onSave: (Double, Int, String, Double?, String?) -> Unit
 ) {
     var weight by remember(initialSet?.id) { mutableStateOf(initialSet?.weight?.toCleanString().orEmpty()) }
     var reps by remember(initialSet?.id) { mutableStateOf(initialSet?.reps?.toString().orEmpty()) }
+    // Phase 1: open the chosen field focused with the numeric keyboard up so the
+    // user can begin typing immediately (no extra tap).
+    val weightFocus = remember { androidx.compose.ui.focus.FocusRequester() }
+    val repsFocus = remember { androidx.compose.ui.focus.FocusRequester() }
+    val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    LaunchedEffect(Unit) {
+        when (autoFocusField) {
+            "weight" -> { weightFocus.requestFocus(); keyboard?.show() }
+            "reps" -> { repsFocus.requestFocus(); keyboard?.show() }
+            else -> Unit
+        }
+    }
     var setType by remember(initialSet?.id) { mutableStateOf(initialSet?.setType ?: SetType.WORKING) }
     var rpeValueState by remember(initialSet?.id) { mutableStateOf(initialSet?.rpe) }
     var tempoOption by remember(initialSet?.id) { mutableStateOf(com.replog.domain.logging.TempoPresets.optionForNotation(initialSet?.tempo)) }
@@ -841,12 +868,20 @@ private fun AddOrEditSetDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
-                    NumberInputField(weight, "Weight", Modifier.weight(1.15f), if (useKg) "kg" else "lb") { v ->
-                        weight = v.filter { it.isDigit() || it == '.' }
-                    }
-                    NumberInputField(reps, "Reps", Modifier.weight(0.85f)) { v ->
-                        reps = v.filter { it.isDigit() }
-                    }
+                    NumberInputField(
+                        weight, "Weight", Modifier.weight(1.15f), if (useKg) "kg" else "lb",
+                        focusRequester = weightFocus,
+                        imeAction = androidx.compose.ui.text.input.ImeAction.Next,
+                        keyboardActions = androidx.compose.foundation.text.KeyboardActions(onNext = { repsFocus.requestFocus() })
+                    ) { v -> weight = v.filter { it.isDigit() || it == '.' } }
+                    NumberInputField(
+                        reps, "Reps", Modifier.weight(0.85f),
+                        focusRequester = repsFocus,
+                        imeAction = androidx.compose.ui.text.input.ImeAction.Done,
+                        keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = {
+                            if (weightValue >= 0 && repsValue > 0) { onSave(weightValue, repsValue, setType, rpeValue, tempoToSave) }
+                        })
+                    ) { v -> reps = v.filter { it.isDigit() } }
                 }
                 // Weight quick-add
                 FlowRow(
