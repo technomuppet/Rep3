@@ -43,6 +43,7 @@ data class HomeUiState(
     val dayStreak: Int = 0,
     val topGoal: HomeGoal? = null,
     val genomeHeadline: String? = null,
+    val favoriteTemplates: List<com.replog.data.model.TemplateWithExercises> = emptyList(),
     val isLoading: Boolean = true
 )
 
@@ -50,17 +51,48 @@ data class HomeUiState(
 class HomeViewModel @Inject constructor(
     private val repo: WorkoutRepository,
     private val goalRepository: GoalRepository,
-    private val prefs: PreferencesManager
+    private val prefs: PreferencesManager,
+    private val workoutStarter: com.replog.util.WorkoutStarter
 ) : ViewModel() {
     private val stats = MutableStateFlow(0 to 0.0)
 
+    /** P5: launch a favourite template (sets it active; Training tab resumes it). */
+    fun startTemplate(template: com.replog.data.model.TemplateWithExercises) = viewModelScope.launch {
+        workoutStarter.startTemplate(template)
+    }
+
+    /** P6: one-tap repeat of a recent session. */
+    fun repeatSession(session: SessionWithExercises) = viewModelScope.launch {
+        workoutStarter.repeatSession(session)
+    }
+
+    /** P5: star/unstar a template from the Home quick-launch row. */
+    fun toggleFavorite(template: com.replog.data.model.TemplateWithExercises) = viewModelScope.launch {
+        repo.setTemplateFavorite(template.template.id, !template.template.isFavorite)
+    }
+
     val uiState: StateFlow<HomeUiState> = combine(
-        stats,
-        repo.getRecentSessions(3),
-        repo.getRecentPRs(),
-        repo.getAllSessions(),
-        goalRepository.getActive()
-    ) { s, sessions, prs, allSessions, activeGoals ->
+        listOf(
+            stats,
+            repo.getRecentSessions(5),
+            repo.getRecentPRs(),
+            repo.getAllSessions(),
+            goalRepository.getActive(),
+            repo.getFavoriteTemplates()
+        )
+    ) { values ->
+        @Suppress("UNCHECKED_CAST")
+        val s = values[0] as Pair<Int, Double>
+        @Suppress("UNCHECKED_CAST")
+        val sessions = values[1] as List<SessionWithExercises>
+        @Suppress("UNCHECKED_CAST")
+        val prs = values[2] as List<SetLog>
+        @Suppress("UNCHECKED_CAST")
+        val allSessions = values[3] as List<SessionWithExercises>
+        @Suppress("UNCHECKED_CAST")
+        val activeGoals = values[4] as List<com.replog.data.model.Goal>
+        @Suppress("UNCHECKED_CAST")
+        val favorites = values[5] as List<com.replog.data.model.TemplateWithExercises>
         val completed = allSessions.filter { it.session.endTime != null }
         val now = System.currentTimeMillis()
         val startTimes = completed.map { it.session.startTime }
@@ -94,6 +126,7 @@ class HomeViewModel @Inject constructor(
             dayStreak = com.replog.domain.home.HomeDashboardStats.dayStreak(startTimes, now),
             topGoal = topGoal,
             genomeHeadline = genomeHeadline,
+            favoriteTemplates = favorites,
             isLoading = false
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HomeUiState())

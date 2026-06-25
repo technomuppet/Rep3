@@ -5,6 +5,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.Star
@@ -32,6 +33,7 @@ fun HomeScreen(
     onOpenCoachHistory: () -> Unit = {},
     onOpenGoals: () -> Unit = {},
     onOpenTrainingDna: () -> Unit = {},
+    onOpenQuickWorkouts: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
     coachViewModel: com.replog.ui.coach.CoachViewModel = hiltViewModel()
 ) {
@@ -71,6 +73,61 @@ fun HomeScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 StatCard("Day streak", if (state.dayStreak > 0) "🔥 ${state.dayStreak}" else "—", Modifier.weight(1f))
                 StatCard("Total workouts", state.sessionCount.toString(), Modifier.weight(1f))
+            }
+        }
+
+        // Browse the curated Quick Workout library (P2/P3).
+        item {
+            RepLogCard(onClick = onOpenQuickWorkouts) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.FitnessCenter, null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("Quick Workouts", fontWeight = FontWeight.Bold)
+                        Text("Start a proven workout instantly — 5x5, PPL, full body and more.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+
+        // Quick Start: pinned/starred templates (P5) — one tap launches.
+        if (state.favoriteTemplates.isNotEmpty()) {
+            item { Text("Quick Start", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+            items(state.favoriteTemplates, key = { "fav-${it.template.id}" }) { template ->
+                RepLogCard(onClick = { viewModel.startTemplate(template); onStartWorkout() }) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Star, null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(template.template.name, fontWeight = FontWeight.Bold)
+                            Text("${template.exercises.size} exercises", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Text("Start", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+            }
+        }
+
+        // Recent workouts (P6) — one tap repeats them.
+        val recentCompleted = state.recentSessions.filter { it.session.endTime != null }
+        if (recentCompleted.isNotEmpty()) {
+            item { Text("Recent workouts", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+            items(recentCompleted.take(5), key = { "recent-${it.session.id}" }) { session ->
+                RepLogCard(onClick = { viewModel.repeatSession(session); onStartWorkout() }) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Refresh, null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(session.session.templateName ?: "Workout", fontWeight = FontWeight.Bold)
+                            Text(
+                                "${session.exercises.size} exercises • ${session.exercises.sumOf { it.sets.size }} sets",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Text("Repeat", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    }
+                }
             }
         }
 

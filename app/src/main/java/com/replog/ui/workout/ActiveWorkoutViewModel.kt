@@ -101,12 +101,13 @@ data class ActiveWorkoutUiState(
 class ActiveWorkoutViewModel @Inject constructor(
     private val workouts: WorkoutRepository,
     private val trainingDnaRepository: TrainingDNARepository,
-    exercises: ExerciseRepository,
+    private val exercises: ExerciseRepository,
     private val prefs: PreferencesManager,
     private val restTimer: RestTimerManager,
     private val coachHandoff: com.replog.ui.coach.CoachHandoff,
     private val recommendationRepository: com.replog.data.repository.RecommendationRepository,
-    private val dataSeeder: com.replog.util.DataSeeder
+    private val dataSeeder: com.replog.util.DataSeeder,
+    private val workoutStarter: com.replog.util.WorkoutStarter
 ) : ViewModel() {
 
     /** Install the full built-in template catalog (idempotent — no duplicates). */
@@ -122,6 +123,16 @@ class ActiveWorkoutViewModel @Inject constructor(
     val templateMessage: StateFlow<String?> = templateMessageFlow
 
     fun clearTemplateMessage() { templateMessageFlow.value = null }
+
+    /** P3: duplicate a curated Quick Workout into the user's editable templates. */
+    fun duplicateQuickWorkout(workout: com.replog.domain.library.QuickWorkout) = viewModelScope.launch {
+        runCatching { dataSeeder.duplicateQuickWorkout(workout) }
+            .onSuccess { name ->
+                templateMessageFlow.value = if (name != null) "Saved \"$name\" to your templates" else "Could not save this workout"
+                refresh()
+            }
+            .onFailure { templateMessageFlow.value = "Could not save this workout" }
+    }
 
     /**
      * Serialize a template to a portable .replogtemplate file in the cache and
@@ -349,12 +360,20 @@ class ActiveWorkoutViewModel @Inject constructor(
 
     fun startWorkoutFromTemplate(template: TemplateWithExercises) = viewModelScope.launch {
         summary.value = null; previousWorkoutCache.clear(); cachedForSessionId = null; restTimer.cancel()
-        val id = workouts.insertSession(WorkoutSession(templateName = template.template.name, startTime = System.currentTimeMillis())).toInt()
-        template.exercises.sortedBy { it.templateExercise.orderIndex }.forEachIndexed { index, te ->
-            workouts.insertSessionExercise(SessionExercise(sessionId = id, exerciseId = te.exercise.id, orderIndex = index, notes = ""))
-        }
-        workouts.insertPrescriptions(template.exercises.map { te -> WorkoutPrescription(sessionId = id, exerciseId = te.exercise.id, source = "Template", targetSets = te.templateExercise.defaultSets, targetReps = te.templateExercise.targetReps, targetWeight = te.templateExercise.targetWeight, adjustment = "Programmed", reason = "Template target") })
-        activeId.value = id; prefs.setActiveSessionId(id); refresh()
+        val id = workoutStarter.startTemplate(template)
+        activeId.value = id; refresh()
+    }
+
+    /**
+     * Sprint 5 P2/P3: start a curated Quick Workout immediately. Resolves
+     * exercises by name, sets up the session in order and pre-loads each
+     * exercise's suggested sets/reps as a target prescription so the user can
+     * begin logging at once.
+     */
+    fun startQuickWorkout(workout: com.replog.domain.library.QuickWorkout) = viewModelScope.launch {
+        summary.value = null; previousWorkoutCache.clear(); cachedForSessionId = null; restTimer.cancel()
+        val id = workoutStarter.startQuickWorkout(workout) ?: return@launch
+        activeId.value = id; refresh()
     }
 
     /** P5: star/unstar a template for the Home quick-launch row. */
@@ -370,27 +389,8 @@ class ActiveWorkoutViewModel @Inject constructor(
      */
     fun repeatWorkout(session: SessionWithExercises) = viewModelScope.launch {
         summary.value = null; previousWorkoutCache.clear(); cachedForSessionId = null; restTimer.cancel()
-        val id = workouts.insertSession(
-            WorkoutSession(templateName = session.session.templateName ?: "Repeat workout", startTime = System.currentTimeMillis())
-        ).toInt()
-        val ordered = session.exercises.sortedBy { it.sessionExercise.orderIndex }
-        val prescriptions = mutableListOf<WorkoutPrescription>()
-        ordered.forEachIndexed { index, entry ->
-            workouts.insertSessionExercise(
-                SessionExercise(sessionId = id, exerciseId = entry.exercise.id, orderIndex = index, notes = entry.sessionExercise.notes)
-            )
-            val working = entry.sets.filter { it.setType == SetType.WORKING }.ifEmpty { entry.sets }
-            val top = working.maxByOrNull { it.weight }
-            if (top != null) {
-                prescriptions += WorkoutPrescription(
-                    sessionId = id, exerciseId = entry.exercise.id, source = "Repeat",
-                    targetSets = working.size.coerceAtLeast(1), targetReps = top.reps, targetWeight = top.weight,
-                    adjustment = "Repeat", reason = "Same as last time"
-                )
-            }
-        }
-        if (prescriptions.isNotEmpty()) workouts.insertPrescriptions(prescriptions)
-        activeId.value = id; prefs.setActiveSessionId(id); refresh()
+        val id = workoutStarter.repeatSession(session)
+        activeId.value = id; refresh()
     }
 
     fun discardWorkout() = viewModelScope.launch {

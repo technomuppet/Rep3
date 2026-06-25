@@ -57,6 +57,8 @@ class PreferencesManager @Inject constructor(@ApplicationContext context: Contex
         // URI is blank, exports fall back to the public Downloads/RepLog folder.
         val EXPORT_TREE_URI = stringPreferencesKey("export_tree_uri")
         val EXPORT_FOLDER_LABEL = stringPreferencesKey("export_folder_label")
+        // Sprint 5 P1: which field to auto-focus after completing a set ("weight" | "reps").
+        val AUTO_FOCUS_FIELD = stringPreferencesKey("auto_focus_field")
     }
 
     val useKg: Flow<Boolean> = store.data.map { it[Keys.USE_KG] ?: true }
@@ -147,6 +149,9 @@ class PreferencesManager @Inject constructor(@ApplicationContext context: Contex
     val profileEquipment: Flow<String?> = store.data.map { it[Keys.PROFILE_EQUIPMENT] }
     val profileDaysPerWeek: Flow<Int?> = store.data.map { it[Keys.PROFILE_DAYS] }
     val profileStyle: Flow<String?> = store.data.map { it[Keys.PROFILE_STYLE] }
+    /** Sprint 5 P1: "weight" (default) or "reps" - the field focused after a completed set. */
+    val autoFocusField: Flow<String> = store.data.map { it[Keys.AUTO_FOCUS_FIELD] ?: "weight" }
+    suspend fun setAutoFocusField(value: String) { store.edit { it[Keys.AUTO_FOCUS_FIELD] = value } }
     suspend fun setTrainingProfile(goal: String, level: String, equipment: String, daysPerWeek: Int, style: String = "NO_PREFERENCE") {
         store.edit {
             it[Keys.PROFILE_GOAL] = goal

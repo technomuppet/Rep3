@@ -170,6 +170,53 @@ class DataSeeder @Inject constructor(
         return name
     }
 
+    /**
+     * Sprint 5 P3: duplicate a curated Quick Workout into the user's own editable
+     * templates without touching the original catalogue. Exercises resolve by
+     * name against the library; the rep range is parsed to a representative
+     * target rep. Returns the new template name (deduped if it already exists),
+     * or null if no exercises could be resolved.
+     */
+    suspend fun duplicateQuickWorkout(workout: com.replog.domain.library.QuickWorkout): String? {
+        val existingNames = workouts.getAllTemplates().first().map { it.template.name }.toSet()
+        var name = workout.name.trim().ifBlank { "Quick workout" }
+        if (name in existingNames) {
+            var n = 2
+            while ("$name ($n)" in existingNames) n++
+            name = "$name ($n)"
+        }
+        val templateId = workouts.insertTemplate(WorkoutTemplate(name = name, isBuiltIn = false)).toInt()
+        var added = 0
+        workout.exercises.forEachIndexed { index, spec ->
+            val exercise = exercises.getExerciseByName(spec.exerciseName) ?: return@forEachIndexed
+            workouts.insertTemplateExercise(
+                TemplateExercise(
+                    templateId = templateId,
+                    exerciseId = exercise.id,
+                    defaultSets = spec.sets.coerceAtLeast(1),
+                    orderIndex = index,
+                    targetReps = parseTargetReps(spec.reps)
+                )
+            )
+            added++
+        }
+        if (added == 0) {
+            workouts.deleteTemplate(WorkoutTemplate(id = templateId, name = name, isBuiltIn = false))
+            return null
+        }
+        return name
+    }
+
+    /** Parse "5", "8-12", "AMRAP", "30s" into a representative integer rep target. */
+    private fun parseTargetReps(reps: String): Int {
+        val nums = Regex("\\d+").findAll(reps).map { it.value.toInt() }.toList()
+        return when {
+            nums.isEmpty() -> 8
+            nums.size >= 2 -> ((nums[0] + nums[1]) / 2).coerceAtLeast(1)
+            else -> nums[0].coerceAtLeast(1)
+        }
+    }
+
     data class ExerciseData(
         val name: String,
         val category: String,

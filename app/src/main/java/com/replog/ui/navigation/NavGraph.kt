@@ -55,6 +55,7 @@ sealed class RepLogRoute(val route: String, val label: String, val icon: ImageVe
     data object TrainingDna : RepLogRoute("training_dna", "Training DNA", Icons.Default.ShowChart)
     data object CoachHistory : RepLogRoute("coach_history", "Coach History", Icons.Default.History)
     data object Goals : RepLogRoute("goals", "Goals", Icons.Default.Flag)
+    data object QuickWorkouts : RepLogRoute("quick_workouts", "Quick Workouts", Icons.Default.FitnessCenter)
 }
 
 /** Bottom-navigation tabs, in order. */
@@ -74,7 +75,8 @@ private val tabRoutes = bottomTabs.map { it.route }.toSet()
 private val secondaryTitles = mapOf(
     RepLogRoute.TrainingDna.route to "Training DNA",
     RepLogRoute.CoachHistory.route to "Coach History",
-    RepLogRoute.Goals.route to "Goals"
+    RepLogRoute.Goals.route to "Goals",
+    RepLogRoute.QuickWorkouts.route to "Quick Workouts"
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -155,7 +157,16 @@ fun RepLogNavGraph(
                     onViewRecoveryGuidance = { openDetail(RepLogRoute.TrainingDna.route) },
                     onOpenCoachHistory = { openDetail(RepLogRoute.CoachHistory.route) },
                     onOpenGoals = { openDetail(RepLogRoute.Goals.route) },
-                    onOpenTrainingDna = { openDetail(RepLogRoute.TrainingDna.route) }
+                    onOpenTrainingDna = { openDetail(RepLogRoute.TrainingDna.route) },
+                    onOpenQuickWorkouts = { openDetail(RepLogRoute.QuickWorkouts.route) }
+                )
+            }
+            composable(RepLogRoute.QuickWorkouts.route) {
+                com.replog.ui.library.QuickWorkoutsScreen(
+                    contentPadding = padding,
+                    // Starting a Quick Workout marks a session active; jump to the
+                    // Training tab, which resumes it for logging.
+                    onWorkoutStarted = { switchTab(RepLogRoute.Workout.route) }
                 )
             }
             // Training tab: the plain Workout destination (bottom-bar / Home button).
