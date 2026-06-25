@@ -29,7 +29,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
 import com.replog.ui.exercise.ExerciseLibraryScreen
 import com.replog.ui.history.HistoryScreen
 import com.replog.ui.home.HomeScreen
@@ -44,6 +43,10 @@ sealed class RepLogRoute(val route: String, val label: String, val icon: ImageVe
     // Primary tabs (bottom navigation)
     data object Home : RepLogRoute("home", "Home", Icons.Default.Home)
     data object Workout : RepLogRoute("workout", "Training", Icons.Default.FitnessCenter)
+    // Recommendation deep link: opens the Training screen and consumes the staged
+    // Coach recommendation once. Distinct from the Workout tab so it can never be
+    // resurfaced by tab state restoration (the "Home loops to Training" bug).
+    data object WorkoutRecommendation : RepLogRoute("workout_recommendation", "Training", Icons.Default.FitnessCenter)
     data object Progress : RepLogRoute("progress", "Progress", Icons.Default.ShowChart)
     data object History : RepLogRoute("history", "History", Icons.Default.History)
     data object Exercises : RepLogRoute("exercises", "Exercises", Icons.Default.List)
@@ -92,7 +95,10 @@ fun RepLogNavGraph(
 
     val entry by navController.currentBackStackEntryAsState()
     val currentBase = entry?.destination?.route?.substringBefore("?")
-    val isPrimaryTab = currentBase in tabRoutes
+    // The recommendation deep link is part of the Training experience, so it
+    // shows the bottom bar (Training tab highlighted) rather than being a
+    // trapped, bar-less screen.
+    val isPrimaryTab = currentBase in tabRoutes || currentBase == RepLogRoute.WorkoutRecommendation.route
     val secondaryTitle = secondaryTitles[currentBase]
 
     // Switching to a primary tab must always behave like a bottom-bar tab switch:
@@ -137,10 +143,11 @@ fun RepLogNavGraph(
                     onStartWorkout = { switchTab(RepLogRoute.Workout.route) },
                     onViewHistory = { switchTab(RepLogRoute.History.route) },
                     onStartRecommendedWorkout = {
-                        // Recommendation carries an arg, so it pushes the parameterised
-                        // Workout route rather than restoring a saved tab state.
-                        navController.navigate(RepLogRoute.Workout.route + "?fromRecommendation=true") {
-                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                        // Recommendation is a one-shot deep link into the Training screen.
+                        // It does NOT save/restore tab state, so it can never be resurfaced
+                        // later when the user taps the Home tab (the cause of the reported
+                        // "Home loops back to Training" issue). Back returns to Home.
+                        navController.navigate(RepLogRoute.WorkoutRecommendation.route) {
                             launchSingleTop = true
                         }
                     },
@@ -151,12 +158,14 @@ fun RepLogNavGraph(
                     onOpenTrainingDna = { openDetail(RepLogRoute.TrainingDna.route) }
                 )
             }
-            composable(
-                route = RepLogRoute.Workout.route + "?fromRecommendation={fromRecommendation}",
-                arguments = listOf(navArgument("fromRecommendation") { defaultValue = "false" })
-            ) { backStackEntry ->
-                val fromRec = backStackEntry.arguments?.getString("fromRecommendation") == "true"
-                ActiveWorkoutScreen(padding, startFromRecommendation = fromRec)
+            // Training tab: the plain Workout destination (bottom-bar / Home button).
+            composable(RepLogRoute.Workout.route) {
+                ActiveWorkoutScreen(padding, startFromRecommendation = false)
+            }
+            // Recommendation deep link: a distinct route that opens the Training
+            // screen and consumes the staged Coach recommendation exactly once.
+            composable(RepLogRoute.WorkoutRecommendation.route) {
+                ActiveWorkoutScreen(padding, startFromRecommendation = true)
             }
             composable(RepLogRoute.Progress.route) {
                 ProgressScreen(
@@ -178,10 +187,16 @@ fun RepLogNavGraph(
 private fun RepLogBottomBar(navController: NavHostController) {
     val entry by navController.currentBackStackEntryAsState()
     val current = entry?.destination
+    val currentRoute = current?.route?.substringBefore("?")
     NavigationBar {
         bottomTabs.forEach { item ->
+            // The recommendation deep link highlights the Training tab.
+            val isRecommendationOnWorkout =
+                item.route == RepLogRoute.Workout.route &&
+                    currentRoute == RepLogRoute.WorkoutRecommendation.route
             NavigationBarItem(
-                selected = current?.hierarchy?.any { it.route?.substringBefore("?") == item.route } == true,
+                selected = isRecommendationOnWorkout ||
+                    current?.hierarchy?.any { it.route?.substringBefore("?") == item.route } == true,
                 onClick = {
                     navController.navigate(item.route) {
                         // Always return to a single Home-rooted back stack; never trap the user.
