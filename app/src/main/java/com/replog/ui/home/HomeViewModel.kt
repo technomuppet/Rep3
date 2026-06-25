@@ -32,6 +32,15 @@ data class HomeGoal(
     val summaryLine: String
 )
 
+/** Priority 2: a resumable in-progress workout shown as a large Home card. */
+data class ContinueWorkout(
+    val sessionId: Int,
+    val templateName: String,
+    val startTime: Long,
+    val exerciseCount: Int,
+    val setCount: Int
+)
+
 data class HomeUiState(
     val sessionCount: Int = 0,
     val totalVolume: Double = 0.0,
@@ -52,9 +61,42 @@ class HomeViewModel @Inject constructor(
     private val repo: WorkoutRepository,
     private val goalRepository: GoalRepository,
     private val prefs: PreferencesManager,
-    private val workoutStarter: com.replog.util.WorkoutStarter
+    private val workoutStarter: com.replog.util.WorkoutStarter,
+    private val intelligenceRepository: com.replog.data.repository.IntelligenceRepository
 ) : ViewModel() {
     private val stats = MutableStateFlow(0 to 0.0)
+
+    // Priority 1: the unified Today's Briefing. Computed on demand and cached so
+    // the expensive multi-engine pass does NOT run on every set/DB change.
+    private val _briefing = MutableStateFlow<com.replog.domain.intelligence.TodaysBriefing?>(null)
+    val briefing: StateFlow<com.replog.domain.intelligence.TodaysBriefing?> = _briefing
+    private var briefingLoadedForSessionCount = -1
+
+    // Priority 2: an in-progress workout to resume, if any.
+    private val _continueWorkout = MutableStateFlow<ContinueWorkout?>(null)
+    val continueWorkout: StateFlow<ContinueWorkout?> = _continueWorkout
+
+    /** Load (or refresh) the briefing + continue-workout card. Cheap to call repeatedly. */
+    fun loadIntelligence() = viewModelScope.launch {
+        val activeId = prefs.activeSessionId.first()
+        _continueWorkout.value = activeId?.let { id ->
+            repo.getSessionById(id)?.takeIf { it.session.endTime == null }?.let { s ->
+                ContinueWorkout(
+                    sessionId = id,
+                    templateName = s.session.templateName ?: "Workout",
+                    startTime = s.session.startTime,
+                    exerciseCount = s.exercises.size,
+                    setCount = s.exercises.sumOf { it.sets.size }
+                )
+            }
+        }
+        // Recompute the briefing only when the completed-session count changed.
+        val count = repo.getCompletedSessionCount()
+        if (count != briefingLoadedForSessionCount || _briefing.value == null) {
+            _briefing.value = runCatching { intelligenceRepository.buildBriefing() }.getOrNull()
+            briefingLoadedForSessionCount = count
+        }
+    }
 
     /** P5: launch a favourite template (sets it active; Training tab resumes it). */
     fun startTemplate(template: com.replog.data.model.TemplateWithExercises) = viewModelScope.launch {

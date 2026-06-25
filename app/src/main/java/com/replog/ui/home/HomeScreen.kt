@@ -39,10 +39,22 @@ fun HomeScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val coachState by coachViewModel.state.collectAsState()
+    val briefing by viewModel.briefing.collectAsState()
+    val continueWorkout by viewModel.continueWorkout.collectAsState()
     var showTrainAnywayDialog by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { viewModel.refresh(); coachViewModel.loadRecommendation(force = false) }
+    LaunchedEffect(Unit) { viewModel.refresh(); viewModel.loadIntelligence(); coachViewModel.loadRecommendation(force = false) }
     LazyColumn(Modifier.fillMaxSize().padding(contentPadding), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item { Text("Today", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.ExtraBold); Text("Your training dashboard.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+
+        // Priority 2: Continue Workout - the top card when a session is in progress.
+        continueWorkout?.let { cw ->
+            item { ContinueWorkoutCard(cw, onContinue = onStartWorkout) }
+        }
+
+        // Priority 1: Today's Briefing - the unified intelligence card.
+        briefing?.let { b ->
+            item { TodaysBriefingCard(b) }
+        }
 
         // Coach Dashboard — the unified "Good morning" advisor (recommendation +
         // recovery + focus + progression + goal + estimated time).
@@ -244,5 +256,57 @@ private fun RecentWorkoutCard(session: SessionWithExercises) = RepLogCard {
         Icon(Icons.Default.FitnessCenter, null, tint = MaterialTheme.colorScheme.primary); Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) { Text(session.session.templateName ?: "Workout", fontWeight = FontWeight.Bold); Text(SimpleDateFormat("EEE d MMM, HH:mm", Locale.getDefault()).format(Date(session.session.startTime)), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall); Text("${session.exercises.size} exercises • ${session.exercises.sumOf { it.sets.size }} sets", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) }
         Icon(Icons.Default.Timer, null, tint = MaterialTheme.colorScheme.onSurfaceVariant); Spacer(Modifier.width(4.dp)); Text(duration, style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+@Composable
+private fun ContinueWorkoutCard(cw: ContinueWorkout, onContinue: () -> Unit) = RepLogCard(onClick = onContinue) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Default.Timer, null, tint = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text("Continue Workout", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold)
+            Text(cw.templateName, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Text("Resume", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+    }
+    Spacer(Modifier.height(8.dp))
+    val elapsedMin = ((System.currentTimeMillis() - cw.startTime) / 60000L).toInt().coerceAtLeast(0)
+    Text(
+        "$elapsedMin min • ${cw.exerciseCount} exercises • ${cw.setCount} sets logged",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+}
+
+@Composable
+private fun TodaysBriefingCard(b: com.replog.domain.intelligence.TodaysBriefing) = RepLogCard {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Default.Insights, null, tint = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.width(12.dp))
+        Text("Today's Briefing", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
+        b.recoveryScore?.let {
+            Text("Recovery $it%", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+        }
+    }
+    Spacer(Modifier.height(8.dp))
+    Text(b.recommendation, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+    Spacer(Modifier.height(6.dp))
+    b.reasons.forEach { reason ->
+        Text("• $reason", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    Spacer(Modifier.height(6.dp))
+    val confidenceLabel = when (b.confidence) {
+        com.replog.domain.intelligence.BriefingConfidence.HIGH -> "High"
+        com.replog.domain.intelligence.BriefingConfidence.MEDIUM -> "Medium"
+        com.replog.domain.intelligence.BriefingConfidence.LOW -> "Low"
+    }
+    Text("Confidence: $confidenceLabel", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    if (b.coachInsights.isNotEmpty()) {
+        Spacer(Modifier.height(10.dp))
+        Text("Your coach noticed", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+        b.coachInsights.forEach { insight ->
+            Text("• ${insight.text}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }

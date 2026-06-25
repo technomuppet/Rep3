@@ -62,7 +62,9 @@ class RecommendationRepository @Inject constructor(
     }
 
     private suspend fun buildContext(): RecommendationContext {
-        val sessions = workoutRepository.getAllSessions().first().filter { it.session.endTime != null }
+        // Priority 7: bounded recent history - the recommendation/recovery engines
+        // only use recent training, so we never load the entire database.
+        val sessions = workoutRepository.getRecentCompletedSessions(60).first()
         val exercises = exerciseRepository.getAllExercises().first()
         val dna = trainingDNARepository.getLatestDNA().first()
         val plateaus = trainingDNARepository.getPlateauEvents().first()
