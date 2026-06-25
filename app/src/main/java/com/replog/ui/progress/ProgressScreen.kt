@@ -249,7 +249,7 @@ private fun RecoveryCard(recovery: RecoveryInsight) = RepLogCard {
         }
     }
     Spacer(Modifier.height(8.dp))
-    LinearProgressIndicator(progress = recovery.score / 100f, modifier = Modifier.fillMaxWidth())
+    LinearProgressIndicator(progress = { recovery.score / 100f }, modifier = Modifier.fillMaxWidth())
 }
 
 @Composable
@@ -280,7 +280,7 @@ private fun BalanceCard(title: String, points: List<BalancePoint>, useKg: Boolea
                 Text(point.label, modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
                 Text("${(point.percentage * 100).toInt()}%", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            LinearProgressIndicator(progress = point.percentage.toFloat(), modifier = Modifier.fillMaxWidth())
+            LinearProgressIndicator(progress = { point.percentage.toFloat() }, modifier = Modifier.fillMaxWidth())
             Text(formatWeight(point.volume, useKg), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(8.dp))
         }
