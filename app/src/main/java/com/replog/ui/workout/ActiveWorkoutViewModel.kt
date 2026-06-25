@@ -169,7 +169,7 @@ class ActiveWorkoutViewModel @Inject constructor(
         restored,
         summary,
         restTimer.state,
-        workouts.getAllSessions(),
+        workouts.getRecentCompletedSessions(8),
         prefs.restAutoStart,
         prefs.autoFocusField
     ) { args ->
@@ -208,9 +208,12 @@ class ActiveWorkoutViewModel @Inject constructor(
         }.mapNotNull { (k, v) -> v?.let { k to it } }.toMap()
 
         val adaptivePlan = if (id == null) {
-            if (cachedAdaptivePlan == null || cachedAdaptivePlanForSessionCount != allSessions.size) {
+            // Phase 2: key the cache on the most recent completed session id (stable,
+            // monotonic) rather than list size, since the window is now bounded.
+            val latestCompletedId = allSessions.firstOrNull()?.session?.id ?: -1
+            if (cachedAdaptivePlan == null || cachedAdaptivePlanForSessionCount != latestCompletedId) {
                 cachedAdaptivePlan = AdaptiveProgramEngine.buildPlan(allSessions)
-                cachedAdaptivePlanForSessionCount = allSessions.size
+                cachedAdaptivePlanForSessionCount = latestCompletedId
             }
             cachedAdaptivePlan
         } else null

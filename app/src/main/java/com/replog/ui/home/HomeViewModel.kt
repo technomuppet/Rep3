@@ -76,9 +76,10 @@ class HomeViewModel @Inject constructor(
             stats,
             repo.getRecentSessions(5),
             repo.getRecentPRs(),
-            repo.getAllSessions(),
+            repo.getCompletedSessionSummaries(),
             goalRepository.getActive(),
-            repo.getFavoriteTemplates()
+            repo.getFavoriteTemplates(),
+            repo.getRecentCompletedSessions(30)
         )
     ) { values ->
         @Suppress("UNCHECKED_CAST")
@@ -88,17 +89,17 @@ class HomeViewModel @Inject constructor(
         @Suppress("UNCHECKED_CAST")
         val prs = values[2] as List<SetLog>
         @Suppress("UNCHECKED_CAST")
-        val allSessions = values[3] as List<SessionWithExercises>
+        val summaries = values[3] as List<com.replog.data.model.SessionSummaryRow>
         @Suppress("UNCHECKED_CAST")
         val activeGoals = values[4] as List<com.replog.data.model.Goal>
         @Suppress("UNCHECKED_CAST")
         val favorites = values[5] as List<com.replog.data.model.TemplateWithExercises>
-        val completed = allSessions.filter { it.session.endTime != null }
+        @Suppress("UNCHECKED_CAST")
+        val recentCompleted = values[6] as List<SessionWithExercises>
         val now = System.currentTimeMillis()
-        val startTimes = completed.map { it.session.startTime }
-        val startTimesToVolume = completed.map { c ->
-            c.session.startTime to c.exercises.sumOf { e -> e.sets.sumOf { it.weight * it.reps } }
-        }
+        // Phase 2: cheap stats from SQL-aggregated summaries (no full graph load).
+        val startTimes = summaries.map { it.startTime }
+        val startTimesToVolume = summaries.map { it.startTime to it.volume }
         val weekly = com.replog.domain.home.HomeDashboardStats.weeklyProgress(startTimesToVolume, now)
 
         // Top active goal with a live forecast (best-effort).
@@ -111,7 +112,8 @@ class HomeViewModel @Inject constructor(
         }
 
         // Training Genome headline (only when it has learned something).
-        val genome = TrainingGenomeEngine.analyze(completed, now)
+        // Uses a bounded recent window of full sessions (Phase 2).
+        val genome = TrainingGenomeEngine.analyze(recentCompleted, now)
         val genomeHeadline = genome.takeIf { it.hasEnoughData }?.traits?.firstOrNull()
             ?.let { "${it.dimension}: ${it.bestValue}" }
 
@@ -120,7 +122,7 @@ class HomeViewModel @Inject constructor(
             totalVolume = s.second,
             recentSessions = sessions,
             recentPRs = prs,
-            insight = buildHomeInsight(completed),
+            insight = buildHomeInsight(recentCompleted),
             sessionsThisWeek = weekly.sessionsThisWeek,
             volumeThisWeek = weekly.volumeThisWeek,
             dayStreak = com.replog.domain.home.HomeDashboardStats.dayStreak(startTimes, now),

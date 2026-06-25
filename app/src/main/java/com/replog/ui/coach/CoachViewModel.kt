@@ -121,7 +121,8 @@ class CoachViewModel @Inject constructor(
 
         // Recovery (reuse the existing analyzer + dashboard mapping).
         val recoveryState = runCatching {
-            val sessions = workoutRepository.getAllSessions().first().filter { it.session.endTime != null }
+            // Phase 2: recovery only depends on recent training; bound the history load.
+            val sessions = workoutRepository.getRecentCompletedSessions(30).first()
             val bodyweights = bodyweightRepository.getAllBodyweights().first()
             RecoveryDashboard.from(RecoveryAnalyzer.overallRecovery(sessions, bodyweights, now))
         }.getOrNull()

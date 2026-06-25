@@ -27,6 +27,10 @@ class WorkoutRepository @Inject constructor(
 ) {
     fun getAllSessions(): Flow<List<SessionWithExercises>> = sessionDao.getAllSessions()
     fun getRecentSessions(limit: Int): Flow<List<SessionWithExercises>> = sessionDao.getRecentSessions(limit)
+    /** Phase 2: SQL-aggregated completed-session summaries (no full graph load). */
+    fun getCompletedSessionSummaries(): Flow<List<com.replog.data.model.SessionSummaryRow>> = sessionDao.getCompletedSessionSummaries()
+    /** Phase 2: bounded recent completed sessions with full set detail. */
+    fun getRecentCompletedSessions(limit: Int): Flow<List<SessionWithExercises>> = sessionDao.getRecentCompletedSessions(limit)
     suspend fun getSessionById(sessionId: Int): SessionWithExercises? = sessionDao.getSessionById(sessionId)
     suspend fun getSessionEntity(sessionId: Int): WorkoutSession? = sessionDao.getSessionEntity(sessionId)
     suspend fun insertSession(session: WorkoutSession): Long = sessionDao.insertSession(session)

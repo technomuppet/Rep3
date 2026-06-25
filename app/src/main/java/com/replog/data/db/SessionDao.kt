@@ -8,6 +8,28 @@ import kotlinx.coroutines.flow.Flow
 interface SessionDao {
     @Transaction @Query("SELECT * FROM workout_sessions ORDER BY startTime DESC") fun getAllSessions(): Flow<List<SessionWithExercises>>
     @Transaction @Query("SELECT * FROM workout_sessions ORDER BY startTime DESC LIMIT :limit") fun getRecentSessions(limit: Int): Flow<List<SessionWithExercises>>
+
+    // Phase 2: lightweight per-completed-session summary (volume aggregated in SQL,
+    // no set objects loaded) for dashboard stats / streaks / weekly progress.
+    @Query(
+        """
+        SELECT ws.id AS id, ws.startTime AS startTime, ws.endTime AS endTime,
+               COALESCE(SUM(sl.weight * sl.reps), 0) AS volume
+        FROM workout_sessions ws
+        LEFT JOIN session_exercises se ON se.sessionId = ws.id
+        LEFT JOIN set_logs sl ON sl.sessionExerciseId = se.id
+        WHERE ws.endTime IS NOT NULL
+        GROUP BY ws.id
+        ORDER BY ws.startTime DESC
+        """
+    )
+    fun getCompletedSessionSummaries(): Flow<List<SessionSummaryRow>>
+
+    // Phase 2: bounded recent completed sessions (full graph) for engines that
+    // genuinely need per-set detail (e.g. Training Genome), without loading all history.
+    @Transaction
+    @Query("SELECT * FROM workout_sessions WHERE endTime IS NOT NULL ORDER BY startTime DESC LIMIT :limit")
+    fun getRecentCompletedSessions(limit: Int): Flow<List<SessionWithExercises>>
     @Transaction @Query("SELECT * FROM workout_sessions WHERE id = :sessionId") suspend fun getSessionById(sessionId: Int): SessionWithExercises?
     @Query("SELECT * FROM workout_sessions WHERE id = :sessionId") suspend fun getSessionEntity(sessionId: Int): WorkoutSession?
     @Insert suspend fun insertSession(session: WorkoutSession): Long
