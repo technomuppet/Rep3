@@ -125,7 +125,7 @@ class DataSeeder @Inject constructor(
     }
 
     /**
-     * Import a shared template (.rpltemplate). Exercises are resolved by name;
+     * Import a shared template (.replogtemplate). Exercises are resolved by name;
      * any the user does not have are created as custom exercises from the
      * metadata in the file. If the template name already exists, a numeric
      * suffix is added so the import never silently overwrites or fails.

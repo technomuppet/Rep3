@@ -1047,7 +1047,7 @@ private fun supersetLabel(entry: SessionExerciseWithSets, entries: List<SessionE
 private fun elapsed(start: Long?): String { if (start == null) return "00:00"; val sec = ((System.currentTimeMillis() - start) / 1000).coerceAtLeast(0); return "%02d:%02d:%02d".format(sec / 3600, (sec % 3600) / 60, sec % 60) }
 private fun Double.toCleanString(): String = if (this % 1.0 == 0.0) toInt().toString() else "%.2f".format(this).trimEnd('0').trimEnd('.')
 
-/** Write a .rpltemplate file to the cache and open the OS share sheet. */
+/** Write a .replogtemplate file to the cache and open the OS share sheet. */
 private fun shareTemplateFile(context: android.content.Context, fileName: String, json: String) {
     val dir = java.io.File(context.cacheDir, "share").apply { mkdirs() }
     val file = java.io.File(dir, fileName)

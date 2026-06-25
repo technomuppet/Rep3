@@ -124,7 +124,7 @@ class ActiveWorkoutViewModel @Inject constructor(
     fun clearTemplateMessage() { templateMessageFlow.value = null }
 
     /**
-     * Serialize a template to a portable .rpltemplate file in the cache and
+     * Serialize a template to a portable .replogtemplate file in the cache and
      * return (fileName, json) so the screen can share it via the OS share sheet.
      */
     fun buildShareableTemplate(template: TemplateWithExercises): Pair<String, String> {
