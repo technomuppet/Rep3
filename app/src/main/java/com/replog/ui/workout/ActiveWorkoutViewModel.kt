@@ -90,6 +90,8 @@ data class ActiveWorkoutUiState(
     val restTimer: RestTimerState = RestTimerState(),
     val restAutoStart: Boolean = true,
     val useKg: Boolean = true,
+    /** Sprint 5 P1: which field to auto-focus after a completed set ("weight" | "reps"). */
+    val autoFocusField: String = "weight",
     val isSaving: Boolean = false,
     val restoredWorkout: Boolean = false,
     val summary: WorkoutSummary? = null,
@@ -178,7 +180,8 @@ class ActiveWorkoutViewModel @Inject constructor(
         summary,
         restTimer.state,
         workouts.getAllSessions(),
-        prefs.restAutoStart
+        prefs.restAutoStart,
+        prefs.autoFocusField
     ) { args ->
         val id = args[0] as Int?
         @Suppress("UNCHECKED_CAST") val isSaving = args[2] as Boolean
@@ -190,6 +193,7 @@ class ActiveWorkoutViewModel @Inject constructor(
         val timerState = args[8] as RestTimerState
         @Suppress("UNCHECKED_CAST") val allSessions = args[9] as List<SessionWithExercises>
         val restAutoStart = args[10] as Boolean
+        val autoFocusField = args[11] as String
 
         val session = id?.let { workouts.getSessionById(it) }
         val prescriptions = id?.let { workouts.getPrescriptionsForSession(it) }.orEmpty()
@@ -232,6 +236,7 @@ class ActiveWorkoutViewModel @Inject constructor(
             restTimer = timerState,
             restAutoStart = restAutoStart,
             useKg = useKg,
+            autoFocusField = autoFocusField,
             isSaving = isSaving,
             restoredWorkout = restoredWorkout,
             summary = currentSummary,
