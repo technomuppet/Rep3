@@ -13,4 +13,6 @@ interface TemplateDao {
     @Update suspend fun updateTemplate(template: WorkoutTemplate)
     @Delete suspend fun deleteTemplate(template: WorkoutTemplate)
     @Query("DELETE FROM template_exercises WHERE templateId = :templateId") suspend fun deleteTemplateExercises(templateId: Int)
+    @Query("UPDATE workout_templates SET isFavorite = :favorite WHERE id = :templateId") suspend fun setFavorite(templateId: Int, favorite: Boolean)
+    @Transaction @Query("SELECT * FROM workout_templates WHERE isFavorite = 1 ORDER BY name ASC") fun getFavoriteTemplates(): Flow<List<TemplateWithExercises>>
 }

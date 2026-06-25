@@ -357,6 +357,42 @@ class ActiveWorkoutViewModel @Inject constructor(
         activeId.value = id; prefs.setActiveSessionId(id); refresh()
     }
 
+    /** P5: star/unstar a template for the Home quick-launch row. */
+    fun toggleTemplateFavorite(template: TemplateWithExercises) = viewModelScope.launch {
+        workouts.setTemplateFavorite(template.template.id, !template.template.isFavorite)
+        refresh()
+    }
+
+    /**
+     * P6: one-tap repeat of a previous workout. Recreates the same exercises in
+     * the same order, with the prior weights/reps pre-loaded as targets and the
+     * per-exercise notes carried over. Loads instantly; the user just confirms sets.
+     */
+    fun repeatWorkout(session: SessionWithExercises) = viewModelScope.launch {
+        summary.value = null; previousWorkoutCache.clear(); cachedForSessionId = null; restTimer.cancel()
+        val id = workouts.insertSession(
+            WorkoutSession(templateName = session.session.templateName ?: "Repeat workout", startTime = System.currentTimeMillis())
+        ).toInt()
+        val ordered = session.exercises.sortedBy { it.sessionExercise.orderIndex }
+        val prescriptions = mutableListOf<WorkoutPrescription>()
+        ordered.forEachIndexed { index, entry ->
+            workouts.insertSessionExercise(
+                SessionExercise(sessionId = id, exerciseId = entry.exercise.id, orderIndex = index, notes = entry.sessionExercise.notes)
+            )
+            val working = entry.sets.filter { it.setType == SetType.WORKING }.ifEmpty { entry.sets }
+            val top = working.maxByOrNull { it.weight }
+            if (top != null) {
+                prescriptions += WorkoutPrescription(
+                    sessionId = id, exerciseId = entry.exercise.id, source = "Repeat",
+                    targetSets = working.size.coerceAtLeast(1), targetReps = top.reps, targetWeight = top.weight,
+                    adjustment = "Repeat", reason = "Same as last time"
+                )
+            }
+        }
+        if (prescriptions.isNotEmpty()) workouts.insertPrescriptions(prescriptions)
+        activeId.value = id; prefs.setActiveSessionId(id); refresh()
+    }
+
     fun discardWorkout() = viewModelScope.launch {
         activeId.value?.let { workouts.deleteSessionById(it) }
         activeId.value = null; previousWorkoutCache.clear(); cachedForSessionId = null

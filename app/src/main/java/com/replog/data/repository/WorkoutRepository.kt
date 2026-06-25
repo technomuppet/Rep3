@@ -68,6 +68,8 @@ class WorkoutRepository @Inject constructor(
     fun getRecentPRs(): Flow<List<SetLog>> = setLogDao.getRecentPRs()
 
     fun getAllTemplates(): Flow<List<TemplateWithExercises>> = templateDao.getAllTemplates()
+    fun getFavoriteTemplates(): Flow<List<TemplateWithExercises>> = templateDao.getFavoriteTemplates()
+    suspend fun setTemplateFavorite(templateId: Int, favorite: Boolean) = templateDao.setFavorite(templateId, favorite)
     suspend fun getTemplateById(templateId: Int): TemplateWithExercises? = templateDao.getTemplateById(templateId)
     suspend fun insertTemplate(template: WorkoutTemplate): Long = templateDao.insertTemplate(template)
     suspend fun insertTemplateExercise(templateExercise: TemplateExercise): Long = templateDao.insertTemplateExercise(templateExercise)

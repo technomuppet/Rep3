@@ -9,7 +9,9 @@ import androidx.room.PrimaryKey
 data class WorkoutTemplate(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val name: String,
-    val isBuiltIn: Boolean = false
+    val isBuiltIn: Boolean = false,
+    /** Sprint 5 P5: starred/pinned templates surface in the Home quick-launch row. */
+    val isFavorite: Boolean = false
 )
 
 @Entity(
