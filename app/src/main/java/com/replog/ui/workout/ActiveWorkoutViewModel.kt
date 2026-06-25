@@ -126,16 +126,6 @@ class ActiveWorkoutViewModel @Inject constructor(
 
     fun clearTemplateMessage() { templateMessageFlow.value = null }
 
-    /** P3: duplicate a curated Quick Workout into the user's editable templates. */
-    fun duplicateQuickWorkout(workout: com.replog.domain.library.QuickWorkout) = viewModelScope.launch {
-        runCatching { dataSeeder.duplicateQuickWorkout(workout) }
-            .onSuccess { name ->
-                templateMessageFlow.value = if (name != null) "Saved \"$name\" to your templates" else "Could not save this workout"
-                refresh()
-            }
-            .onFailure { templateMessageFlow.value = "Could not save this workout" }
-    }
-
     /**
      * Serialize a template to a portable .replogtemplate file in the cache and
      * return (fileName, json) so the screen can share it via the OS share sheet.
@@ -375,27 +365,10 @@ class ActiveWorkoutViewModel @Inject constructor(
      * exercise's suggested sets/reps as a target prescription so the user can
      * begin logging at once.
      */
-    fun startQuickWorkout(workout: com.replog.domain.library.QuickWorkout) = viewModelScope.launch {
-        summary.value = null; previousWorkoutCache.clear(); cachedForSessionId = null; restTimer.cancel()
-        val id = workoutStarter.startQuickWorkout(workout) ?: return@launch
-        activeId.value = id; refresh()
-    }
-
     /** P5: star/unstar a template for the Home quick-launch row. */
     fun toggleTemplateFavorite(template: TemplateWithExercises) = viewModelScope.launch {
         workouts.setTemplateFavorite(template.template.id, !template.template.isFavorite)
         refresh()
-    }
-
-    /**
-     * P6: one-tap repeat of a previous workout. Recreates the same exercises in
-     * the same order, with the prior weights/reps pre-loaded as targets and the
-     * per-exercise notes carried over. Loads instantly; the user just confirms sets.
-     */
-    fun repeatWorkout(session: SessionWithExercises) = viewModelScope.launch {
-        summary.value = null; previousWorkoutCache.clear(); cachedForSessionId = null; restTimer.cancel()
-        val id = workoutStarter.repeatSession(session)
-        activeId.value = id; refresh()
     }
 
     fun discardWorkout() = viewModelScope.launch {

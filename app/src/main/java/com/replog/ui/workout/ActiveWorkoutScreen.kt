@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
@@ -184,6 +185,7 @@ fun ActiveWorkoutScreen(
                     TemplateCard(
                         template = template,
                         onStart = { viewModel.startWorkoutFromTemplate(template) },
+                        onToggleFavorite = { viewModel.toggleTemplateFavorite(template) },
                         onEdit = { editingTemplate = template },
                         onDelete = { templatePendingDelete = template },
                         onShare = {
@@ -424,7 +426,8 @@ private fun TemplateCard(
     onStart: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
-    onShare: () -> Unit
+    onShare: () -> Unit,
+    onToggleFavorite: () -> Unit
 ) = RepLogCard(onClick = onStart) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Default.PlayArrow, null, tint = MaterialTheme.colorScheme.primary)
@@ -440,6 +443,14 @@ private fun TemplateCard(
             if (!template.template.isBuiltIn) {
                 Text("Custom template", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
             }
+        }
+        // P5: star to pin this template to the Home "Quick Start" row.
+        IconButton(onClick = onToggleFavorite) {
+            Icon(
+                if (template.template.isFavorite) Icons.Default.Star else Icons.Default.StarBorder,
+                contentDescription = if (template.template.isFavorite) "Unpin from Quick Start" else "Pin to Quick Start",
+                tint = if (template.template.isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
         IconButton(onClick = onShare) { Icon(Icons.Default.Share, "Share template") }
         if (!template.template.isBuiltIn) {
