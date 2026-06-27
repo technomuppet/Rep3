@@ -136,9 +136,92 @@ class IntelligenceRepository @Inject constructor(
                 goalSummary = goalSummary,
                 strongestDayOfWeek = strongestDay,
                 prsAfterRestDays = prsAfterRest,
-                slowRecoveryAfterHighVolume = slowAfterLegs
+                slowRecoveryAfterHighVolume = slowAfterLegs,
+                hourOfDay = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
             )
         )
+    }
+
+    /**
+     * Priority 5: compute the RepLog Score from component values derived by the
+     * existing engines (recovery, volume, forecasts, goals). No raw-session
+     * analysis here - it reuses bounded reads and feeds the pure score engine.
+     */
+    suspend fun buildRepLogScore(): com.replog.domain.intelligence.RepLogScoreResult? {
+        val now = System.currentTimeMillis()
+        val sessions = workoutRepository.getRecentCompletedSessions(60).first()
+        if (sessions.size < 3) return null
+        val bodyweights = bodyweightRepository.getAllBodyweights().first()
+
+        // Recovery (0-100 already)
+        val recovery = runCatching {
+            RecoveryAnalyzer.overallRecovery(sessions, bodyweights, now).score.toInt()
+        }.getOrNull() ?: 60
+
+        // Volume quality + muscle balance from weekly landmarks.
+        val landmarks = runCatching { VolumeLandmarks.analyze(sessions, now, weeks = 1) }.getOrNull().orEmpty()
+        val trained = landmarks.filter { it.status != VolumeStatus.NONE }
+        val volumeQuality = if (trained.isEmpty()) 50 else
+            (trained.count { it.status == VolumeStatus.IN_RANGE } * 100 / trained.size)
+        // Balance: penalise groups below optimal (neglected) among those trained.
+        val muscleBalance = if (trained.isEmpty()) 50 else
+            (100 - trained.count { it.status == VolumeStatus.UNDER } * 100 / trained.size).coerceIn(0, 100)
+
+        // Progressive overload: share of tracked lifts trending up.
+        val scores = runCatching { trainingDNARepository.getProgressionScores().first() }.getOrNull().orEmpty()
+        val overload = if (scores.isEmpty()) 50 else {
+            val rising = scores.count { it.estimatedOneRm30Day >= it.estimatedOneRm90Day && it.estimatedOneRm30Day > 0 }
+            (rising * 100 / scores.size)
+        }
+
+        // Goal adherence: average progress across active goals.
+        val useKg = prefs.useKg.first()
+        val goals = runCatching { goalRepository.getActive().first() }.getOrNull().orEmpty()
+        val goalAdherence = if (goals.isEmpty()) 60 else runCatching {
+            goals.map { goalRepository.forecastFor(it, useKg).progressPercent }.average().toInt()
+        }.getOrNull() ?: 60
+
+        // Consistency: sessions in the last 4 weeks vs the user's typical frequency.
+        val consistency = consistencyScore(sessions, now)
+        // Recovery discipline: not training while very fatigued / honouring rest.
+        val recoveryDiscipline = recoveryDisciplineScore(sessions, now)
+
+        return RepLogScoreEngineCompute(
+            consistency, recovery, overload, volumeQuality, goalAdherence, muscleBalance, recoveryDiscipline
+        )
+    }
+
+    private fun RepLogScoreEngineCompute(
+        consistency: Int, recovery: Int, overload: Int, volumeQuality: Int,
+        goalAdherence: Int, muscleBalance: Int, recoveryDiscipline: Int
+    ) = com.replog.domain.intelligence.RepLogScoreEngine.compute(
+        com.replog.domain.intelligence.RepLogScoreInputs(
+            consistency = consistency, recovery = recovery, progressiveOverload = overload,
+            volumeQuality = volumeQuality, goalAdherence = goalAdherence,
+            muscleBalance = muscleBalance, recoveryDiscipline = recoveryDiscipline
+        )
+    )
+
+    /** Sessions/week over the last 4 weeks scaled to a 0-100 score (3+/wk = 100). */
+    private fun consistencyScore(sessions: List<com.replog.data.model.SessionWithExercises>, now: Long): Int {
+        val fourWeeksAgo = now - 28L * 86_400_000L
+        val recent = sessions.count { it.session.startTime >= fourWeeksAgo }
+        val perWeek = recent / 4.0
+        return ((perWeek / 3.0) * 100).toInt().coerceIn(0, 100)
+    }
+
+    /** Penalise back-to-back sessions hitting the same muscles very hard (overreaching). */
+    private fun recoveryDisciplineScore(sessions: List<com.replog.data.model.SessionWithExercises>, now: Long): Int {
+        val sorted = sessions.sortedBy { it.session.startTime }
+        if (sorted.size < 2) return 80
+        var tooSoon = 0
+        for (i in 1 until sorted.size) {
+            val gapH = (sorted[i].session.startTime - sorted[i - 1].session.startTime) / 3_600_000.0
+            val highRpe = sorted[i - 1].exercises.any { e -> e.sets.any { (it.rpe ?: 0.0) >= 9.0 } }
+            if (gapH < 18 && highRpe) tooSoon++
+        }
+        val ratio = tooSoon.toDouble() / (sorted.size - 1)
+        return (100 - (ratio * 100).toInt()).coerceIn(0, 100)
     }
 
     /** Most common day-of-week for completed sessions (>=4 sessions to be meaningful). */

@@ -41,6 +41,7 @@ fun HomeScreen(
     val coachState by coachViewModel.state.collectAsState()
     val briefing by viewModel.briefing.collectAsState()
     val continueWorkout by viewModel.continueWorkout.collectAsState()
+    val repLogScore by viewModel.repLogScore.collectAsState()
     var showTrainAnywayDialog by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { viewModel.refresh(); viewModel.loadIntelligence(); coachViewModel.loadRecommendation(force = false) }
     LazyColumn(Modifier.fillMaxSize().padding(contentPadding), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -54,6 +55,11 @@ fun HomeScreen(
         // Priority 1: Today's Briefing - the unified intelligence card.
         briefing?.let { b ->
             item { TodaysBriefingCard(b) }
+        }
+
+        // Sprint 8 P5: RepLog Score with explainable component breakdown.
+        repLogScore?.let { s ->
+            item { RepLogScoreCard(s) }
         }
 
         // Coach Dashboard — the unified "Good morning" advisor (recommendation +
@@ -279,8 +285,15 @@ private fun ContinueWorkoutCard(cw: ContinueWorkout, onContinue: () -> Unit) = R
     )
 }
 
+private fun confidenceText(c: com.replog.domain.intelligence.BriefingConfidence): String = when (c) {
+    com.replog.domain.intelligence.BriefingConfidence.HIGH -> "High"
+    com.replog.domain.intelligence.BriefingConfidence.MEDIUM -> "Medium"
+    com.replog.domain.intelligence.BriefingConfidence.LOW -> "Low"
+}
+
 @Composable
 private fun TodaysBriefingCard(b: com.replog.domain.intelligence.TodaysBriefing) = RepLogCard {
+    var showWhy by remember { mutableStateOf(false) }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Default.Insights, null, tint = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.width(12.dp))
@@ -289,24 +302,75 @@ private fun TodaysBriefingCard(b: com.replog.domain.intelligence.TodaysBriefing)
             Text("Recovery $it%", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
         }
     }
-    Spacer(Modifier.height(8.dp))
-    Text(b.recommendation, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-    Spacer(Modifier.height(6.dp))
-    b.reasons.forEach { reason ->
-        Text("• $reason", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Spacer(Modifier.height(10.dp))
+    // P4: conversational, deterministic narrative (one sentence per signal).
+    val narrative = b.narrative.ifEmpty { b.reasons }
+    narrative.forEach { line ->
+        Text(line, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+        Spacer(Modifier.height(2.dp))
     }
-    Spacer(Modifier.height(6.dp))
-    val confidenceLabel = when (b.confidence) {
-        com.replog.domain.intelligence.BriefingConfidence.HIGH -> "High"
-        com.replog.domain.intelligence.BriefingConfidence.MEDIUM -> "Medium"
-        com.replog.domain.intelligence.BriefingConfidence.LOW -> "Low"
+
+    // P3: every recommendation is explainable.
+    if (b.explainSections.isNotEmpty()) {
+        Spacer(Modifier.height(8.dp))
+        TextButton(onClick = { showWhy = !showWhy }, modifier = Modifier.fillMaxWidth()) {
+            Text(if (showWhy) "Hide why" else "Why?", fontWeight = FontWeight.Bold)
+        }
+        if (showWhy) {
+            b.explainSections.forEach { section ->
+                Spacer(Modifier.height(6.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(section.title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    Text("Confidence: ${confidenceText(section.confidence)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                }
+                section.lines.forEach { line ->
+                    Text("• $line", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
     }
-    Text("Confidence: $confidenceLabel", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
     if (b.coachInsights.isNotEmpty()) {
         Spacer(Modifier.height(10.dp))
         Text("Your coach noticed", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
         b.coachInsights.forEach { insight ->
             Text("• ${insight.text}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun RepLogScoreCard(s: com.replog.domain.intelligence.RepLogScoreResult) = RepLogCard {
+    var showBreakdown by remember { mutableStateOf(false) }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Default.Insights, null, tint = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text("RepLog Score", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold)
+            val trend = buildString {
+                s.weeklyTrend?.let { append("Week ${if (it >= 0) "+$it" else "$it"}") }
+                s.monthlyTrend?.let { if (isNotEmpty()) append("  •  "); append("Month ${if (it >= 0) "+$it" else "$it"}") }
+            }
+            if (trend.isNotBlank()) {
+                Text(trend, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Text("${s.score}", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+    }
+    Spacer(Modifier.height(8.dp))
+    LinearProgressIndicator(progress = { s.score / 100f }, modifier = Modifier.fillMaxWidth().height(8.dp))
+    Spacer(Modifier.height(8.dp))
+    TextButton(onClick = { showBreakdown = !showBreakdown }, modifier = Modifier.fillMaxWidth()) {
+        Text(if (showBreakdown) "Hide breakdown" else "How is this calculated?", fontWeight = FontWeight.Bold)
+    }
+    if (showBreakdown) {
+        s.components.forEach { c ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(c.name, style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
+                Text("${c.value}/100 • ${c.weightPercent}%", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+            }
+            Text(c.explanation, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(6.dp))
         }
     }
 }

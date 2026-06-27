@@ -76,6 +76,10 @@ class HomeViewModel @Inject constructor(
     private val _continueWorkout = MutableStateFlow<ContinueWorkout?>(null)
     val continueWorkout: StateFlow<ContinueWorkout?> = _continueWorkout
 
+    // Sprint 8 P5: RepLog Score, cached alongside the briefing.
+    private val _repLogScore = MutableStateFlow<com.replog.domain.intelligence.RepLogScoreResult?>(null)
+    val repLogScore: StateFlow<com.replog.domain.intelligence.RepLogScoreResult?> = _repLogScore
+
     /** Load (or refresh) the briefing + continue-workout card. Cheap to call repeatedly. */
     fun loadIntelligence() = viewModelScope.launch {
         val activeId = prefs.activeSessionId.first()
@@ -94,6 +98,7 @@ class HomeViewModel @Inject constructor(
         val count = repo.getCompletedSessionCount()
         if (count != briefingLoadedForSessionCount || _briefing.value == null) {
             _briefing.value = runCatching { intelligenceRepository.buildBriefing() }.getOrNull()
+            _repLogScore.value = runCatching { intelligenceRepository.buildRepLogScore() }.getOrNull()
             briefingLoadedForSessionCount = count
         }
     }
