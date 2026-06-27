@@ -42,7 +42,19 @@ data class IntelligenceInputs(
     val goalSummary: String? = null,
     val strongestDayOfWeek: String? = null,  // e.g. "Monday"
     val prsAfterRestDays: Int? = null,        // typical rest days before a PR
-    val slowRecoveryAfterHighVolume: Boolean = false
+    val slowRecoveryAfterHighVolume: Boolean = false,
+    val hourOfDay: Int = 9                     // passed in to keep the engine deterministic
+)
+
+/**
+ * One explainability section behind a recommendation (Priority 3). Each maps to
+ * a single source engine and carries its own confidence; only emitted when the
+ * underlying signal exists, so there are never unexplained recommendations.
+ */
+data class ExplainSection(
+    val title: String,        // e.g. "Recovery", "Genome", "Forecast"
+    val lines: List<String>,
+    val confidence: BriefingConfidence
 )
 
 /** The single unified output shown on Home (Priority 1). */
@@ -51,7 +63,11 @@ data class TodaysBriefing(
     val recommendation: String,
     val reasons: List<String>,
     val confidence: BriefingConfidence,
-    val coachInsights: List<CoachInsight>
+    val coachInsights: List<CoachInsight>,
+    /** Priority 4: deterministic conversational briefing, one sentence per signal. */
+    val narrative: List<String> = emptyList(),
+    /** Priority 3: structured "Why?" sections with per-section confidence. */
+    val explainSections: List<ExplainSection> = emptyList()
 )
 
 object IntelligenceEngine {
@@ -83,8 +99,72 @@ object IntelligenceEngine {
             recommendation = recommendation,
             reasons = reasons,
             confidence = confidence,
-            coachInsights = insights
+            coachInsights = insights,
+            narrative = buildNarrative(inputs, recommendation, confidence),
+            explainSections = buildExplainSections(inputs, confidence)
         )
+    }
+
+    /**
+     * Priority 4 - a deterministic conversational briefing. Every sentence is
+     * produced only when its input field exists, so nothing is fabricated. The
+     * same inputs always yield the same text.
+     */
+    private fun buildNarrative(
+        i: IntelligenceInputs,
+        recommendation: String,
+        confidence: BriefingConfidence
+    ): List<String> {
+        val out = mutableListOf<String>()
+        out += "${timeGreeting(i.hourOfDay)}."
+        i.recoveryScore?.let { out += "Recovery is $it%." }
+        if (i.readyMuscleGroups.isNotEmpty()) {
+            out += "Your ${joinHuman(i.readyMuscleGroups.map { it.lowercase() })} ${if (i.readyMuscleGroups.size == 1) "has" else "have"} fully recovered."
+        }
+        if (i.fatiguedMuscleGroups.isNotEmpty()) {
+            out += "${capitalize(joinHuman(i.fatiguedMuscleGroups.map { it.lowercase() }))} recovery remains incomplete."
+        }
+        if (i.isRestRecommended) {
+            out += "Today is a good day to rest or train light."
+        } else {
+            out += "Today is an excellent day for a $recommendation workout."
+        }
+        if (i.underVolumeGroups.isNotEmpty()) {
+            out += "Your ${joinHuman(i.underVolumeGroups.map { it.lowercase() })} volume has been below your optimal range."
+        }
+        i.topForecastLabel?.takeIf { it.isNotBlank() }?.let { out += "$it." }
+        i.goalSummary?.takeIf { it.isNotBlank() }?.let { out += it }
+        out += "Confidence: ${confidenceLabel(confidence)}."
+        return out
+    }
+
+    /** Priority 3 - structured per-engine "Why?" sections, each with confidence. */
+    private fun buildExplainSections(i: IntelligenceInputs, overall: BriefingConfidence): List<ExplainSection> {
+        val out = mutableListOf<ExplainSection>()
+        val recoveryLines = mutableListOf<String>()
+        i.recoveryScore?.let { recoveryLines += "Overall recovery: $it%." }
+        if (i.readyMuscleGroups.isNotEmpty()) recoveryLines += "Recovered: ${joinHuman(i.readyMuscleGroups)}."
+        if (i.fatiguedMuscleGroups.isNotEmpty()) recoveryLines += "Still recovering: ${joinHuman(i.fatiguedMuscleGroups)}."
+        recoveryLines += i.recoveryFactors.take(3)
+        if (recoveryLines.isNotEmpty()) {
+            out += ExplainSection("Recovery", recoveryLines, if (i.recoveryScore != null) BriefingConfidence.HIGH else BriefingConfidence.LOW)
+        }
+        i.genomeBestRepRange?.takeIf { it.isNotBlank() }?.let {
+            out += ExplainSection("Training Genome", listOf("You respond best to $it."), BriefingConfidence.MEDIUM)
+        }
+        if (i.underVolumeGroups.isNotEmpty()) {
+            out += ExplainSection("Weekly Volume", listOf("Below optimal: ${joinHuman(i.underVolumeGroups)}."), BriefingConfidence.MEDIUM)
+        }
+        i.topForecastLabel?.takeIf { it.isNotBlank() }?.let {
+            out += ExplainSection("Progress Forecast", listOf(it), if (i.topForecastConfidenceHigh) BriefingConfidence.HIGH else BriefingConfidence.MEDIUM)
+        }
+        i.goalSummary?.takeIf { it.isNotBlank() }?.let {
+            out += ExplainSection("Goal", listOf(it), BriefingConfidence.MEDIUM)
+        }
+        if (i.neglectedMuscles.isNotEmpty()) {
+            out += ExplainSection("Muscle Gap", listOf("Most neglected: ${joinHuman(i.neglectedMuscles.take(3))}."), BriefingConfidence.MEDIUM)
+        }
+        return out
     }
 
     private fun buildReasons(i: IntelligenceInputs): List<String> {
@@ -153,6 +233,21 @@ object IntelligenceEngine {
         }
         return out
     }
+
+    private fun timeGreeting(hour: Int): String = when (hour) {
+        in 0..11 -> "Good morning"
+        in 12..16 -> "Good afternoon"
+        else -> "Good evening"
+    }
+
+    private fun confidenceLabel(c: BriefingConfidence): String = when (c) {
+        BriefingConfidence.HIGH -> "High"
+        BriefingConfidence.MEDIUM -> "Medium"
+        BriefingConfidence.LOW -> "Low"
+    }
+
+    private fun capitalize(s: String): String =
+        s.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
 
     private fun joinHuman(items: List<String>): String = when (items.size) {
         0 -> ""
