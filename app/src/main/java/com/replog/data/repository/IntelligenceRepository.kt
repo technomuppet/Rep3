@@ -9,6 +9,8 @@ import com.replog.domain.intelligence.TodaysBriefing
 import com.replog.domain.musclegap.MuscleGapAnalyzer
 import com.replog.domain.recommendation.MuscleRecoveryStatus
 import com.replog.domain.recommendation.RecoveryAnalyzer
+import com.replog.domain.recovery.RecoveryCalendar
+import com.replog.domain.recovery.RecoveryCalendarDay
 import com.replog.domain.recovery.RecoveryDashboard
 import com.replog.domain.volume.VolumeLandmarks
 import com.replog.domain.volume.VolumeStatus
@@ -27,6 +29,76 @@ import javax.inject.Singleton
  * so no engine logic is duplicated and the heavy work runs once per request
  * (the ViewModel caches the result). Offline-only: every value comes from Room.
  */
+/** One muscle's recovery state for the Recovery Centre (from RecoveryAnalyzer). */
+data class MuscleRecoveryUi(
+    val muscle: String,
+    val score: Int,                 // 0-100
+    val status: String,             // FRESH / RECOVERED / FATIGUED / VERY_FATIGUED
+    val hoursUntilReady: Int        // estimated hours until ready (0 if ready now)
+)
+
+/** Recovery Centre screen data (Priority 1) - all from RecoveryAnalyzer/RecoveryDashboard/RecoveryCalendar. */
+data class RecoveryCentreData(
+    val hasData: Boolean,
+    val score: Int = 0,
+    val statusLabel: String = "",
+    val directive: String = "",
+    val directiveDetail: String = "",
+    val factors: List<String> = emptyList(),
+    val recovered: List<MuscleRecoveryUi> = emptyList(),
+    val fatigued: List<MuscleRecoveryUi> = emptyList(),
+    val calendar: List<RecoveryCalendarDay> = emptyList(),
+    val todayScore: Int = 0,
+    val tomorrowScore: Int = 0,         // projected
+    val in48hScore: Int = 0,            // projected
+    val estimatedFullRecoveryHours: Int = 0,
+    val suggestedIntensity: String = "",
+    val suggestedDurationMinutes: Int = 0,
+    val suggestedType: String = "",
+    val improvements: List<String> = emptyList(),
+    val warnings: List<String> = emptyList()
+)
+
+/** One muscle group's volume/balance line (from VolumeLandmarks). */
+data class MuscleBalanceRow(
+    val muscleGroup: String,
+    val weeklySets: Int,
+    val optimalLow: Int,
+    val optimalHigh: Int,
+    val status: String,                 // UNDER / IN_RANGE / ABOVE / NONE
+    val severity: Int,                  // 0-100, how far below optimal (gap severity)
+    val recommendedExercises: List<String>
+)
+
+/** Muscle Balance Centre data (Priority 2) - from VolumeLandmarks + MuscleGapAnalyzer + DNA snapshot. */
+data class MuscleBalanceData(
+    val hasData: Boolean,
+    val balanceScore: Int = 0,          // overall balance 0-100
+    val weakest: List<String> = emptyList(),
+    val strongest: List<String> = emptyList(),
+    val rows: List<MuscleBalanceRow> = emptyList(),
+    val estimatedWeeksToBalance: Int = 0
+)
+
+/** One DNA snapshot flattened for evolution timelines (from stored snapshots). */
+data class DnaEvolutionPoint(
+    val generatedAt: Long,
+    val preferredRepRange: String,
+    val workoutDurationMinutes: Int,
+    val recoveryHours: Int,
+    val frequency: String,
+    val volumeTolerance: Int,
+    val monthlyPrCount: Int
+)
+
+/** DNA Evolution data (Priority 3) - built ONLY from stored historical snapshots. */
+data class DnaEvolutionData(
+    val hasData: Boolean,
+    val points: List<DnaEvolutionPoint> = emptyList(),
+    val genomeMaturity: String = "",
+    val consistencyTrend: String = ""
+)
+
 @Singleton
 class IntelligenceRepository @Inject constructor(
     private val workoutRepository: WorkoutRepository,
@@ -201,6 +273,186 @@ class IntelligenceRepository @Inject constructor(
             muscleBalance = muscleBalance, recoveryDiscipline = recoveryDiscipline
         )
     )
+
+    // -------------------------------------------------------------------------
+    // Priority 1: Recovery Centre (reuses RecoveryAnalyzer / Dashboard / Calendar)
+    // -------------------------------------------------------------------------
+    suspend fun buildRecoveryCentre(): RecoveryCentreData {
+        val now = System.currentTimeMillis()
+        val sessions = workoutRepository.getRecentCompletedSessions(60).first()
+        if (sessions.size < 3) return RecoveryCentreData(hasData = false)
+        val bodyweights = bodyweightRepository.getAllBodyweights().first()
+
+        val overall = RecoveryAnalyzer.overallRecovery(sessions, bodyweights, now)
+        val state = RecoveryDashboard.from(overall)
+        val muscle = RecoveryAnalyzer.muscleRecovery(sessions, now)
+
+        fun toUi(mr: com.replog.domain.recommendation.MuscleRecovery): MuscleRecoveryUi {
+            // Reuse the analyzer's score; estimate hours-to-ready from its own score curve.
+            val hours = when {
+                mr.recoveryScore >= 80 -> 0
+                mr.recoveryScore >= 60 -> 18
+                mr.recoveryScore >= 40 -> 36
+                else -> 54
+            }
+            return MuscleRecoveryUi(mr.muscle, mr.recoveryScore.toInt(), mr.status.name, hours)
+        }
+        val recovered = muscle.filter { it.status == MuscleRecoveryStatus.FRESH || it.status == MuscleRecoveryStatus.RECOVERED }
+            .sortedByDescending { it.recoveryScore }.map { toUi(it) }
+        val fatigued = muscle.filter { it.status == MuscleRecoveryStatus.FATIGUED || it.status == MuscleRecoveryStatus.VERY_FATIGUED }
+            .sortedBy { it.recoveryScore }.map { toUi(it) }
+
+        val calendar = RecoveryCalendar.build(
+            sessions.map { c -> c.session.startTime to c.exercises.sumOf { e -> e.sets.sumOf { it.weight * it.reps } } },
+            now, days = 14
+        )
+
+        // Today/tomorrow/48h projection from the analyzer score plus per-muscle readiness.
+        val today = state.score
+        val tomorrow = (today + (100 - today) / 3).coerceIn(0, 100)
+        val in48 = (today + (100 - today) * 2 / 3).coerceIn(0, 100)
+        val fullHours = fatigued.maxOfOrNull { it.hoursUntilReady } ?: 0
+
+        val intensity = when {
+            today >= 80 -> "Heavy"
+            today >= 60 -> "Moderate"
+            today >= 45 -> "Light"
+            else -> "Rest / mobility"
+        }
+        val duration = when {
+            today >= 80 -> 60
+            today >= 60 -> 45
+            today >= 45 -> 30
+            else -> 0
+        }
+        val type = when {
+            recovered.isNotEmpty() -> "${recovered.first().muscle} focus"
+            today < 45 -> "Recovery day"
+            else -> "Balanced session"
+        }
+        val improvements = mutableListOf<String>()
+        if (recovered.isNotEmpty()) improvements += "${recovered.size} muscle group${if (recovered.size == 1) "" else "s"} fully recovered."
+        if (today >= 80) improvements += "Overall recovery is excellent today."
+        val warnings = mutableListOf<String>()
+        if (today < 45) warnings += "Recovery is low - training hard today may set you back."
+        fatigued.firstOrNull()?.let { warnings += "${it.muscle} is still fatigued (${it.hoursUntilReady}h to go)." }
+
+        return RecoveryCentreData(
+            hasData = true, score = state.score, statusLabel = state.statusLabel,
+            directive = state.directive, directiveDetail = state.directiveDetail, factors = state.factors,
+            recovered = recovered, fatigued = fatigued, calendar = calendar,
+            todayScore = today, tomorrowScore = tomorrow, in48hScore = in48,
+            estimatedFullRecoveryHours = fullHours, suggestedIntensity = intensity,
+            suggestedDurationMinutes = duration, suggestedType = type,
+            improvements = improvements, warnings = warnings
+        )
+    }
+
+    // -------------------------------------------------------------------------
+    // Priority 2: Muscle Balance Centre (reuses VolumeLandmarks + MuscleGapAnalyzer)
+    // -------------------------------------------------------------------------
+    suspend fun buildMuscleBalance(): MuscleBalanceData {
+        val now = System.currentTimeMillis()
+        val sessions = workoutRepository.getRecentCompletedSessions(60).first()
+        if (sessions.size < 3) return MuscleBalanceData(hasData = false)
+        val library = exerciseRepository.getAllExercises().first()
+        val landmarks = VolumeLandmarks.analyze(sessions, now, weeks = 1)
+
+        val rows = landmarks.map { lm ->
+            val severity = when (lm.status) {
+                VolumeStatus.UNDER -> (((lm.optimalLow - lm.weeklySets) / lm.optimalLow.coerceAtLeast(1)) * 100).toInt().coerceIn(0, 100)
+                VolumeStatus.NONE -> 100
+                else -> 0
+            }
+            val recs = if (lm.status == VolumeStatus.UNDER || lm.status == VolumeStatus.NONE)
+                MuscleGapAnalyzer.suggestionsFor(lm.muscleGroup, library, limit = 3).map { it.name }
+            else emptyList()
+            MuscleBalanceRow(
+                muscleGroup = lm.muscleGroup, weeklySets = lm.weeklySets.toInt(),
+                optimalLow = lm.optimalLow, optimalHigh = lm.optimalHigh, status = lm.status.name,
+                severity = severity, recommendedExercises = recs
+            )
+        }
+        val trained = landmarks.filter { it.status != VolumeStatus.NONE }
+        val balanceScore = if (trained.isEmpty()) 0
+        else (100 - trained.count { it.status == VolumeStatus.UNDER } * 100 / trained.size).coerceIn(0, 100)
+
+        // Strongest/weakest from the latest DNA snapshot (already computed there).
+        val dna = trainingDNARepository.getLatestDNA().first()
+        val weakest = dna?.weakestMuscles?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() }
+            ?: rows.filter { it.status == "UNDER" || it.status == "NONE" }.map { it.muscleGroup }
+        val strongest = dna?.strongestMuscles?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() } ?: emptyList()
+        // Rough estimate: ~1 week per under-volume group to add the missing sets.
+        val weeksToBalance = rows.count { it.status == "UNDER" || it.status == "NONE" }.coerceAtMost(8)
+
+        return MuscleBalanceData(
+            hasData = true, balanceScore = balanceScore, weakest = weakest.take(5),
+            strongest = strongest.take(5), rows = rows, estimatedWeeksToBalance = weeksToBalance
+        )
+    }
+
+    /** Resolve the recommended exercises for a muscle into a startable Quick Workout-style session via WorkoutStarter is handled in the ViewModel; here we expose the library lookup. */
+    suspend fun startMuscleGapWorkout(muscle: String): Boolean {
+        val library = exerciseRepository.getAllExercises().first()
+        val exercises = MuscleGapAnalyzer.suggestionsFor(muscle, library, limit = 4)
+        if (exercises.isEmpty()) return false
+        val sessionId = workoutRepository.insertSession(
+            com.replog.data.model.WorkoutSession(templateName = "$muscle focus", startTime = System.currentTimeMillis())
+        ).toInt()
+        exercises.forEachIndexed { index, ex ->
+            workoutRepository.insertSessionExercise(
+                com.replog.data.model.SessionExercise(sessionId = sessionId, exerciseId = ex.id, orderIndex = index, notes = "")
+            )
+        }
+        prefs.setActiveSessionId(sessionId)
+        return true
+    }
+
+    suspend fun addMuscleGapToTemplate(muscle: String): String? {
+        val library = exerciseRepository.getAllExercises().first()
+        val exercises = MuscleGapAnalyzer.suggestionsFor(muscle, library, limit = 4)
+        if (exercises.isEmpty()) return null
+        val name = "$muscle focus"
+        val templateId = workoutRepository.insertTemplate(
+            com.replog.data.model.WorkoutTemplate(name = name, isBuiltIn = false)
+        ).toInt()
+        exercises.forEachIndexed { index, ex ->
+            workoutRepository.insertTemplateExercise(
+                com.replog.data.model.TemplateExercise(templateId = templateId, exerciseId = ex.id, orderIndex = index, defaultSets = 3, targetReps = 10)
+            )
+        }
+        return name
+    }
+
+    // -------------------------------------------------------------------------
+    // Priority 3: DNA Evolution (built ONLY from stored historical snapshots)
+    // -------------------------------------------------------------------------
+    suspend fun buildDnaEvolution(): DnaEvolutionData {
+        val snapshots = trainingDNARepository.getHistoricalDNA().first().sortedBy { it.generatedAt }
+        if (snapshots.isEmpty()) return DnaEvolutionData(hasData = false)
+        val points = snapshots.map { s ->
+            DnaEvolutionPoint(
+                generatedAt = s.generatedAt,
+                preferredRepRange = s.preferredRepRange,
+                workoutDurationMinutes = s.averageWorkoutDuration.toInt(),
+                recoveryHours = s.averageRecoveryHours.toInt(),
+                frequency = s.preferredFrequency,
+                volumeTolerance = s.volumeToleranceScore.toInt(),
+                monthlyPrCount = s.monthlyPRCount
+            )
+        }
+        val maturity = when {
+            snapshots.size >= 6 -> "Mature"
+            snapshots.size >= 3 -> "Developing"
+            else -> "Emerging"
+        }
+        val consistencyTrend = if (points.size >= 2) {
+            val first = points.first().workoutDurationMinutes
+            val last = points.last().workoutDurationMinutes
+            if (last >= first) "Stable or improving" else "Variable"
+        } else "Not enough history"
+        return DnaEvolutionData(hasData = true, points = points, genomeMaturity = maturity, consistencyTrend = consistencyTrend)
+    }
 
     /** Sessions/week over the last 4 weeks scaled to a 0-100 score (3+/wk = 100). */
     private fun consistencyScore(sessions: List<com.replog.data.model.SessionWithExercises>, now: Long): Int {

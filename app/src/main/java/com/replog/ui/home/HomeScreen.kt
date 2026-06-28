@@ -34,6 +34,9 @@ fun HomeScreen(
     onOpenGoals: () -> Unit = {},
     onOpenTrainingDna: () -> Unit = {},
     onOpenQuickWorkouts: () -> Unit = {},
+    onOpenRecoveryCentre: () -> Unit = {},
+    onOpenMuscleBalance: () -> Unit = {},
+    onOpenDnaEvolution: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
     coachViewModel: com.replog.ui.coach.CoachViewModel = hiltViewModel()
 ) {
@@ -54,12 +57,21 @@ fun HomeScreen(
 
         // Priority 1: Today's Briefing - the unified intelligence card.
         briefing?.let { b ->
-            item { TodaysBriefingCard(b) }
+            item { TodaysBriefingCard(b, onOpenRecovery = onOpenRecoveryCentre) }
         }
 
         // Sprint 8 P5: RepLog Score with explainable component breakdown.
         repLogScore?.let { s ->
             item { RepLogScoreCard(s) }
+        }
+
+        // Sprint 9: intelligence hubs (Recovery Centre / Muscle Balance / DNA Evolution).
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                IntelligenceNavCard("Recovery", Modifier.weight(1f), onOpenRecoveryCentre)
+                IntelligenceNavCard("Muscle Balance", Modifier.weight(1f), onOpenMuscleBalance)
+                IntelligenceNavCard("DNA", Modifier.weight(1f), onOpenDnaEvolution)
+            }
         }
 
         // Coach Dashboard — the unified "Good morning" advisor (recommendation +
@@ -292,7 +304,17 @@ private fun confidenceText(c: com.replog.domain.intelligence.BriefingConfidence)
 }
 
 @Composable
-private fun TodaysBriefingCard(b: com.replog.domain.intelligence.TodaysBriefing) = RepLogCard {
+private fun IntelligenceNavCard(label: String, modifier: Modifier, onClick: () -> Unit) = RepLogCard(modifier, onClick = onClick) {
+    Icon(Icons.Default.Insights, null, tint = MaterialTheme.colorScheme.primary)
+    Spacer(Modifier.height(6.dp))
+    Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+}
+
+@Composable
+private fun TodaysBriefingCard(
+    b: com.replog.domain.intelligence.TodaysBriefing,
+    onOpenRecovery: () -> Unit
+) = RepLogCard(onClick = onOpenRecovery) {
     var showWhy by remember { mutableStateOf(false) }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Default.Insights, null, tint = MaterialTheme.colorScheme.primary)

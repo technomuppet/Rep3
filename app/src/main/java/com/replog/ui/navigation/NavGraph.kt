@@ -56,6 +56,9 @@ sealed class RepLogRoute(val route: String, val label: String, val icon: ImageVe
     data object CoachHistory : RepLogRoute("coach_history", "Coach History", Icons.Default.History)
     data object Goals : RepLogRoute("goals", "Goals", Icons.Default.Flag)
     data object QuickWorkouts : RepLogRoute("quick_workouts", "Quick Workouts", Icons.Default.FitnessCenter)
+    data object RecoveryCentre : RepLogRoute("recovery_centre", "Recovery Centre", Icons.Default.ShowChart)
+    data object MuscleBalance : RepLogRoute("muscle_balance", "Muscle Balance", Icons.Default.ShowChart)
+    data object DnaEvolution : RepLogRoute("dna_evolution", "DNA Evolution", Icons.Default.ShowChart)
 }
 
 /** Bottom-navigation tabs, in order. */
@@ -76,7 +79,10 @@ private val secondaryTitles = mapOf(
     RepLogRoute.TrainingDna.route to "Training DNA",
     RepLogRoute.CoachHistory.route to "Coach History",
     RepLogRoute.Goals.route to "Goals",
-    RepLogRoute.QuickWorkouts.route to "Quick Workouts"
+    RepLogRoute.QuickWorkouts.route to "Quick Workouts",
+    RepLogRoute.RecoveryCentre.route to "Recovery Centre",
+    RepLogRoute.MuscleBalance.route to "Muscle Balance",
+    RepLogRoute.DnaEvolution.route to "DNA Evolution"
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -154,11 +160,14 @@ fun RepLogNavGraph(
                         }
                     },
                     // Secondary detail targets just push one entry (back arrow returns).
-                    onViewRecoveryGuidance = { openDetail(RepLogRoute.TrainingDna.route) },
+                    onViewRecoveryGuidance = { openDetail(RepLogRoute.RecoveryCentre.route) },
                     onOpenCoachHistory = { openDetail(RepLogRoute.CoachHistory.route) },
                     onOpenGoals = { openDetail(RepLogRoute.Goals.route) },
                     onOpenTrainingDna = { openDetail(RepLogRoute.TrainingDna.route) },
-                    onOpenQuickWorkouts = { openDetail(RepLogRoute.QuickWorkouts.route) }
+                    onOpenQuickWorkouts = { openDetail(RepLogRoute.QuickWorkouts.route) },
+                    onOpenRecoveryCentre = { openDetail(RepLogRoute.RecoveryCentre.route) },
+                    onOpenMuscleBalance = { openDetail(RepLogRoute.MuscleBalance.route) },
+                    onOpenDnaEvolution = { openDetail(RepLogRoute.DnaEvolution.route) }
                 )
             }
             composable(RepLogRoute.QuickWorkouts.route) {
@@ -168,6 +177,18 @@ fun RepLogNavGraph(
                     // Training tab, which resumes it for logging.
                     onWorkoutStarted = { switchTab(RepLogRoute.Workout.route) }
                 )
+            }
+            composable(RepLogRoute.RecoveryCentre.route) {
+                com.replog.ui.intelligence.RecoveryCentreScreen(contentPadding = padding)
+            }
+            composable(RepLogRoute.MuscleBalance.route) {
+                com.replog.ui.intelligence.MuscleBalanceScreen(
+                    contentPadding = padding,
+                    onWorkoutStarted = { switchTab(RepLogRoute.Workout.route) }
+                )
+            }
+            composable(RepLogRoute.DnaEvolution.route) {
+                com.replog.ui.intelligence.DnaEvolutionScreen(contentPadding = padding)
             }
             // Training tab: the plain Workout destination (bottom-bar / Home button).
             composable(RepLogRoute.Workout.route) {
