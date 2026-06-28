@@ -181,7 +181,7 @@ private fun MuscleRow(m: MuscleRecoveryUi, ready: Boolean) = RepLogCard {
 @Composable
 private fun CalendarDot(day: RecoveryCalendarDay) {
     val c = when (day.state) {
-        RecoveryDay.READY -> Color(0xFF2E7D32)
+        RecoveryDay.READY -> com.replog.ui.theme.RepLogSuccess
         RecoveryDay.CAUTION -> MaterialTheme.colorScheme.tertiary
         RecoveryDay.RECOVERING -> MaterialTheme.colorScheme.error
         RecoveryDay.REST_NO_DATA -> MaterialTheme.colorScheme.surfaceVariant
@@ -194,7 +194,7 @@ private fun CalendarDot(day: RecoveryCalendarDay) {
 
 @Composable
 private fun recoveryColor(score: Int): Color = when {
-    score >= 80 -> Color(0xFF2E7D32)
+    score >= 80 -> com.replog.ui.theme.RepLogSuccess
     score >= 60 -> MaterialTheme.colorScheme.primary
     score >= 45 -> MaterialTheme.colorScheme.tertiary
     else -> MaterialTheme.colorScheme.error

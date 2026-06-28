@@ -171,7 +171,7 @@ private fun BriefingLine(icon: ImageVector, text: String) {
 
 @Composable
 private fun recoveryColor(score: Int): Color = when {
-    score >= 80 -> Color(0xFF2E7D32)
+    score >= 80 -> com.replog.ui.theme.RepLogSuccess
     score >= 60 -> MaterialTheme.colorScheme.primary
     score >= 40 -> MaterialTheme.colorScheme.tertiary
     else -> MaterialTheme.colorScheme.error

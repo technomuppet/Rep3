@@ -106,7 +106,7 @@ private fun CoachHistoryCard(entry: RecommendationHistory) = RepLogCard {
 @Composable
 private fun OutcomeBadge(outcome: String?) {
     val (icon, tint) = when (outcome) {
-        "Completed" -> Icons.Default.CheckCircle to Color(0xFF2E7D32)
+        "Completed" -> Icons.Default.CheckCircle to com.replog.ui.theme.RepLogSuccess
         "Accepted" -> Icons.Default.HourglassEmpty to MaterialTheme.colorScheme.primary
         "Rejected" -> Icons.Default.Cancel to MaterialTheme.colorScheme.error
         else -> Icons.Default.HourglassEmpty to MaterialTheme.colorScheme.onSurfaceVariant
@@ -118,7 +118,7 @@ private fun OutcomeBadge(outcome: String?) {
 
 @Composable
 private fun outcomeColor(outcome: String?): Color = when (outcome) {
-    "Completed" -> Color(0xFF2E7D32)
+    "Completed" -> com.replog.ui.theme.RepLogSuccess
     "Accepted" -> MaterialTheme.colorScheme.primary
     "Rejected" -> MaterialTheme.colorScheme.error
     else -> MaterialTheme.colorScheme.onSurfaceVariant

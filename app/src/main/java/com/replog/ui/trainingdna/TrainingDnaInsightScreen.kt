@@ -433,7 +433,7 @@ private fun MuscleGapCard(
 @Composable
 private fun VolumeLandmarkCard(lm: com.replog.domain.volume.VolumeLandmark) = RepLogCard {
     val (statusColor, statusText) = when (lm.status) {
-        com.replog.domain.volume.VolumeStatus.IN_RANGE -> androidx.compose.ui.graphics.Color(0xFF2E7D32) to "In Range"
+        com.replog.domain.volume.VolumeStatus.IN_RANGE -> com.replog.ui.theme.RepLogSuccess to "In Range"
         com.replog.domain.volume.VolumeStatus.UNDER -> MaterialTheme.colorScheme.tertiary to "Below optimal"
         com.replog.domain.volume.VolumeStatus.ABOVE -> MaterialTheme.colorScheme.error to "Above optimal"
         com.replog.domain.volume.VolumeStatus.NONE -> MaterialTheme.colorScheme.onSurfaceVariant to "Not trained"
@@ -461,8 +461,8 @@ private fun RecoveryCalendarCard(days: List<com.replog.domain.recovery.RecoveryC
     Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
         days.takeLast(14).forEach { d ->
             val c = when (d.state) {
-                com.replog.domain.recovery.RecoveryDay.READY -> androidx.compose.ui.graphics.Color(0xFF2E7D32)
-                com.replog.domain.recovery.RecoveryDay.CAUTION -> androidx.compose.ui.graphics.Color(0xFFF9A825)
+                com.replog.domain.recovery.RecoveryDay.READY -> com.replog.ui.theme.RepLogSuccess
+                com.replog.domain.recovery.RecoveryDay.CAUTION -> com.replog.ui.theme.RepLogWarning
                 com.replog.domain.recovery.RecoveryDay.RECOVERING -> MaterialTheme.colorScheme.error
                 com.replog.domain.recovery.RecoveryDay.REST_NO_DATA -> MaterialTheme.colorScheme.surfaceVariant
             }
@@ -496,8 +496,8 @@ private fun VolumeHeatmapCard(landmarks: List<com.replog.domain.volume.VolumeLan
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         landmarks.forEach { lm ->
             val c = when (lm.status) {
-                com.replog.domain.volume.VolumeStatus.IN_RANGE -> androidx.compose.ui.graphics.Color(0xFF2E7D32)
-                com.replog.domain.volume.VolumeStatus.UNDER -> androidx.compose.ui.graphics.Color(0xFFF9A825)
+                com.replog.domain.volume.VolumeStatus.IN_RANGE -> com.replog.ui.theme.RepLogSuccess
+                com.replog.domain.volume.VolumeStatus.UNDER -> com.replog.ui.theme.RepLogWarning
                 com.replog.domain.volume.VolumeStatus.ABOVE -> MaterialTheme.colorScheme.error
                 com.replog.domain.volume.VolumeStatus.NONE -> MaterialTheme.colorScheme.surfaceVariant
             }
@@ -521,7 +521,7 @@ private fun TrainingGenomeCard(genome: com.replog.domain.genome.TrainingGenome) 
         val conf = genome.traits.firstOrNull()?.confidence
         if (conf != null) {
             val (label, color) = when (conf) {
-                com.replog.domain.genome.GenomeConfidence.STRONG -> "Strong" to androidx.compose.ui.graphics.Color(0xFF2E7D32)
+                com.replog.domain.genome.GenomeConfidence.STRONG -> "Strong" to com.replog.ui.theme.RepLogSuccess
                 com.replog.domain.genome.GenomeConfidence.MODERATE -> "Building" to MaterialTheme.colorScheme.primary
                 com.replog.domain.genome.GenomeConfidence.EMERGING -> "Emerging" to MaterialTheme.colorScheme.tertiary
             }

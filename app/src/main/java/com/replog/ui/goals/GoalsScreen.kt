@@ -97,8 +97,8 @@ fun GoalsScreen(
 private fun GoalCard(gwf: GoalWithForecast, useKg: Boolean, onDelete: () -> Unit) = RepLogCard {
     val f = gwf.forecast
     val statusColor = when (f.status) {
-        GoalStatus.ACHIEVED -> Color(0xFF2E7D32)
-        GoalStatus.AHEAD -> Color(0xFF2E7D32)
+        GoalStatus.ACHIEVED -> com.replog.ui.theme.RepLogSuccess
+        GoalStatus.AHEAD -> com.replog.ui.theme.RepLogSuccess
         GoalStatus.ON_TRACK -> MaterialTheme.colorScheme.primary
         GoalStatus.STALLED -> MaterialTheme.colorScheme.error
         GoalStatus.NO_DATA -> MaterialTheme.colorScheme.onSurfaceVariant

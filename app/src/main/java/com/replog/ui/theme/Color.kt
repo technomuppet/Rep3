@@ -16,3 +16,10 @@ val RepLogLightBackground = Color(0xFFF8FAFC)
 val RepLogLightSurface = Color(0xFFFFFFFF)
 val RepLogLightTextPrimary = Color(0xFF0F172A)
 val RepLogLightTextSecondary = Color(0xFF475569)
+
+// Semantic status colours (Sprint 11 P4/P5): one source of truth for "good" /
+// "caution" states, replacing the green/amber literals that were duplicated
+// across the recovery, goals, coach and DNA screens. These have sufficient
+// contrast in both light and dark themes.
+val RepLogSuccess = Color(0xFF2E9E4F)
+val RepLogWarning = Color(0xFFF9A825)
