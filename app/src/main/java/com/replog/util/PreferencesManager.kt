@@ -10,6 +10,8 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.replog.util.legal.LegalAcceptance
+import com.replog.util.profile.UserProfile
 import com.replog.util.timer.RestPresets
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -59,6 +61,24 @@ class PreferencesManager @Inject constructor(@ApplicationContext context: Contex
         val EXPORT_FOLDER_LABEL = stringPreferencesKey("export_folder_label")
         // Sprint 5 P1: which field to auto-focus after completing a set ("weight" | "reps").
         val AUTO_FOCUS_FIELD = stringPreferencesKey("auto_focus_field")
+
+        // Sprint 12: user identity (profile). Display name is the only required field.
+        val PROFILE_DISPLAY_NAME = stringPreferencesKey("profile_display_name")
+        val PROFILE_DOB_EPOCH_DAY = longPreferencesKey("profile_dob_epoch_day")
+        val PROFILE_HEIGHT_CM = doublePreferencesKey("profile_height_cm")
+        val PROFILE_WEIGHT_KG = doublePreferencesKey("profile_weight_kg")
+
+        // Sprint 12: versioned legal acceptance (latest record).
+        val LEGAL_ACCEPTED_SIGNATURE = stringPreferencesKey("legal_accepted_signature")
+        val LEGAL_DISCLAIMER_VERSION = stringPreferencesKey("legal_disclaimer_version")
+        val LEGAL_TERMS_VERSION = stringPreferencesKey("legal_terms_version")
+        val LEGAL_PRIVACY_VERSION = stringPreferencesKey("legal_privacy_version")
+        val LEGAL_ACCEPTED_AT = longPreferencesKey("legal_accepted_at")
+        val LEGAL_ACCEPTED_APP_VERSION = stringPreferencesKey("legal_accepted_app_version")
+        val LEGAL_ACCEPTED_NAME = stringPreferencesKey("legal_accepted_name")
+        val LEGAL_COMPLETED = booleanPreferencesKey("legal_completed")
+        // Append-only acceptance history, one record per line; fields tab-separated.
+        val LEGAL_HISTORY = stringPreferencesKey("legal_acceptance_history")
     }
 
     val useKg: Flow<Boolean> = store.data.map { it[Keys.USE_KG] ?: true }
@@ -205,5 +225,109 @@ class PreferencesManager @Inject constructor(@ApplicationContext context: Contex
     }
     suspend fun trackProgressionAccepted() {
         store.edit { it[Keys.PROG_ACCEPTED_COUNT] = (it[Keys.PROG_ACCEPTED_COUNT] ?: 0) + 1 }
+    }
+
+    // --- Sprint 12: user profile (DataStore; never Room) ---
+    /** Emits null until a non-blank display name has been stored. */
+    val userProfile: Flow<UserProfile?> = store.data.map { p ->
+        val name = p[Keys.PROFILE_DISPLAY_NAME]?.takeIf { it.isNotBlank() } ?: return@map null
+        UserProfile(
+            displayName = name,
+            dateOfBirthEpochDay = p[Keys.PROFILE_DOB_EPOCH_DAY]?.takeIf { it > 0 },
+            heightCm = p[Keys.PROFILE_HEIGHT_CM]?.takeIf { it > 0.0 },
+            weightKg = p[Keys.PROFILE_WEIGHT_KG]?.takeIf { it > 0.0 },
+            useKg = p[Keys.USE_KG] ?: true,
+            experienceLevel = p[Keys.PROFILE_LEVEL],
+            primaryGoal = p[Keys.PROFILE_GOAL],
+            weeklyFrequency = p[Keys.PROFILE_DAYS],
+            equipment = p[Keys.PROFILE_EQUIPMENT]
+        )
+    }
+
+    /** Convenience: the display name for greetings (null before onboarding). */
+    val displayName: Flow<String?> = store.data.map { it[Keys.PROFILE_DISPLAY_NAME]?.takeIf { n -> n.isNotBlank() } }
+
+    /** Whether a usable profile (non-blank display name) exists. */
+    val hasProfile: Flow<Boolean> = store.data.map { !it[Keys.PROFILE_DISPLAY_NAME].isNullOrBlank() }
+
+    /** Persist the whole profile atomically. Units + training prefs reuse existing keys. */
+    suspend fun setUserProfile(profile: UserProfile) {
+        store.edit { p ->
+            p[Keys.PROFILE_DISPLAY_NAME] = profile.displayName.trim()
+            if (profile.dateOfBirthEpochDay != null && profile.dateOfBirthEpochDay > 0) p[Keys.PROFILE_DOB_EPOCH_DAY] = profile.dateOfBirthEpochDay else p.remove(Keys.PROFILE_DOB_EPOCH_DAY)
+            if (profile.heightCm != null && profile.heightCm > 0.0) p[Keys.PROFILE_HEIGHT_CM] = profile.heightCm else p.remove(Keys.PROFILE_HEIGHT_CM)
+            if (profile.weightKg != null && profile.weightKg > 0.0) p[Keys.PROFILE_WEIGHT_KG] = profile.weightKg else p.remove(Keys.PROFILE_WEIGHT_KG)
+            p[Keys.USE_KG] = profile.useKg
+            profile.experienceLevel?.let { p[Keys.PROFILE_LEVEL] = it }
+            profile.primaryGoal?.let { p[Keys.PROFILE_GOAL] = it }
+            profile.weeklyFrequency?.let { p[Keys.PROFILE_DAYS] = it }
+            profile.equipment?.let { p[Keys.PROFILE_EQUIPMENT] = it }
+        }
+    }
+
+    // --- Sprint 12: versioned legal acceptance (DataStore) ---
+    val legalAcceptance: Flow<LegalAcceptance?> = store.data.map { p ->
+        val sig = p[Keys.LEGAL_ACCEPTED_SIGNATURE]?.takeIf { it.isNotBlank() } ?: return@map null
+        LegalAcceptance(
+            acceptedSignature = sig,
+            disclaimerVersion = p[Keys.LEGAL_DISCLAIMER_VERSION].orEmpty(),
+            termsVersion = p[Keys.LEGAL_TERMS_VERSION].orEmpty(),
+            privacyVersion = p[Keys.LEGAL_PRIVACY_VERSION].orEmpty(),
+            acceptedAtEpochMillis = p[Keys.LEGAL_ACCEPTED_AT] ?: 0L,
+            appVersion = p[Keys.LEGAL_ACCEPTED_APP_VERSION].orEmpty(),
+            displayName = p[Keys.LEGAL_ACCEPTED_NAME].orEmpty(),
+            completed = p[Keys.LEGAL_COMPLETED] ?: false
+        )
+    }
+
+    /** Full acceptance history, newest first. Stored line-delimited, tab-separated. */
+    val legalAcceptanceHistory: Flow<List<LegalAcceptance>> = store.data.map { p ->
+        decodeLegalHistory(p[Keys.LEGAL_HISTORY].orEmpty())
+    }
+
+    /** Record a legal acceptance: writes the latest record and appends to history. */
+    suspend fun recordLegalAcceptance(record: LegalAcceptance) {
+        store.edit { p ->
+            p[Keys.LEGAL_ACCEPTED_SIGNATURE] = record.acceptedSignature
+            p[Keys.LEGAL_DISCLAIMER_VERSION] = record.disclaimerVersion
+            p[Keys.LEGAL_TERMS_VERSION] = record.termsVersion
+            p[Keys.LEGAL_PRIVACY_VERSION] = record.privacyVersion
+            p[Keys.LEGAL_ACCEPTED_AT] = record.acceptedAtEpochMillis
+            p[Keys.LEGAL_ACCEPTED_APP_VERSION] = record.appVersion
+            p[Keys.LEGAL_ACCEPTED_NAME] = record.displayName
+            p[Keys.LEGAL_COMPLETED] = record.completed
+            val existing = decodeLegalHistory(p[Keys.LEGAL_HISTORY].orEmpty())
+            val updated = (listOf(record) + existing).take(50)
+            p[Keys.LEGAL_HISTORY] = encodeLegalHistory(updated)
+        }
+    }
+
+    private fun encodeLegalHistory(items: List<LegalAcceptance>): String =
+        items.joinToString("\n") { r ->
+            listOf(
+                r.acceptedSignature, r.disclaimerVersion, r.termsVersion, r.privacyVersion,
+                r.acceptedAtEpochMillis.toString(), r.appVersion,
+                r.displayName.replace("\t", " ").replace("\n", " "), r.completed.toString()
+            ).joinToString("\t")
+        }
+
+    private fun decodeLegalHistory(raw: String): List<LegalAcceptance> {
+        if (raw.isBlank()) return emptyList()
+        return raw.split("\n").mapNotNull { line ->
+            val f = line.split("\t")
+            if (f.size < 8) return@mapNotNull null
+            runCatching {
+                LegalAcceptance(
+                    acceptedSignature = f[0],
+                    disclaimerVersion = f[1],
+                    termsVersion = f[2],
+                    privacyVersion = f[3],
+                    acceptedAtEpochMillis = f[4].toLongOrNull() ?: 0L,
+                    appVersion = f[5],
+                    displayName = f[6],
+                    completed = f[7].toBooleanStrictOrNull() ?: false
+                )
+            }.getOrNull()
+        }
     }
 }
