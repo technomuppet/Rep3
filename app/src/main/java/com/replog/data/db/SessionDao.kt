@@ -44,6 +44,7 @@ interface SessionDao {
     @Query("DELETE FROM session_exercises WHERE id = :id") suspend fun deleteSessionExercise(id: Int)
     @Query("SELECT * FROM workout_sessions ORDER BY startTime DESC LIMIT 1") suspend fun getLastSession(): WorkoutSession?
     @Query("SELECT COUNT(*) FROM workout_sessions WHERE endTime IS NOT NULL") suspend fun getCompletedSessionCount(): Int
+    @Query("SELECT COUNT(*) FROM workout_sessions WHERE endTime IS NOT NULL") fun getCompletedSessionCountFlow(): kotlinx.coroutines.flow.Flow<Int>
     @Query("SELECT COALESCE(SUM(set_logs.weight * set_logs.reps), 0) FROM set_logs INNER JOIN session_exercises ON set_logs.sessionExerciseId = session_exercises.id INNER JOIN workout_sessions ON session_exercises.sessionId = workout_sessions.id WHERE workout_sessions.endTime IS NOT NULL") suspend fun getTotalVolume(): Double
     @Query("UPDATE session_exercises SET orderIndex = :orderIndex WHERE id = :id")
     suspend fun updateSessionExerciseOrder(id: Int, orderIndex: Int)

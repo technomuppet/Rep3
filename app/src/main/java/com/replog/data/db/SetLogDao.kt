@@ -6,12 +6,31 @@ import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Update
 import com.replog.data.model.ExerciseSetHistory
+import com.replog.data.model.ProgressTotalsRow
 import com.replog.data.model.SetLog
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface SetLogDao {
     @Insert suspend fun insertSet(setLog: SetLog): Long
+
+    // Sprint 10 P1: all-time totals aggregated in SQL over completed sessions'
+    // sets. Exact and cheap at any history size; reactive so the Progress
+    // headline updates on every logged set without loading the full graph.
+    @Query(
+        """
+        SELECT
+            COUNT(*) AS totalSets,
+            COALESCE(SUM(sl.reps), 0) AS totalReps,
+            COALESCE(SUM(sl.weight * sl.reps), 0) AS totalVolume,
+            COALESCE(SUM(CASE WHEN sl.isPR = 1 THEN 1 ELSE 0 END), 0) AS totalPrs
+        FROM set_logs sl
+        INNER JOIN session_exercises se ON sl.sessionExerciseId = se.id
+        INNER JOIN workout_sessions ws ON se.sessionId = ws.id
+        WHERE ws.endTime IS NOT NULL
+        """
+    )
+    fun getProgressTotals(): Flow<ProgressTotalsRow>
     @Update suspend fun updateSet(setLog: SetLog)
     @Delete suspend fun deleteSet(setLog: SetLog)
 

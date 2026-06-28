@@ -2,8 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- Rest timer is a brief, user-initiated countdown -> shortService is the
+         Play-compliant type (no media playback). -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SHORT_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- Legacy public-Downloads export fallback on API 26-28 only; API 29+ uses MediaStore without permission. -->
@@ -38,6 +39,6 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
-        <service android:name=".ui.workout.RestTimerService" android:exported="false" android:foregroundServiceType="mediaPlayback" />
+        <service android:name=".ui.workout.RestTimerService" android:exported="false" android:foregroundServiceType="shortService" />
     </application>
 </manifest>

@@ -42,6 +42,7 @@ import com.replog.ui.components.EmptyState
 import com.replog.ui.components.LoadingState
 import com.replog.ui.components.PRBadge
 import com.replog.ui.components.RepLogCard
+import com.replog.ui.components.SecondaryButton
 import com.replog.ui.components.StatCard
 import com.replog.ui.components.formatWeight
 import java.text.SimpleDateFormat
@@ -91,6 +92,13 @@ fun HistoryScreen(
                 }
                 items(sessions, key = { it.session.id }) { session ->
                     SessionHistoryCard(session) { pendingDelete = session }
+                }
+            }
+
+            // P2: incremental loading - grow the window instead of loading everything.
+            if (state.canLoadMore) {
+                item {
+                    SecondaryButton("Load more", onClick = { viewModel.loadMore() })
                 }
             }
         }

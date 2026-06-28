@@ -46,6 +46,9 @@ class WorkoutRepository @Inject constructor(
     suspend fun updateSessionExercise(sessionExercise: SessionExercise) = sessionDao.updateSessionExercise(sessionExercise)
     suspend fun deleteSessionExercise(id: Int) = sessionDao.deleteSessionExercise(id)
     suspend fun getCompletedSessionCount(): Int = sessionDao.getCompletedSessionCount()
+    /** Sprint 10 P1: reactive aggregates so analytics screens never load the full graph. */
+    fun getCompletedSessionCountFlow(): Flow<Int> = sessionDao.getCompletedSessionCountFlow()
+    fun getProgressTotals(): Flow<com.replog.data.model.ProgressTotalsRow> = setLogDao.getProgressTotals()
     suspend fun getTotalVolume(): Double = sessionDao.getTotalVolume()
     
     suspend fun reorderSessionExercises(sessionId: Int, orderedIds: List<Int>) {

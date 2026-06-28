@@ -75,13 +75,17 @@ class TrainingDnaViewModel @Inject constructor(
         trainingDNARepository.getPlateauEvents(),
         trainingDNARepository.getProgressionScores(),
         exerciseRepository.getAllExercises(),
-        combine(workoutRepository.getAllSessions(), bodyweightRepository.getAllBodyweights()) { s, b -> s to b }
+        // Sprint 10 P1: bounded recent window - recovery, calendar and genome all
+        // operate on recent training, so this preserves identical behaviour while
+        // never loading the full history reactively.
+        combine(workoutRepository.getRecentCompletedSessions(200), bodyweightRepository.getAllBodyweights()) { s, b -> s to b }
     ) { snapshot, plateaus, scores, exercises, sessionsAndBw ->
         val (sessions, bodyweights) = sessionsAndBw
         val now = System.currentTimeMillis()
 
         // Recovery dashboard (#13) from the existing analyzer.
-        val completed = sessions.filter { it.session.endTime != null }
+        // (Sessions are already completed-only from the bounded query.)
+        val completed = sessions
         val recovery = RecoveryDashboard.from(
             RecoveryAnalyzer.overallRecovery(completed, bodyweights, now)
         )

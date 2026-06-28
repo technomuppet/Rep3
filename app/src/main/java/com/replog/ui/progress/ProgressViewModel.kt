@@ -13,6 +13,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.Calendar
@@ -125,12 +126,27 @@ class ProgressViewModel @Inject constructor(
     private val preferencesManager: PreferencesManager
 ) : ViewModel() {
     val uiState: StateFlow<ProgressUiState> = combine(
-        workoutRepository.getAllSessions(),
-        bodyweightRepository.getAllBodyweights(),
-        preferencesManager.useKg,
-        preferencesManager.bodyweightGoal
-    ) { sessions, bodyweights, useKg, goal ->
-        buildProgressState(sessions.filter { it.session.endTime != null }, bodyweights, useKg, goal)
+        listOf(
+            // Sprint 10 P1: bounded recent window for the deep analytics (rankings,
+            // forecasts, recovery, plateaus) - never the full history.
+            workoutRepository.getRecentCompletedSessions(RECENT_WINDOW),
+            bodyweightRepository.getAllBodyweights(),
+            preferencesManager.useKg.map { it as Any? },
+            preferencesManager.bodyweightGoal.map { it as Any? },
+            // All-time headline totals from SQL aggregates (exact at any size).
+            workoutRepository.getProgressTotals(),
+            workoutRepository.getCompletedSessionCountFlow()
+        )
+    ) { values ->
+        @Suppress("UNCHECKED_CAST")
+        val sessions = values[0] as List<SessionWithExercises>
+        @Suppress("UNCHECKED_CAST")
+        val bodyweights = values[1] as List<BodyweightLog>
+        val useKg = values[2] as Boolean
+        val goal = values[3] as Double?
+        val totals = values[4] as com.replog.data.model.ProgressTotalsRow
+        val completedCount = values[5] as Int
+        buildProgressState(sessions, bodyweights, useKg, goal, totals, completedCount)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ProgressUiState())
 
     fun addBodyweight(weight: Double, note: String? = null) = viewModelScope.launch {
@@ -145,14 +161,17 @@ class ProgressViewModel @Inject constructor(
         sessions: List<SessionWithExercises>,
         bodyweights: List<BodyweightLog>,
         useKg: Boolean,
-        goal: Double?
+        goal: Double?,
+        totals: com.replog.data.model.ProgressTotalsRow,
+        completedCount: Int
     ): ProgressUiState {
         val allEntries = sessions.flatMap { session -> session.exercises }
-        val allSets = allEntries.flatMap { it.sets }
-        val totalVolume = allSets.sumOf { it.weight * it.reps }
-        val totalSets = allSets.size
-        val totalReps = allSets.sumOf { it.reps }
-        val totalPRs = allSets.count { it.isPR }
+        // All-time headline totals come from SQL aggregates so they stay exact at
+        // any history size; the per-set analytics below use the bounded window.
+        val totalVolume = totals.totalVolume
+        val totalSets = totals.totalSets
+        val totalReps = totals.totalReps
+        val totalPRs = totals.totalPrs
         val latestBodyweight = bodyweights.lastOrNull()
         val bw = latestBodyweight?.weight?.takeIf { it > 0 }
         val streak = currentStreakDays(sessions)
@@ -183,13 +202,13 @@ class ProgressViewModel @Inject constructor(
             .sortedWith(compareByDescending<ExerciseRanking> { it.bestEstimatedOneRm }.thenByDescending { it.totalVolume })
 
         return ProgressUiState(
-            totalWorkouts = sessions.size,
+            totalWorkouts = completedCount,
             totalSets = totalSets,
             totalReps = totalReps,
             totalVolume = totalVolume,
             totalPRs = totalPRs,
             currentStreakDays = streak,
-            milestones = buildMilestones(sessions.size, totalSets, totalVolume, totalPRs, streak),
+            milestones = buildMilestones(completedCount, totalSets, totalVolume, totalPRs, streak),
             rankings = rankings,
             weeklyVolume = weeklyVolume,
             bodyweights = bodyweights,
@@ -486,5 +505,8 @@ class ProgressViewModel @Inject constructor(
 
     private companion object {
         const val DAY = 24L * 60L * 60L * 1000L
+        // Bounded analytics window: enough for rich rankings/charts without
+        // loading 20 years of history into memory.
+        const val RECENT_WINDOW = 200
     }
 }
