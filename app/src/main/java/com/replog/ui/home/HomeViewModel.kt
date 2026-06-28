@@ -80,6 +80,10 @@ class HomeViewModel @Inject constructor(
     private val _repLogScore = MutableStateFlow<com.replog.domain.intelligence.RepLogScoreResult?>(null)
     val repLogScore: StateFlow<com.replog.domain.intelligence.RepLogScoreResult?> = _repLogScore
 
+    /** The user's chosen display name for personalised greetings (null before onboarding). */
+    val displayName: StateFlow<String?> = prefs.displayName
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
     /** Load (or refresh) the briefing + continue-workout card. Cheap to call repeatedly. */
     fun loadIntelligence() = viewModelScope.launch {
         val activeId = prefs.activeSessionId.first()

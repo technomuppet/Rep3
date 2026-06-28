@@ -45,10 +45,18 @@ fun HomeScreen(
     val briefing by viewModel.briefing.collectAsState()
     val continueWorkout by viewModel.continueWorkout.collectAsState()
     val repLogScore by viewModel.repLogScore.collectAsState()
+    val displayName by viewModel.displayName.collectAsState()
     var showTrainAnywayDialog by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { viewModel.refresh(); viewModel.loadIntelligence(); coachViewModel.loadRecommendation(force = false) }
     LazyColumn(Modifier.fillMaxSize().padding(contentPadding), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        item { Text("Today", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.ExtraBold); Text("Your training dashboard.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        item {
+            val name = displayName?.takeIf { it.isNotBlank() }
+            val hour = remember { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
+            val header = if (name != null) com.replog.util.profile.Greetings.timeOfDay(name, hour) else "Today"
+            val subtitle = if (name != null) com.replog.util.profile.Greetings.possessive(name, "training dashboard") else "Your training dashboard."
+            Text(header, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.ExtraBold)
+            Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
 
         // Priority 2: Continue Workout - the top card when a session is in progress.
         continueWorkout?.let { cw ->

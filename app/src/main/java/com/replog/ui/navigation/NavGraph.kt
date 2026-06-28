@@ -59,6 +59,12 @@ sealed class RepLogRoute(val route: String, val label: String, val icon: ImageVe
     data object RecoveryCentre : RepLogRoute("recovery_centre", "Recovery Centre", Icons.Default.ShowChart)
     data object MuscleBalance : RepLogRoute("muscle_balance", "Muscle Balance", Icons.Default.ShowChart)
     data object DnaEvolution : RepLogRoute("dna_evolution", "DNA Evolution", Icons.Default.ShowChart)
+    // Sprint 12: Legal Centre (secondary screens reached from Settings)
+    data object LegalDisclaimer : RepLogRoute("legal_disclaimer", "Health & Safety Disclaimer", Icons.Default.Settings)
+    data object LegalTerms : RepLogRoute("legal_terms", "Terms of Use", Icons.Default.Settings)
+    data object LegalPrivacy : RepLogRoute("legal_privacy", "Privacy Policy", Icons.Default.Settings)
+    data object LegalHistory : RepLogRoute("legal_history", "Acceptance History", Icons.Default.History)
+    data object OpenSourceLicences : RepLogRoute("open_source_licences", "Open Source Licences", Icons.Default.List)
 }
 
 /** Bottom-navigation tabs, in order. */
@@ -82,7 +88,12 @@ private val secondaryTitles = mapOf(
     RepLogRoute.QuickWorkouts.route to "Quick Workouts",
     RepLogRoute.RecoveryCentre.route to "Recovery Centre",
     RepLogRoute.MuscleBalance.route to "Muscle Balance",
-    RepLogRoute.DnaEvolution.route to "DNA Evolution"
+    RepLogRoute.DnaEvolution.route to "DNA Evolution",
+    RepLogRoute.LegalDisclaimer.route to "Health & Safety Disclaimer",
+    RepLogRoute.LegalTerms.route to "Terms of Use",
+    RepLogRoute.LegalPrivacy.route to "Privacy Policy",
+    RepLogRoute.LegalHistory.route to "Acceptance History",
+    RepLogRoute.OpenSourceLicences.route to "Open Source Licences"
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -227,7 +238,27 @@ fun RepLogNavGraph(
             composable(RepLogRoute.Goals.route) { com.replog.ui.goals.GoalsScreen(padding) }
             composable(RepLogRoute.History.route) { HistoryScreen(padding) }
             composable(RepLogRoute.Exercises.route) { ExerciseLibraryScreen(padding) }
-            composable(RepLogRoute.Settings.route) { SettingsScreen(padding) }
+            composable(RepLogRoute.Settings.route) {
+                SettingsScreen(
+                    contentPadding = padding,
+                    onOpenDisclaimer = { openDetail(RepLogRoute.LegalDisclaimer.route) },
+                    onOpenTerms = { openDetail(RepLogRoute.LegalTerms.route) },
+                    onOpenPrivacy = { openDetail(RepLogRoute.LegalPrivacy.route) },
+                    onOpenAcceptanceHistory = { openDetail(RepLogRoute.LegalHistory.route) },
+                    onOpenLicences = { openDetail(RepLogRoute.OpenSourceLicences.route) }
+                )
+            }
+            composable(RepLogRoute.LegalDisclaimer.route) {
+                com.replog.ui.legal.LegalDocumentScreen(com.replog.util.legal.LegalDocId.DISCLAIMER, padding)
+            }
+            composable(RepLogRoute.LegalTerms.route) {
+                com.replog.ui.legal.LegalDocumentScreen(com.replog.util.legal.LegalDocId.TERMS, padding)
+            }
+            composable(RepLogRoute.LegalPrivacy.route) {
+                com.replog.ui.legal.LegalDocumentScreen(com.replog.util.legal.LegalDocId.PRIVACY, padding)
+            }
+            composable(RepLogRoute.LegalHistory.route) { com.replog.ui.legal.AcceptanceHistoryScreen(padding) }
+            composable(RepLogRoute.OpenSourceLicences.route) { com.replog.ui.legal.OpenSourceLicencesScreen(padding) }
         }
     }
 }

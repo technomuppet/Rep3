@@ -60,6 +60,11 @@ import com.replog.util.PlateCalculator
 @Composable
 fun SettingsScreen(
     contentPadding: PaddingValues,
+    onOpenDisclaimer: () -> Unit = {},
+    onOpenTerms: () -> Unit = {},
+    onOpenPrivacy: () -> Unit = {},
+    onOpenAcceptanceHistory: () -> Unit = {},
+    onOpenLicences: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -302,6 +307,33 @@ fun SettingsScreen(
                     )
                 }
             }
+        }
+
+        // --- Sprint 12: Legal Centre ---
+        Text("Legal", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold, modifier = Modifier.padding(top = 4.dp))
+        RepLogCard(onClick = onOpenDisclaimer) {
+            Text("Health & Safety Disclaimer", fontWeight = FontWeight.Bold)
+            Text("Read the disclaimer you accepted.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        }
+        RepLogCard(onClick = onOpenTerms) {
+            Text("Terms of Use", fontWeight = FontWeight.Bold)
+            Text("Read the terms you accepted.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        }
+        RepLogCard(onClick = onOpenPrivacy) {
+            Text("Privacy Policy", fontWeight = FontWeight.Bold)
+            Text("How RepLog handles your data (it stays on your device).", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        }
+        RepLogCard(onClick = onOpenAcceptanceHistory) {
+            Text("Acceptance History", fontWeight = FontWeight.Bold)
+            Text("When you accepted each document version.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        }
+        RepLogCard(onClick = onOpenLicences) {
+            Text("Open Source Licences", fontWeight = FontWeight.Bold)
+            Text("The open source components RepLog is built with.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        }
+        RepLogCard {
+            Text("App Version", fontWeight = FontWeight.Bold)
+            Text("RepLog ${com.replog.util.AppInfo.versionName} (build ${com.replog.util.AppInfo.versionCode})", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
         RepLogCard {
