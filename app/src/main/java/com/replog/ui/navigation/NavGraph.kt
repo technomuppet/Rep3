@@ -32,7 +32,7 @@ import androidx.navigation.compose.rememberNavController
 import com.replog.ui.exercise.ExerciseLibraryScreen
 import com.replog.ui.history.HistoryScreen
 import com.replog.ui.home.HomeScreen
-import com.replog.ui.onboarding.OnboardingScreen
+import com.replog.ui.onboarding.OnboardingFlow
 import com.replog.ui.onboarding.OnboardingViewModel
 import com.replog.ui.progress.ProgressScreen
 import com.replog.ui.settings.SettingsScreen
@@ -89,16 +89,33 @@ private val secondaryTitles = mapOf(
 @Composable
 fun RepLogNavGraph(
     navController: NavHostController = rememberNavController(),
-    onboardingViewModel: OnboardingViewModel = hiltViewModel()
+    onboardingViewModel: OnboardingViewModel = hiltViewModel(),
+    rootGateViewModel: com.replog.ui.navigation.RootGateViewModel = hiltViewModel()
 ) {
-    val onboardingState by onboardingViewModel.uiState.collectAsState()
+    val gate by rootGateViewModel.state.collectAsState()
 
-    if (!onboardingState.onboardingComplete) {
-        OnboardingScreen(
-            onComplete = onboardingViewModel::finish,
-            onPersonalize = onboardingViewModel::finishWithPersonalization
-        )
-        return
+    // Single app-entry gate. Home (the NavHost) is NOT composed until the user
+    // has a profile AND has accepted the current legal documents. A legal version
+    // bump flips the gate to NEEDS_REACCEPTANCE while all stored data is preserved.
+    when (gate.gate) {
+        null -> {
+            // Still loading persisted state: render nothing to avoid flashing the
+            // onboarding flow to an already-onboarded user.
+            return
+        }
+        com.replog.util.legal.GateState.NEEDS_ONBOARDING -> {
+            OnboardingFlow(viewModel = onboardingViewModel)
+            return
+        }
+        com.replog.util.legal.GateState.NEEDS_REACCEPTANCE -> {
+            // Existing user must re-accept updated documents; profile untouched.
+            androidx.compose.runtime.LaunchedEffect(gate.displayName) {
+                onboardingViewModel.startReacceptance(gate.displayName)
+            }
+            OnboardingFlow(viewModel = onboardingViewModel)
+            return
+        }
+        com.replog.util.legal.GateState.READY -> Unit // fall through to the app
     }
 
     val entry by navController.currentBackStackEntryAsState()
