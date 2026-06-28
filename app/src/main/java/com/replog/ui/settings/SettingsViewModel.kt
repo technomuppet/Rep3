@@ -174,14 +174,15 @@ class SettingsViewModel @Inject constructor(
             val prescriptions = sessions.associate { session ->
                 session.session.id to workoutRepository.getPrescriptionsForSession(session.session.id)
             }
-            val csv = WorkoutCsvExporter.toCsv(sessions, prescriptions)
-            val result = FileExporter.save(
+            // P3: stream rows straight to the file (no giant in-memory CSV string).
+            val result = FileExporter.saveStreaming(
                 context = context,
                 fileName = "WorkoutHistory_${dateStamp()}.csv",
                 mimeType = "text/csv",
-                content = csv,
                 treeUriString = prefs.exportTreeUri.first()
-            )
+            ) { writer ->
+                WorkoutCsvExporter.writeCsv(sessions, prescriptions) { writer.append(it) }
+            }
             val (location, fileName) = splitPath(result.displayPath)
             artifacts.value = artifacts.value.copy(
                 csvShareUri = result.shareUri?.toString(),

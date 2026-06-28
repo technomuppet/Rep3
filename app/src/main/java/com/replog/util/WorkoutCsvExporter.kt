@@ -4,12 +4,29 @@ import com.replog.data.model.SessionWithExercises
 import com.replog.data.model.WorkoutPrescription
 
 object WorkoutCsvExporter {
+    private const val HEADER = "session_id,workout_name,start_time,end_time,exercise,category,equipment,movement_pattern,primary_muscles,secondary_muscles,superset_group,set_number,set_type,weight,reps,rpe,tempo,is_pr,volume,prescription_source,target_sets,target_reps,target_weight,target_hit"
+
+    /** In-memory CSV (kept for tests / small uses). Delegates to the streaming writer. */
     fun toCsv(
         sessions: List<SessionWithExercises>,
         prescriptionsBySessionId: Map<Int, List<WorkoutPrescription>> = emptyMap()
     ): String {
-        val builder = StringBuilder()
-        builder.appendLine("session_id,workout_name,start_time,end_time,exercise,category,equipment,movement_pattern,primary_muscles,secondary_muscles,superset_group,set_number,set_type,weight,reps,rpe,tempo,is_pr,volume,prescription_source,target_sets,target_reps,target_weight,target_hit")
+        val sb = StringBuilder()
+        writeCsv(sessions, prescriptionsBySessionId) { sb.append(it) }
+        return sb.toString()
+    }
+
+    /**
+     * Sprint 10 P3: stream CSV rows to an Appendable (e.g. a buffered file Writer)
+     * so a 20-year history never materialises as one giant String. Identical
+     * output format to toCsv().
+     */
+    fun writeCsv(
+        sessions: List<SessionWithExercises>,
+        prescriptionsBySessionId: Map<Int, List<WorkoutPrescription>> = emptyMap(),
+        out: (CharSequence) -> Unit
+    ) {
+        out(HEADER); out("\n")
         sessions.forEach { session ->
             val prescriptions = prescriptionsBySessionId[session.session.id].orEmpty().associateBy { it.exerciseId }
             session.exercises.forEach { entry ->
@@ -20,7 +37,7 @@ object WorkoutCsvExporter {
                     hardSets.size >= target.targetSets && hardSets.any { it.weight >= targetWeight && it.reps >= target.targetReps }
                 }
                 entry.sets.forEach { set ->
-                    builder.appendLine(
+                    out(
                         listOf(
                             session.session.id.toString(),
                             csv(session.session.templateName ?: "Workout"),
@@ -48,10 +65,10 @@ object WorkoutCsvExporter {
                             targetHit?.toString().orEmpty()
                         ).joinToString(",")
                     )
+                    out("\n")
                 }
             }
         }
-        return builder.toString()
     }
 
     private fun csv(value: String): String = "\"" + value.replace("\"", "\"\"") + "\""
