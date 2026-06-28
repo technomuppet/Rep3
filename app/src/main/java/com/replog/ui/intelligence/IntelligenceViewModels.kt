@@ -6,10 +6,13 @@ import com.replog.data.repository.DnaEvolutionData
 import com.replog.data.repository.IntelligenceRepository
 import com.replog.data.repository.MuscleBalanceData
 import com.replog.data.repository.RecoveryCentreData
+import com.replog.util.PreferencesManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -22,10 +25,13 @@ import javax.inject.Inject
 
 @HiltViewModel
 class RecoveryCentreViewModel @Inject constructor(
-    private val repo: IntelligenceRepository
+    private val repo: IntelligenceRepository,
+    prefs: PreferencesManager
 ) : ViewModel() {
     private val _state = MutableStateFlow<RecoveryCentreData?>(null)
     val state: StateFlow<RecoveryCentreData?> = _state.asStateFlow()
+    val displayName: StateFlow<String?> = prefs.displayName
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     fun load() = viewModelScope.launch {
         if (_state.value == null) _state.value = runCatching { repo.buildRecoveryCentre() }.getOrNull()
     }

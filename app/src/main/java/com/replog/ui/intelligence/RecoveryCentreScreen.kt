@@ -45,6 +45,7 @@ fun RecoveryCentreScreen(
     viewModel: RecoveryCentreViewModel = hiltViewModel()
 ) {
     val data by viewModel.state.collectAsState()
+    val displayName by viewModel.displayName.collectAsState()
     LaunchedEffect(Unit) { viewModel.load() }
 
     LazyColumn(
@@ -53,7 +54,12 @@ fun RecoveryCentreScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            Text("Recovery Centre", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.ExtraBold)
+            val rcName = displayName?.takeIf { it.isNotBlank() }
+            Text(
+                if (rcName != null) com.replog.util.profile.Greetings.possessive(rcName, "Recovery Centre") else "Recovery Centre",
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.ExtraBold
+            )
             Text("How recovered you are, and what to train today.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         val d = data
