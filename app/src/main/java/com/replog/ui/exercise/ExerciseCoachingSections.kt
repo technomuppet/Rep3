@@ -80,6 +80,7 @@ fun ConfidenceCardView(card: ConfidenceCard, modifier: Modifier = Modifier) {
 /** Collapsed-by-default coaching sections (Phase 6). */
 @Composable
 fun CoachingSections(
+    exercise: Exercise,
     coaching: CoachingInfo,
     why: String,
     easier: EasierAlternative?,
@@ -108,11 +109,20 @@ fun CoachingSections(
         ExpandableSection("Why RepLog Recommends This") {
             Text(why, style = MaterialTheme.typography.bodyMedium)
         }
-        if (easier != null) {
-            ExpandableSection("Alternatives", initiallyExpanded = false) {
+        // Phase 3: the Alternatives section is ALWAYS shown - either a recommended
+        // easier variation, or an explanation of why none is suggested.
+        ExpandableSection("Alternatives", initiallyExpanded = false) {
+            if (easier != null) {
                 Text("Recommended first", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
                 Text(easier.exercise.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text(easier.reason, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                val msg = when (exercise.difficulty.lowercase()) {
+                    "beginner" -> "This is already a beginner-friendly exercise, so there is no easier version to learn first."
+                    "custom" -> "This is a custom exercise, so RepLog does not suggest an easier variation."
+                    else -> "This is already one of the most accessible options for this movement, so there is no easier variation to recommend first."
+                }
+                Text(msg, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

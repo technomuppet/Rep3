@@ -290,7 +290,7 @@ private fun ExerciseDetailDialog(
 
             // --- Progressive-disclosure coaching sections (Phase 6). ---
             coaching?.let { c ->
-                CoachingSections(coaching = c.coaching, why = c.why, easier = c.easier)
+                CoachingSections(exercise = ex, coaching = c.coaching, why = c.why, easier = c.easier)
             }
 
             if (swaps.isNotEmpty()) {

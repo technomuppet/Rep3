@@ -1,18 +1,28 @@
 package com.replog.ui.exercise
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -28,40 +38,69 @@ import com.replog.domain.library.Point
 import com.replog.domain.library.Pose
 
 /**
- * Renders the lightweight keyframe animation (Phase 5) as a moving stick figure
- * on a Compose Canvas. Frames are generated locally by [ExerciseAnimation]; there
- * is no video, GIF or photo and no downloaded media. Linear interpolation between
- * the (<= 8) poses produces smooth motion. A content description names the
- * movement for screen readers (Phase 8).
+ * Renders the lightweight keyframe animation (Phase 5) as a moving stick figure on
+ * a Compose Canvas, with Play/Pause and Restart controls. Frames are generated
+ * locally by [ExerciseAnimation]; there is no video, GIF or photo and no
+ * downloaded media. The clock is advanced manually with withFrameNanos so the
+ * user can pause and restart it. A content description names the movement for
+ * screen readers (Phase 8).
  */
 @Composable
 fun ExerciseAnimationView(exercise: Exercise, modifier: Modifier = Modifier) {
     val clip = remember(exercise.id, exercise.movementPattern, exercise.equipment) {
         ExerciseAnimation.clip(exercise)
     }
-    val transition = rememberInfiniteTransition(label = "exerciseAnim")
-    val t by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = clip.cycleMillis, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "phase"
-    )
+    var playing by remember(exercise.id) { mutableStateOf(true) }
+    // phase in 0..1 across one cycle
+    var phase by remember(exercise.id) { mutableFloatStateOf(0f) }
+
+    // Advance the phase only while playing. Restarting sets playing=true & phase=0.
+    LaunchedEffect(exercise.id, playing, clip.cycleMillis) {
+        if (!playing) return@LaunchedEffect
+        var last = withFrameNanos { it }
+        while (true) {
+            val now = withFrameNanos { it }
+            val deltaMs = (now - last) / 1_000_000f
+            last = now
+            val cycle = clip.cycleMillis.coerceAtLeast(1)
+            phase = (phase + deltaMs / cycle) % 1f
+        }
+    }
 
     val figure = MaterialTheme.colorScheme.primary
     val implementColor = MaterialTheme.colorScheme.tertiary
     val joint = MaterialTheme.colorScheme.onSurface
 
-    Canvas(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(180.dp)
-            .semantics { contentDescription = "Animated demonstration of ${exercise.name}" }
-    ) {
-        val pose = interpolate(clip, t)
-        drawFigure(pose, figure, implementColor, joint)
+    Column(modifier = modifier) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(180.dp)
+                .semantics { contentDescription = "Animated demonstration of ${exercise.name}" }
+        ) {
+            val pose = interpolate(clip, phase)
+            drawFigure(pose, figure, implementColor, joint)
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = { playing = !playing }) {
+                Icon(
+                    if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    contentDescription = if (playing) "Pause animation" else "Play animation"
+                )
+            }
+            IconButton(onClick = { phase = 0f; playing = true }) {
+                Icon(Icons.Default.Refresh, contentDescription = "Restart animation")
+            }
+            Text(
+                if (playing) "Playing" else "Paused",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 

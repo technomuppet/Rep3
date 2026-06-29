@@ -57,6 +57,20 @@ object ExerciseFilter {
     private val noEquipment = setOf("bodyweight", "none")
     private val machineEquipment = setOf("machine", "smith machine", "cable")
 
+    /** Public single-goal check reused by WhyThisExercise (no logic duplication). */
+    fun matchesGoalPublic(ex: Exercise, goal: String?): Boolean {
+        val g = goalLabelFor(goal) ?: return false
+        return matchesGoal(ex, setOf(g))
+    }
+
+    /** Maps a profile goal enum name to the goal chip label used by matchesGoal. */
+    private fun goalLabelFor(goal: String?): String? = when (goal?.uppercase()) {
+        "HYPERTROPHY" -> "Hypertrophy"
+        "STRENGTH" -> "Strength"
+        "FAT_LOSS" -> "Fat Loss"
+        else -> null
+    }
+
     private fun matchesGoal(ex: Exercise, goals: Set<String>): Boolean {
         if (goals.isEmpty()) return true
         val pattern = ex.movementPattern.lowercase()

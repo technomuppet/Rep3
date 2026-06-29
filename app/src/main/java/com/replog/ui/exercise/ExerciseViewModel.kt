@@ -128,20 +128,25 @@ class ExerciseViewModel @Inject constructor(
     }
 
     /** Generated coaching bundle for the selected exercise (Sprint 13). */
+    // Goal + experience level read together to stay within the typed combine arity.
+    private val goalAndLevel: Flow<Pair<String?, String?>> =
+        combine(prefs.profileGoal, prefs.profileLevel) { goal, level -> goal to level }
+
     val selectedCoaching: StateFlow<ExerciseCoaching?> = combine(
         selectedExercise,
         exerciseRepository.getAllExercises(),
-        prefs.profileGoal,
+        goalAndLevel,
         prefs.displayName,
         recoveredMuscles
-    ) { selected, library, goal, name, recovered ->
+    ) { selected, library, goalLevel, name, recovered ->
         if (selected == null) return@combine null
+        val (goal, level) = goalLevel
         val primary = selected.primaryMuscles.split(",").firstOrNull()?.trim()?.lowercase()
         val recoveredMatch = primary?.let { p -> recovered.firstOrNull { it == p || it.contains(p) || p.contains(it) } }
         ExerciseCoaching(
             coaching = ExerciseCoach.coach(selected),
             confidence = BeginnerGuidance.confidence(selected),
-            why = WhyThisExercise.rationale(selected, goal, name, recoveredMatch),
+            why = WhyThisExercise.rationale(selected, goal, level, name, recoveredMatch),
             easier = BeginnerGuidance.easierAlternative(selected, library)
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
