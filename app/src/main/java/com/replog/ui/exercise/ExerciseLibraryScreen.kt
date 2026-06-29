@@ -114,6 +114,9 @@ fun ExerciseLibraryScreen(
                     onToggleEquipment = viewModel::toggleEquipment,
                     onToggleDifficulty = viewModel::toggleDifficulty,
                     onTogglePattern = viewModel::togglePattern,
+                    onToggleGoal = viewModel::toggleGoal,
+                    onToggleExperience = viewModel::toggleExperience,
+                    onToggleEquipmentPreset = viewModel::toggleEquipmentPreset,
                     onClear = viewModel::clearFilters
                 )
             }
@@ -447,11 +450,15 @@ private fun FilterSection(
     onToggleEquipment: (String) -> Unit,
     onToggleDifficulty: (String) -> Unit,
     onTogglePattern: (String) -> Unit,
+    onToggleGoal: (String) -> Unit,
+    onToggleExperience: (String) -> Unit,
+    onToggleEquipmentPreset: (String) -> Unit,
     onClear: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
     val f = state.filter
-    val activeCount = f.muscles.size + f.equipment.size + f.difficulties.size + f.patterns.size
+    val activeCount = f.muscles.size + f.equipment.size + f.difficulties.size + f.patterns.size +
+        f.goals.size + f.experiences.size + f.equipmentPresets.size
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -470,6 +477,9 @@ private fun FilterSection(
         // Always show muscle chips (the primary filter); other dimensions when expanded.
         FilterChipGroup("Muscles", state.muscleGroups, f.muscles, onToggleMuscle)
         if (expanded) {
+            FilterChipGroup("Experience", state.experienceOptions, f.experiences, onToggleExperience)
+            FilterChipGroup("Goal", state.goalOptions, f.goals, onToggleGoal)
+            FilterChipGroup("Quick equipment", state.equipmentPresetOptions, f.equipmentPresets, onToggleEquipmentPreset)
             FilterChipGroup("Equipment", state.equipmentOptions, f.equipment, onToggleEquipment)
             FilterChipGroup("Difficulty", state.difficultyOptions, f.difficulties, onToggleDifficulty)
             FilterChipGroup("Movement", state.patternOptions, f.patterns, onTogglePattern)

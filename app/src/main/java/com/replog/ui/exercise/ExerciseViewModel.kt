@@ -38,6 +38,9 @@ data class ExerciseUiState(
     val equipmentOptions: List<String> = emptyList(),
     val difficultyOptions: List<String> = listOf("Beginner", "Intermediate", "Advanced"),
     val patternOptions: List<String> = ExerciseFilter.PATTERNS,
+    val goalOptions: List<String> = ExerciseFilter.GOALS,
+    val experienceOptions: List<String> = ExerciseFilter.EXPERIENCES,
+    val equipmentPresetOptions: List<String> = ExerciseFilter.EQUIPMENT_PRESETS,
     val filter: ExerciseFilterState = ExerciseFilterState(),
     val resultCount: Int = 0,
     val useKg: Boolean = true,
@@ -152,6 +155,9 @@ class ExerciseViewModel @Inject constructor(
     fun toggleEquipment(value: String) { filter.value = filter.value.copy(equipment = toggle(filter.value.equipment, value)) }
     fun toggleDifficulty(value: String) { filter.value = filter.value.copy(difficulties = toggle(filter.value.difficulties, value)) }
     fun togglePattern(value: String) { filter.value = filter.value.copy(patterns = toggle(filter.value.patterns, value)) }
+    fun toggleGoal(value: String) { filter.value = filter.value.copy(goals = toggle(filter.value.goals, value)) }
+    fun toggleExperience(value: String) { filter.value = filter.value.copy(experiences = toggle(filter.value.experiences, value)) }
+    fun toggleEquipmentPreset(value: String) { filter.value = filter.value.copy(equipmentPresets = toggle(filter.value.equipmentPresets, value)) }
     fun clearFilters() { filter.value = ExerciseFilterState(query = filter.value.query) }
 
     fun selectExercise(exercise: Exercise) { selectedExercise.value = exercise }
