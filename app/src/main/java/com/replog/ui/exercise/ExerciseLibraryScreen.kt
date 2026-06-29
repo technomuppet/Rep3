@@ -1,7 +1,6 @@
 package com.replog.ui.exercise
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -41,7 +40,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
@@ -50,7 +48,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.replog.R
 import com.replog.data.model.Exercise
 import com.replog.data.model.ExerciseInsight
 import com.replog.data.model.ExerciseSetHistory
@@ -162,11 +159,13 @@ fun ExerciseLibraryScreen(
         )
     }
 
+    val coaching by viewModel.selectedCoaching.collectAsState()
     selectedInsight?.let { insight ->
         ExerciseDetailDialog(
             insight = insight,
             useKg = state.useKg,
             swaps = swaps,
+            coaching = coaching,
             onDismiss = viewModel::clearSelectedExercise
         )
     }
@@ -233,38 +232,66 @@ private fun ExerciseDetailDialog(
     insight: ExerciseInsight,
     useKg: Boolean,
     swaps: List<com.replog.domain.swap.ExerciseSwap>,
+    coaching: ExerciseCoaching?,
     onDismiss: () -> Unit
 ) {
     val scroll = rememberScrollState()
+    val ex = insight.exercise
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(insight.exercise.name) },
+        title = { Text(ex.name) },
         text = {
             Column(
                 modifier = Modifier
-                    .heightIn(max = 560.dp)
+                    .heightIn(max = 580.dp)
                     .verticalScroll(scroll),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
+            // --- Always-visible summary (Phase 6): name + difficulty + muscles +
+            // equipment + purpose + three coaching cues. ---
             Text(
-                "${insight.exercise.category} • ${insight.exercise.equipment} • ${insight.exercise.difficulty}",
+                "${ex.category} \u2022 ${ex.equipment} \u2022 ${ex.difficulty}",
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            if (insight.exercise.movementPattern.isNotBlank()) {
-                Text("Pattern: ${insight.exercise.movementPattern}", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+            if (ex.primaryMuscles.isNotBlank()) {
+                Text("Primary: ${ex.primaryMuscles}", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            if (insight.exercise.primaryMuscles.isNotBlank()) {
-                Text("Primary: ${insight.exercise.primaryMuscles}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (ex.secondaryMuscles.isNotBlank()) {
+                Text("Secondary: ${ex.secondaryMuscles}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else if (ex.muscles.isNotBlank()) {
+                Text(ex.muscles, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            if (insight.exercise.secondaryMuscles.isNotBlank()) {
-                Text("Secondary: ${insight.exercise.secondaryMuscles}", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            } else if (insight.exercise.muscles.isNotBlank()) {
-                Text(insight.exercise.muscles, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+            coaching?.let { c ->
+                Text(c.coaching.purpose, fontWeight = FontWeight.SemiBold)
+                RepLogCard {
+                    Text("Coaching cues", fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(4.dp))
+                    c.coaching.cues.forEach { cue -> Text("\u2713 $cue", style = MaterialTheme.typography.bodyMedium) }
+                }
+                ConfidenceCardView(c.confidence)
+            }
+
+            // --- Muscle diagram + locally generated animation (Phases 4 & 5). ---
+            RepLogCard {
+                Text("Muscles worked", fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(8.dp))
+                MuscleBodyDiagram(ex)
+            }
+            RepLogCard {
+                Text("Movement", fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(8.dp))
+                ExerciseAnimationView(ex)
+                Text("Generated locally - no video or images.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+
+            // --- Progressive-disclosure coaching sections (Phase 6). ---
+            coaching?.let { c ->
+                CoachingSections(coaching = c.coaching, why = c.why, easier = c.easier)
             }
 
             if (swaps.isNotEmpty()) {
-                RepLogCard {
-                    Text("Swap / alternatives", fontWeight = FontWeight.Bold)
+                ExpandableSection("Swap / alternatives") {
                     Text("Equipment busy or unavailable? Try one of these.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(8.dp))
                     swaps.forEach { s ->
@@ -274,22 +301,6 @@ private fun ExerciseDetailDialog(
                         }
                     }
                 }
-            }
-
-            RepLogCard {
-                Image(
-                    painter = painterResource(id = R.drawable.exercise_media_placeholder),
-                    contentDescription = "Exercise media placeholder for ${insight.exercise.name}",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(150.dp)
-                )
-                Spacer(Modifier.height(8.dp))
-                Text("Exercise media", fontWeight = FontWeight.Bold)
-                Text(
-                    insight.exercise.mediaAsset.ifBlank { "Local image/GIF slot ready. Add bundled media assets in a future content pass." },
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
