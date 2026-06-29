@@ -104,6 +104,18 @@ fun ExerciseAnimationView(exercise: Exercise, modifier: Modifier = Modifier) {
     }
 }
 
+/** Safe fallback used only if a clip somehow has no keyframes. */
+private val NEUTRAL_POSE = Pose(
+    head = Point(0.5f, 0.10f),
+    shoulder = Point(0.5f, 0.22f),
+    elbow = Point(0.42f, 0.34f),
+    hand = Point(0.42f, 0.46f),
+    hip = Point(0.5f, 0.50f),
+    knee = Point(0.5f, 0.72f),
+    foot = Point(0.5f, 0.95f),
+    implement = null
+)
+
 private fun lerp(a: Float, b: Float, f: Float) = a + (b - a) * f
 private fun lerp(a: Point, b: Point, f: Float) = Point(lerp(a.x, b.x, f), lerp(a.y, b.y, f))
 private fun lerp(a: Point?, b: Point?, f: Float): Point? =
@@ -111,6 +123,9 @@ private fun lerp(a: Point?, b: Point?, f: Float): Point? =
 
 private fun interpolate(clip: AnimationClip, t: Float): Pose {
     val frames = clip.keyframes
+    // Defensive guards: an empty clip should never occur (ExerciseAnimation.clip
+    // always returns >= 2 frames), but guard so the renderer can never throw.
+    if (frames.isEmpty()) return NEUTRAL_POSE
     if (frames.size == 1) return frames[0]
     val segments = frames.size - 1
     val scaled = (t.coerceIn(0f, 1f)) * segments

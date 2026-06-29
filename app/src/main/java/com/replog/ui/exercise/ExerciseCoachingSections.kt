@@ -26,7 +26,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.replog.data.model.Exercise
-import com.replog.domain.library.BeginnerGuidance
 import com.replog.domain.library.CoachingInfo
 import com.replog.domain.library.ConfidenceCard
 import com.replog.domain.library.EasierAlternative

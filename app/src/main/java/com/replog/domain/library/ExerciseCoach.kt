@@ -76,7 +76,7 @@ object ExerciseCoach {
         val muscle = primaryMuscle(ex).ifBlank { "the target muscles" }
         val eq = equipmentNoun(ex)
         val tempo = tempoFor(fam)
-        return CoachingInfo(
+        val info = CoachingInfo(
             purpose = purposeFor(fam, muscle).take(150),
             steps = stepsFor(fam, eq),
             cues = cuesFor(fam),
@@ -87,6 +87,16 @@ object ExerciseCoach {
             rangeOfMotion = romFor(fam),
             safety = safetyFor(fam, ex)
         )
+        // Debug-only sanity check (no-op in release; JVM -ea / Android debuggable):
+        // guarantees the content contract so a future content edit that breaks
+        // "exactly 4 steps / 3 cues" is caught immediately during testing. This
+        // changes no runtime behaviour and adds no telemetry.
+        assert(info.steps.size == 4) { "coach(${ex.name}): expected 4 steps, got ${info.steps.size}" }
+        assert(info.cues.size == 3) { "coach(${ex.name}): expected 3 cues, got ${info.cues.size}" }
+        assert(info.mistakes.size in 1..4) { "coach(${ex.name}): mistakes out of range ${info.mistakes.size}" }
+        assert(info.safety.size in 1..3) { "coach(${ex.name}): safety out of range ${info.safety.size}" }
+        assert(info.purpose.length <= 150) { "coach(${ex.name}): purpose too long ${info.purpose.length}" }
+        return info
     }
 
     private fun purposeFor(f: Family, muscle: String): String = when (f) {
