@@ -16,7 +16,7 @@ class BackupJsonTest {
     fun emptyBackupRoundTrips() {
         val json = BackupJson.encode(emptyList(), listOf(BodyweightLog(weight = 82.5, timestamp = 1234L, note = "test")))
         val decoded = BackupJson.decode(json)
-        assertEquals(3, decoded.schemaVersion)
+        assertEquals(4, decoded.schemaVersion)
         assertEquals(1, decoded.bodyweights.size)
         assertEquals(82.5, decoded.bodyweights.first().weight, 0.001)
     }

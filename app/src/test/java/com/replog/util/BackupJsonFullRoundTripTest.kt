@@ -40,7 +40,7 @@ class BackupJsonFullRoundTripTest {
         val restoredSet = restoredExercise.sets.first()
         val restoredPrescription = restoredSession.prescriptions.first()
 
-        assertEquals(3, decoded.schemaVersion)
+        assertEquals(4, decoded.schemaVersion)
         assertEquals("Push Day", restoredSession.templateName)
         assertEquals("Bench Press", restoredExercise.exerciseName)
         assertEquals("Push • Horizontal Press", restoredExercise.movementPattern)
