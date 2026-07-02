@@ -118,7 +118,7 @@ private val NEUTRAL_POSE = Pose(
 
 private fun lerp(a: Float, b: Float, f: Float) = a + (b - a) * f
 private fun lerp(a: Point, b: Point, f: Float) = Point(lerp(a.x, b.x, f), lerp(a.y, b.y, f))
-private fun lerp(a: Point?, b: Point?, f: Float): Point? =
+private fun lerpNullable(a: Point?, b: Point?, f: Float): Point? =
     if (a == null || b == null) null else lerp(a, b, f)
 
 private fun interpolate(clip: AnimationClip, t: Float): Pose {
