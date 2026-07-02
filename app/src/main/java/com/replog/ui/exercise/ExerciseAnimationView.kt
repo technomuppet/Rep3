@@ -141,7 +141,7 @@ private fun interpolate(clip: AnimationClip, t: Float): Pose {
         hip = lerp(a.hip, b.hip, local),
         knee = lerp(a.knee, b.knee, local),
         foot = lerp(a.foot, b.foot, local),
-        implement = lerp(a.implement, b.implement, local)
+	implement = lerpNullable(a.implement, b.implement, local)
     )
 }
 
