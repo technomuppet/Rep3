@@ -5,9 +5,16 @@ import androidx.lifecycle.viewModelScope
 import com.replog.data.model.Exercise
 import com.replog.data.model.ExerciseInsight
 import com.replog.data.repository.ExerciseRepository
+import com.replog.data.repository.IntelligenceRepository
 import com.replog.data.repository.WorkoutRepository
+import com.replog.domain.library.BeginnerGuidance
+import com.replog.domain.library.CoachingInfo
+import com.replog.domain.library.ConfidenceCard
+import com.replog.domain.library.EasierAlternative
+import com.replog.domain.library.ExerciseCoach
 import com.replog.domain.library.ExerciseFilter
 import com.replog.domain.library.ExerciseFilterState
+import com.replog.domain.library.WhyThisExercise
 import com.replog.domain.swap.ExerciseSwap
 import com.replog.domain.swap.ExerciseSwapEngine
 import com.replog.util.PreferencesManager
@@ -31,10 +38,24 @@ data class ExerciseUiState(
     val equipmentOptions: List<String> = emptyList(),
     val difficultyOptions: List<String> = listOf("Beginner", "Intermediate", "Advanced"),
     val patternOptions: List<String> = ExerciseFilter.PATTERNS,
+    val goalOptions: List<String> = ExerciseFilter.GOALS,
+    val experienceOptions: List<String> = ExerciseFilter.EXPERIENCES,
+    val equipmentPresetOptions: List<String> = ExerciseFilter.EQUIPMENT_PRESETS,
     val filter: ExerciseFilterState = ExerciseFilterState(),
     val resultCount: Int = 0,
     val useKg: Boolean = true,
     val isLoading: Boolean = true
+)
+
+/**
+ * The generated beginner-coaching bundle for the selected exercise (Sprint 13).
+ * All fields are derived at runtime; nothing is stored.
+ */
+data class ExerciseCoaching(
+    val coaching: CoachingInfo,
+    val confidence: ConfidenceCard,
+    val why: String,
+    val easier: EasierAlternative?
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -42,6 +63,7 @@ data class ExerciseUiState(
 class ExerciseViewModel @Inject constructor(
     private val exerciseRepository: ExerciseRepository,
     private val workoutRepository: WorkoutRepository,
+    private val intelligenceRepository: IntelligenceRepository,
     private val prefs: PreferencesManager
 ) : ViewModel() {
     private val filter = MutableStateFlow(ExerciseFilterState())
@@ -91,6 +113,44 @@ class ExerciseViewModel @Inject constructor(
         else ExerciseSwapEngine.alternatives(selected, library, limit = 5)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    // Cached set of muscles the Recovery Centre currently reports as FRESH (fully
+    // recovered). Loaded lazily and reused; never invented. Lowercased names.
+    private val recoveredMuscles = MutableStateFlow<Set<String>>(emptySet())
+
+    init {
+        viewModelScope.launch {
+            val data = runCatching { intelligenceRepository.buildRecoveryCentre() }.getOrNull()
+            recoveredMuscles.value = data?.recovered
+                ?.filter { it.status.equals("FRESH", true) }
+                ?.map { it.muscle.lowercase() }?.toSet()
+                ?: emptySet()
+        }
+    }
+
+    /** Generated coaching bundle for the selected exercise (Sprint 13). */
+    // Goal + experience level read together to stay within the typed combine arity.
+    private val goalAndLevel: Flow<Pair<String?, String?>> =
+        combine(prefs.profileGoal, prefs.profileLevel) { goal, level -> goal to level }
+
+    val selectedCoaching: StateFlow<ExerciseCoaching?> = combine(
+        selectedExercise,
+        exerciseRepository.getAllExercises(),
+        goalAndLevel,
+        prefs.displayName,
+        recoveredMuscles
+    ) { selected, library, goalLevel, name, recovered ->
+        if (selected == null) return@combine null
+        val (goal, level) = goalLevel
+        val primary = selected.primaryMuscles.split(",").firstOrNull()?.trim()?.lowercase()
+        val recoveredMatch = primary?.let { p -> recovered.firstOrNull { it == p || it.contains(p) || p.contains(it) } }
+        ExerciseCoaching(
+            coaching = ExerciseCoach.coach(selected),
+            confidence = BeginnerGuidance.confidence(selected),
+            why = WhyThisExercise.rationale(selected, goal, level, name, recoveredMatch),
+            easier = BeginnerGuidance.easierAlternative(selected, library)
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
     fun onSearchQueryChanged(value: String) { filter.value = filter.value.copy(query = value) }
 
     private fun toggle(set: Set<String>, value: String): Set<String> =
@@ -100,6 +160,9 @@ class ExerciseViewModel @Inject constructor(
     fun toggleEquipment(value: String) { filter.value = filter.value.copy(equipment = toggle(filter.value.equipment, value)) }
     fun toggleDifficulty(value: String) { filter.value = filter.value.copy(difficulties = toggle(filter.value.difficulties, value)) }
     fun togglePattern(value: String) { filter.value = filter.value.copy(patterns = toggle(filter.value.patterns, value)) }
+    fun toggleGoal(value: String) { filter.value = filter.value.copy(goals = toggle(filter.value.goals, value)) }
+    fun toggleExperience(value: String) { filter.value = filter.value.copy(experiences = toggle(filter.value.experiences, value)) }
+    fun toggleEquipmentPreset(value: String) { filter.value = filter.value.copy(equipmentPresets = toggle(filter.value.equipmentPresets, value)) }
     fun clearFilters() { filter.value = ExerciseFilterState(query = filter.value.query) }
 
     fun selectExercise(exercise: Exercise) { selectedExercise.value = exercise }

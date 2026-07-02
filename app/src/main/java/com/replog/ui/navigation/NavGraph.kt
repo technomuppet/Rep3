@@ -274,15 +274,34 @@ private fun RepLogBottomBar(navController: NavHostController) {
             val isRecommendationOnWorkout =
                 item.route == RepLogRoute.Workout.route &&
                     currentRoute == RepLogRoute.WorkoutRecommendation.route
+            val isHome = item.route == RepLogRoute.Home.route
             NavigationBarItem(
                 selected = isRecommendationOnWorkout ||
                     current?.hierarchy?.any { it.route?.substringBefore("?") == item.route } == true,
                 onClick = {
-                    navController.navigate(item.route) {
-                        // Always return to a single Home-rooted back stack; never trap the user.
-                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                        launchSingleTop = true
-                        restoreState = true
+                    if (isHome) {
+                        // Home must ALWAYS land on Home, deterministically. We pop the
+                        // entire back stack up to (and including) the start, then go to
+                        // Home, WITHOUT restoring any saved state. This prevents the
+                        // intermittent trap where tapping Home resurfaced the saved
+                        // Training / recommendation sub-stack and dumped the user on
+                        // Training instead of Home.
+                        navController.navigate(RepLogRoute.Home.route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                inclusive = true
+                                saveState = false
+                            }
+                            launchSingleTop = true
+                            restoreState = false
+                        }
+                    } else {
+                        navController.navigate(item.route) {
+                            // Other tabs: return to the single Home-rooted back stack and
+                            // restore their own saved scroll/state.
+                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
                     }
                 },
                 icon = { Icon(item.icon, item.label) },

@@ -4,7 +4,6 @@ import com.replog.data.db.PlateauEventDao
 import com.replog.data.db.RecommendationHistoryDao
 import com.replog.data.db.RestDayOverrideDao
 import com.replog.data.db.RestLogDao
-import com.replog.data.db.TrainingDnaDao
 import com.replog.data.db.TrainingDnaProgressionScoreDao
 import com.replog.data.db.TrainingDnaSnapshotDao
 import com.replog.data.repository.WorkoutRepository
@@ -34,7 +33,6 @@ import javax.inject.Singleton
 @Singleton
 class DataResetManager @Inject constructor(
     private val workoutRepository: WorkoutRepository,
-    private val trainingDnaDao: TrainingDnaDao,
     private val trainingDnaSnapshotDao: TrainingDnaSnapshotDao,
     private val trainingDnaProgressionScoreDao: TrainingDnaProgressionScoreDao,
     private val restLogDao: RestLogDao,
@@ -53,7 +51,6 @@ class DataResetManager @Inject constructor(
         // Derived analytics / history (regenerated from data on next load).
         trainingDnaSnapshotDao.deleteAll()
         trainingDnaProgressionScoreDao.deleteAll()
-        trainingDnaDao.deleteAll()
         plateauEventDao.deleteAll()
         restLogDao.deleteAll()
         recommendationHistoryDao.deleteAll()

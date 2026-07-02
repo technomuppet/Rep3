@@ -7,10 +7,15 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.add
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -48,6 +53,16 @@ import com.replog.util.legal.LegalDocuments
  * machine: Welcome -> Create Profile -> Training Preferences -> Disclaimer ->
  * Terms -> Privacy -> Final Confirmation. Home is never reachable until Finish.
  */
+/**
+ * Content padding that keeps onboarding clear of the system bars (status bar at
+ * the top, navigation bar / gesture area at the bottom). MainActivity enables
+ * edge-to-edge and the onboarding flow renders OUTSIDE the main Scaffold, so each
+ * screen must apply the insets itself or the top and bottom get clipped.
+ */
+@Composable
+private fun onboardingContentPadding(): PaddingValues =
+    WindowInsets.safeDrawing.add(WindowInsets(left = 20, top = 20, right = 20, bottom = 20)).asPaddingValues()
+
 @Composable
 fun OnboardingFlow(viewModel: OnboardingViewModel) {
     val state by viewModel.state.collectAsState()
@@ -98,8 +113,8 @@ fun OnboardingFlow(viewModel: OnboardingViewModel) {
 @Composable
 private fun WelcomeStep(onContinue: () -> Unit) {
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(20.dp),
+        modifier = Modifier.fillMaxSize().imePadding(),
+        contentPadding = onboardingContentPadding(),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
@@ -128,8 +143,8 @@ private fun WelcomeStep(onContinue: () -> Unit) {
 private fun CreateProfileStep(state: OnboardingUiState, vm: OnboardingViewModel) {
     val d = state.draft
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(20.dp),
+        modifier = Modifier.fillMaxSize().imePadding(),
+        contentPadding = onboardingContentPadding(),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
@@ -158,10 +173,7 @@ private fun CreateProfileStep(state: OnboardingUiState, vm: OnboardingViewModel)
                 Spacer(Modifier.height(8.dp))
                 OptionalNumberField(if (d.useKg) "Weight (kg)" else "Weight (lb)", d.weightKg) { vm.setWeight(it) }
                 Spacer(Modifier.height(8.dp))
-                OptionalNumberField("Year of birth", d.dateOfBirthEpochDay?.let { (it / 365.2425 + 1970).toInt().toDouble() }) { year ->
-                    // Store Jan 1 of the chosen year as an epoch-day approximation.
-                    vm.setDob(year?.let { ((it.toInt() - 1970) * 365.2425).toLong() })
-                }
+                YearOfBirthField(d.birthYear) { vm.setBirthYear(it) }
                 Text("Age is calculated from your year of birth and never stored directly.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -192,8 +204,8 @@ private fun TrainingPreferencesStep(state: OnboardingUiState, vm: OnboardingView
     val d = state.draft
     val preview = remember(d.goal, d.level, d.equipment, d.daysPerWeek, d.style) { vm.preview(d) }
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(20.dp),
+        modifier = Modifier.fillMaxSize().imePadding(),
+        contentPadding = onboardingContentPadding(),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item { Text("Training preferences", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold) }
@@ -273,8 +285,8 @@ private fun LegalStep(
 
     LazyColumn(
         state = listState,
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(20.dp),
+        modifier = Modifier.fillMaxSize().imePadding(),
+        contentPadding = onboardingContentPadding(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
@@ -343,8 +355,8 @@ private fun FinalConfirmationStep(
     val matches = typed == expectedName && expectedName.isNotBlank() && allAccepted
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(20.dp),
+        modifier = Modifier.fillMaxSize().imePadding(),
+        contentPadding = onboardingContentPadding(),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
@@ -408,15 +420,41 @@ private fun Choice(label: String, selected: Boolean, onClick: () -> Unit) {
 
 @Composable
 private fun OptionalNumberField(label: String, value: Double?, onChange: (Double?) -> Unit) {
-    var text by remember(value) { mutableStateOf(value?.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() } ?: "") }
+    // Local text is the single source of truth while editing. We only seed it once
+    // (remember without a value key) so re-derived upstream values can never
+    // overwrite what the user is typing mid-entry.
+    var text by remember { mutableStateOf(value?.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() } ?: "") }
     OutlinedTextField(
         value = text,
         onValueChange = {
-            text = it
-            onChange(it.trim().toDoubleOrNull())
+            val filtered = it.filter { ch -> ch.isDigit() || ch == '.' }
+            text = filtered
+            onChange(filtered.trim().toDoubleOrNull())
         },
         singleLine = true,
         label = { Text(label) },
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        modifier = Modifier.fillMaxWidth()
+    )
+}
+
+/**
+ * Year-of-birth entry. Holds its own digit string (max 4 digits) and never
+ * round-trips through epoch-days, so typing "1978" stays exactly "1978". The view
+ * model converts the year to a date once, at commit time.
+ */
+@Composable
+private fun YearOfBirthField(year: Int?, onChange: (Int?) -> Unit) {
+    var text by remember { mutableStateOf(year?.toString() ?: "") }
+    OutlinedTextField(
+        value = text,
+        onValueChange = {
+            val digits = it.filter { ch -> ch.isDigit() }.take(4)
+            text = digits
+            onChange(digits.toIntOrNull())
+        },
+        singleLine = true,
+        label = { Text("Year of birth") },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         modifier = Modifier.fillMaxWidth()
     )

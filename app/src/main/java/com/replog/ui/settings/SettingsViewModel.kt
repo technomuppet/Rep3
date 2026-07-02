@@ -51,6 +51,22 @@ data class SettingsUiState(
     val isBusy: Boolean = false
 )
 
+/** Typed holders so the Settings combine() has no positional casts (Sprint 19). */
+private data class SettingsPrefsGroup(
+    val useKg: Boolean,
+    val restPresets: RestPresets,
+    val customKgPlates: String,
+    val customLbPlates: String,
+    val autoFocusField: String
+)
+private data class SettingsStatusGroup(
+    val exportStatus: String?,
+    val backupStatus: String?,
+    val templateStatus: String?,
+    val exportFolderLabel: String,
+    val isBusy: Boolean
+)
+
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val prefs: PreferencesManager,
@@ -78,39 +94,41 @@ class SettingsViewModel @Inject constructor(
     private val artifacts = MutableStateFlow(ExportArtifacts())
     private val isBusy = MutableStateFlow(false)
 
+    // Fully typed Flow composition (Sprint 19): three typed combine groups (<=5
+    // flows each, kotlinx's typed combine limit) joined into the final state. No
+    // positional array access, no `as Any?`, no unchecked casts - a flow reorder is
+    // now a compile error rather than a runtime ClassCastException.
+    private val prefsGroup: kotlinx.coroutines.flow.Flow<SettingsPrefsGroup> = combine(
+        prefs.useKg, prefs.restPresets, prefs.customKgPlates, prefs.customLbPlates, prefs.autoFocusField
+    ) { useKg, restPresets, kgPlates, lbPlates, autoFocus ->
+        SettingsPrefsGroup(useKg, restPresets, kgPlates, lbPlates, autoFocus)
+    }
+    private val statusGroup: kotlinx.coroutines.flow.Flow<SettingsStatusGroup> = combine(
+        exportStatus, backupStatus, templateStatus, prefs.exportFolderLabel, isBusy
+    ) { export, backup, template, folderLabel, busy ->
+        SettingsStatusGroup(export, backup, template, folderLabel, busy)
+    }
+
     val uiState: StateFlow<SettingsUiState> = combine(
-        listOf(
-            prefs.useKg.map { it as Any? },
-            prefs.restPresets.map { it as Any? },
-            prefs.customKgPlates.map { it as Any? },
-            prefs.customLbPlates.map { it as Any? },
-            exportStatus.map { it as Any? },
-            backupStatus.map { it as Any? },
-            artifacts.map { it as Any? },
-            isBusy.map { it as Any? },
-            prefs.exportFolderLabel.map { it as Any? },
-            templateStatus.map { it as Any? },
-            prefs.autoFocusField.map { it as Any? }
-        )
-    ) { values ->
-        val a = values[6] as ExportArtifacts
+        prefsGroup, statusGroup, artifacts
+    ) { p, s, a ->
         SettingsUiState(
-            useKg = values[0] as Boolean,
-            restPresets = values[1] as RestPresets,
-            customKgPlates = values[2] as String,
-            customLbPlates = values[3] as String,
-            exportStatus = values[4] as String?,
-            backupStatus = values[5] as String?,
+            useKg = p.useKg,
+            restPresets = p.restPresets,
+            customKgPlates = p.customKgPlates,
+            customLbPlates = p.customLbPlates,
+            exportStatus = s.exportStatus,
+            backupStatus = s.backupStatus,
             latestCsvShareUri = a.csvShareUri,
             latestJsonShareUri = a.jsonShareUri,
             latestCsvFileName = a.csvFileName,
             latestCsvLocation = a.csvLocation,
             latestJsonFileName = a.jsonFileName,
             latestJsonLocation = a.jsonLocation,
-            isBusy = values[7] as Boolean,
-            exportFolderLabel = values[8] as String,
-            templateStatus = values[9] as String?,
-            autoFocusField = values[10] as String
+            isBusy = s.isBusy,
+            exportFolderLabel = s.exportFolderLabel,
+            templateStatus = s.templateStatus,
+            autoFocusField = p.autoFocusField
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 

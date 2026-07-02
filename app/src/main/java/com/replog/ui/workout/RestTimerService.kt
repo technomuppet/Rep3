@@ -96,12 +96,12 @@ class RestTimerService : Service() {
                     vib.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 200, 100, 200, 100, 400), -1))
                 } else @Suppress("DEPRECATION") vib.vibrate(longArrayOf(0, 200, 100, 200, 100, 400), -1)
             }
-        } catch (_: Exception) {}
+        } catch (_: Exception) {} // Vibration is a non-critical cue; ignore device/permission failures.
 
         // Sound
         try {
             RingtoneManager.getRingtone(this, RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))?.play()
-        } catch (_: Exception) {}
+        } catch (_: Exception) {} // Notification sound is a non-critical cue; ignore playback failures.
     }
 
     private fun timeLeft(endAt: Long): String {

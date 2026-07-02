@@ -19,8 +19,6 @@ object AppModule {
     @Provides fun provideTemplateDao(db: AppDatabase): TemplateDao = db.templateDao()
     @Provides fun provideBodyweightDao(db: AppDatabase): BodyweightDao = db.bodyweightDao()
     @Provides fun providePrescriptionDao(db: AppDatabase): PrescriptionDao = db.prescriptionDao()
-    @Provides fun provideTrainingDnaDao(db: AppDatabase): TrainingDnaDao = db.trainingDnaDao()
-    @Provides fun provideKnowledgeGraphDao(db: AppDatabase): KnowledgeGraphDao = db.knowledgeGraphDao()
     @Provides fun provideRestLogDao(db: AppDatabase): RestLogDao = db.restLogDao()
     @Provides fun provideTrainingDnaSnapshotDao(db: AppDatabase): TrainingDnaSnapshotDao = db.trainingDnaSnapshotDao()
     @Provides fun provideTrainingDnaProgressionScoreDao(db: AppDatabase): TrainingDnaProgressionScoreDao = db.trainingDnaProgressionScoreDao()

@@ -56,6 +56,19 @@ data class HomeUiState(
     val isLoading: Boolean = true
 )
 
+/** Typed holders so the Home dashboard combine() has no positional casts. */
+private data class HomeGroupA(
+    val stats: Pair<Int, Double>,
+    val sessions: List<SessionWithExercises>,
+    val prs: List<SetLog>,
+    val summaries: List<com.replog.data.model.SessionSummaryRow>,
+    val recentCompleted: List<SessionWithExercises>
+)
+private data class HomeGroupB(
+    val activeGoals: List<com.replog.data.model.Goal>,
+    val favorites: List<com.replog.data.model.TemplateWithExercises>
+)
+
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val repo: WorkoutRepository,
@@ -122,31 +135,33 @@ class HomeViewModel @Inject constructor(
         repo.setTemplateFavorite(template.template.id, !template.template.isFavorite)
     }
 
-    val uiState: StateFlow<HomeUiState> = combine(
-        listOf(
-            stats,
-            repo.getRecentSessions(5),
-            repo.getRecentPRs(),
-            repo.getCompletedSessionSummaries(),
-            goalRepository.getActive(),
-            repo.getFavoriteTemplates(),
-            repo.getRecentCompletedSessions(30)
-        )
-    ) { values ->
-        @Suppress("UNCHECKED_CAST")
-        val s = values[0] as Pair<Int, Double>
-        @Suppress("UNCHECKED_CAST")
-        val sessions = values[1] as List<SessionWithExercises>
-        @Suppress("UNCHECKED_CAST")
-        val prs = values[2] as List<SetLog>
-        @Suppress("UNCHECKED_CAST")
-        val summaries = values[3] as List<com.replog.data.model.SessionSummaryRow>
-        @Suppress("UNCHECKED_CAST")
-        val activeGoals = values[4] as List<com.replog.data.model.Goal>
-        @Suppress("UNCHECKED_CAST")
-        val favorites = values[5] as List<com.replog.data.model.TemplateWithExercises>
-        @Suppress("UNCHECKED_CAST")
-        val recentCompleted = values[6] as List<SessionWithExercises>
+    // Two TYPED combine groups (kotlinx provides typed combine up to 5 flows),
+    // joined into a Pair. This replaces the previous combine(listOf(...)) with
+    // positional `values[N] as Type` unchecked casts, which silently broke at
+    // runtime (ClassCastException) if a flow was reordered. Now every value is
+    // statically typed and a reorder is a compile error.
+    private val homeGroupA: kotlinx.coroutines.flow.Flow<HomeGroupA> = combine(
+        stats,
+        repo.getRecentSessions(5),
+        repo.getRecentPRs(),
+        repo.getCompletedSessionSummaries(),
+        repo.getRecentCompletedSessions(30)
+    ) { s, sessions, prs, summaries, recentCompleted ->
+        HomeGroupA(s, sessions, prs, summaries, recentCompleted)
+    }
+    private val homeGroupB: kotlinx.coroutines.flow.Flow<HomeGroupB> = combine(
+        goalRepository.getActive(),
+        repo.getFavoriteTemplates()
+    ) { activeGoals, favorites -> HomeGroupB(activeGoals, favorites) }
+
+    val uiState: StateFlow<HomeUiState> = combine(homeGroupA, homeGroupB) { a, b ->
+        val s = a.stats
+        val sessions = a.sessions
+        val prs = a.prs
+        val summaries = a.summaries
+        val recentCompleted = a.recentCompleted
+        val activeGoals = b.activeGoals
+        val favorites = b.favorites
         val now = System.currentTimeMillis()
         // Phase 2: cheap stats from SQL-aggregated summaries (no full graph load).
         val startTimes = summaries.map { it.startTime }

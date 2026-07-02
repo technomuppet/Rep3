@@ -9,7 +9,6 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.replog.data.model.BodyweightLog
 import com.replog.data.model.Exercise
 import com.replog.data.model.Goal
-import com.replog.data.model.KnowledgeGraphRelation
 import com.replog.data.model.PlateauEvent
 import com.replog.data.model.RecommendationHistory
 import com.replog.data.model.RestDayOverride
@@ -17,7 +16,6 @@ import com.replog.data.model.RestLog
 import com.replog.data.model.SessionExercise
 import com.replog.data.model.SetLog
 import com.replog.data.model.TemplateExercise
-import com.replog.data.model.TrainingDnaMetric
 import com.replog.data.model.TrainingDnaProgressionScore
 import com.replog.data.model.TrainingDnaSnapshot
 import com.replog.data.model.WorkoutPrescription
@@ -34,8 +32,6 @@ import com.replog.data.model.WorkoutTemplate
         TemplateExercise::class,
         BodyweightLog::class,
         WorkoutPrescription::class,
-        TrainingDnaMetric::class,
-        KnowledgeGraphRelation::class,
         RestLog::class,
         TrainingDnaSnapshot::class,
         TrainingDnaProgressionScore::class,
@@ -44,7 +40,7 @@ import com.replog.data.model.WorkoutTemplate
         Goal::class,
         RestDayOverride::class
     ],
-    version = 15,
+    version = 16,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -54,8 +50,6 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun templateDao(): TemplateDao
     abstract fun bodyweightDao(): BodyweightDao
     abstract fun prescriptionDao(): PrescriptionDao
-    abstract fun trainingDnaDao(): TrainingDnaDao
-    abstract fun knowledgeGraphDao(): KnowledgeGraphDao
     abstract fun restLogDao(): RestLogDao
     abstract fun trainingDnaSnapshotDao(): TrainingDnaSnapshotDao
     abstract fun trainingDnaProgressionScoreDao(): TrainingDnaProgressionScoreDao
@@ -380,12 +374,26 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // Sprint 19: drop two abandoned prototype tables (never read/written by any
+        // live feature - see ARCHITECTURE_CLEANUP_REPORT). The knowledge-graph and
+        // DNA-signal-metric subsystems were superseded by ExerciseSwapEngine/
+        // MuscleGapAnalyzer/RecommendationEngine and the live TrainingDnaEngine
+        // (snapshots/scores/plateaus) respectively. Dropping is safe: no user data
+        // is produced into these tables by any shipped code path.
+        val MIGRATION_15_16 = object : Migration(15, 16) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("DROP TABLE IF EXISTS training_dna_metrics")
+                database.execSQL("DROP TABLE IF EXISTS knowledge_graph_relations")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase = INSTANCE ?: synchronized(this) {
             Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "replog_database")
                 .addMigrations(
                     MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
                     MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11,
-                    MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15
+                    MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15,
+                    MIGRATION_15_16
                 )
                 .build()
                 .also { INSTANCE = it }

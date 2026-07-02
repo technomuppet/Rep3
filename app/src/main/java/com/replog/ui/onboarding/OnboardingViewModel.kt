@@ -37,7 +37,7 @@ enum class OnboardingStep {
 /** Draft of the user profile being collected during onboarding. */
 data class ProfileDraft(
     val displayName: String = "",
-    val dateOfBirthEpochDay: Long? = null,
+    val birthYear: Int? = null,
     val heightCm: Double? = null,
     val weightKg: Double? = null,
     val useKg: Boolean = true,
@@ -93,7 +93,7 @@ class OnboardingViewModel @Inject constructor(
 
     // --- draft editing ---
     fun setDisplayName(v: String) = _state.update { it.copy(draft = it.draft.copy(displayName = v)) }
-    fun setDob(epochDay: Long?) = _state.update { it.copy(draft = it.draft.copy(dateOfBirthEpochDay = epochDay)) }
+    fun setBirthYear(year: Int?) = _state.update { it.copy(draft = it.draft.copy(birthYear = year)) }
     fun setHeight(cm: Double?) = _state.update { it.copy(draft = it.draft.copy(heightCm = cm)) }
     fun setWeight(kg: Double?) = _state.update { it.copy(draft = it.draft.copy(weightKg = kg)) }
     fun setUseKg(v: Boolean) = _state.update { it.copy(draft = it.draft.copy(useKg = v)) }
@@ -129,13 +129,17 @@ class OnboardingViewModel @Inject constructor(
      * the start. Home remains unreachable.
      */
     fun declineAndCancel() = _state.update { s ->
-        if (s.reacceptanceOnly) {
-            // Existing user: keep their profile, just reset the legal checkboxes
-            // and stay on the disclaimer until they accept the updated documents.
-            s.copy(disclaimerAccepted = false, termsAccepted = false, privacyAccepted = false, step = OnboardingStep.DISCLAIMER)
-        } else {
-            OnboardingUiState()
-        }
+        // Declining clears the legal acceptances and cannot grant access to the app,
+        // but it NEVER discards the details the user already entered. New users are
+        // returned to the Training Preferences step (their profile + preferences are
+        // kept); existing users stay on the disclaimer. No profile is written and no
+        // acceptance is recorded until they accept all documents and finish.
+        s.copy(
+            disclaimerAccepted = false,
+            termsAccepted = false,
+            privacyAccepted = false,
+            step = if (s.reacceptanceOnly) OnboardingStep.DISCLAIMER else OnboardingStep.TRAINING_PREFERENCES
+        )
     }
 
     /** The exact display name the final confirmation must match. */
@@ -154,9 +158,15 @@ class OnboardingViewModel @Inject constructor(
 
         if (!s.reacceptanceOnly) {
             val d = s.draft
+            // Convert the chosen birth year to an epoch-day (1 Jan of that year) only
+            // here at commit time, using a real calendar - no lossy round-trip while
+            // the user is typing.
+            val dobEpochDay = d.birthYear?.takeIf { it in 1900..2100 }?.let {
+                java.time.LocalDate.of(it, 1, 1).toEpochDay()
+            }
             val profile = UserProfile(
                 displayName = d.displayName.trim(),
-                dateOfBirthEpochDay = d.dateOfBirthEpochDay,
+                dateOfBirthEpochDay = dobEpochDay,
                 heightCm = d.heightCm,
                 weightKg = d.weightKg,
                 useKg = d.useKg,

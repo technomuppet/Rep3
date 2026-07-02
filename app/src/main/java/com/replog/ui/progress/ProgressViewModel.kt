@@ -119,34 +119,43 @@ private data class DatedSet(
     val estimatedOneRm: Double
 )
 
+/** Typed holder so the Progress combine() has no positional casts. */
+private data class ProgressGroupA(
+    val sessions: List<SessionWithExercises>,
+    val bodyweights: List<BodyweightLog>,
+    val useKg: Boolean,
+    val goal: Double?,
+    val totals: com.replog.data.model.ProgressTotalsRow
+)
+
 @HiltViewModel
 class ProgressViewModel @Inject constructor(
     workoutRepository: WorkoutRepository,
     private val bodyweightRepository: BodyweightRepository,
     private val preferencesManager: PreferencesManager
 ) : ViewModel() {
+    // Typed combine groups replace the previous combine(listOf(...)) with
+    // positional `values[N] as Type` unchecked casts (and the `as Any?` wrapping).
+    // Every value is now statically typed; a flow reorder is a compile error, not a
+    // runtime ClassCastException.
+    private val progressGroupA: kotlinx.coroutines.flow.Flow<ProgressGroupA> = combine(
+        // Sprint 10 P1: bounded recent window for the deep analytics (rankings,
+        // forecasts, recovery, plateaus) - never the full history.
+        workoutRepository.getRecentCompletedSessions(RECENT_WINDOW),
+        bodyweightRepository.getAllBodyweights(),
+        preferencesManager.useKg,
+        preferencesManager.bodyweightGoal,
+        // All-time headline totals from SQL aggregates (exact at any size).
+        workoutRepository.getProgressTotals()
+    ) { sessions, bodyweights, useKg, goal, totals ->
+        ProgressGroupA(sessions, bodyweights, useKg, goal, totals)
+    }
+
     val uiState: StateFlow<ProgressUiState> = combine(
-        listOf(
-            // Sprint 10 P1: bounded recent window for the deep analytics (rankings,
-            // forecasts, recovery, plateaus) - never the full history.
-            workoutRepository.getRecentCompletedSessions(RECENT_WINDOW),
-            bodyweightRepository.getAllBodyweights(),
-            preferencesManager.useKg.map { it as Any? },
-            preferencesManager.bodyweightGoal.map { it as Any? },
-            // All-time headline totals from SQL aggregates (exact at any size).
-            workoutRepository.getProgressTotals(),
-            workoutRepository.getCompletedSessionCountFlow()
-        )
-    ) { values ->
-        @Suppress("UNCHECKED_CAST")
-        val sessions = values[0] as List<SessionWithExercises>
-        @Suppress("UNCHECKED_CAST")
-        val bodyweights = values[1] as List<BodyweightLog>
-        val useKg = values[2] as Boolean
-        val goal = values[3] as Double?
-        val totals = values[4] as com.replog.data.model.ProgressTotalsRow
-        val completedCount = values[5] as Int
-        buildProgressState(sessions, bodyweights, useKg, goal, totals, completedCount)
+        progressGroupA,
+        workoutRepository.getCompletedSessionCountFlow()
+    ) { a, completedCount ->
+        buildProgressState(a.sessions, a.bodyweights, a.useKg, a.goal, a.totals, completedCount)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ProgressUiState())
 
     fun addBodyweight(weight: Double, note: String? = null) = viewModelScope.launch {

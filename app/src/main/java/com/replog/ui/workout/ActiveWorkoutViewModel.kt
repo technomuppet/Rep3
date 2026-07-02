@@ -99,6 +99,25 @@ data class ActiveWorkoutUiState(
     val targetsByExerciseId: Map<Int, WorkoutTargetUi> = emptyMap()
 )
 
+/** Typed holders so the ActiveWorkout combine() has no positional casts (Sprint 19). */
+private data class AwCoreGroup(
+    val activeId: Int?,
+    val isSaving: Boolean,
+    val restoredWorkout: Boolean,
+    val summary: WorkoutSummary?
+)
+private data class AwDataGroup(
+    val allExercises: List<Exercise>,
+    val templates: List<TemplateWithExercises>,
+    val timerState: RestTimerState,
+    val allSessions: List<SessionWithExercises>,
+    val useKg: Boolean
+)
+private data class AwPrefsGroup(
+    val restAutoStart: Boolean,
+    val autoFocusField: String
+)
+
 @HiltViewModel
 class ActiveWorkoutViewModel @Inject constructor(
     private val workouts: WorkoutRepository,
@@ -161,29 +180,41 @@ class ActiveWorkoutViewModel @Inject constructor(
     private var cachedAdaptivePlan: AdaptiveWorkoutPlan? = null
     private var cachedAdaptivePlanForSessionCount: Int = -1
 
-    val uiState: StateFlow<ActiveWorkoutUiState> = combine(
-        activeId, tick, saving,
+    // Fully typed Flow composition (Sprint 19): three typed combine groups (<=5
+    // flows each) joined into the final state. No positional array access, no
+    // unchecked casts. `tick` sits in a group purely to trigger recompute.
+    private val awCore: kotlinx.coroutines.flow.Flow<AwCoreGroup> = combine(
+        activeId, tick, saving, restored, summary
+    ) { id, _, isSaving, restoredWorkout, currentSummary ->
+        AwCoreGroup(id, isSaving, restoredWorkout, currentSummary)
+    }
+    private val awData: kotlinx.coroutines.flow.Flow<AwDataGroup> = combine(
         exercises.getAllExercises(),
         workouts.getAllTemplates(),
-        prefs.useKg,
-        restored,
-        summary,
         restTimer.state,
         workouts.getRecentCompletedSessions(8),
-        prefs.restAutoStart,
-        prefs.autoFocusField
-    ) { args ->
-        val id = args[0] as Int?
-        @Suppress("UNCHECKED_CAST") val isSaving = args[2] as Boolean
-        @Suppress("UNCHECKED_CAST") val allExercises = args[3] as List<Exercise>
-        @Suppress("UNCHECKED_CAST") val templates = args[4] as List<TemplateWithExercises>
-        val useKg = args[5] as Boolean
-        val restoredWorkout = args[6] as Boolean
-        val currentSummary = args[7] as WorkoutSummary?
-        val timerState = args[8] as RestTimerState
-        @Suppress("UNCHECKED_CAST") val allSessions = args[9] as List<SessionWithExercises>
-        val restAutoStart = args[10] as Boolean
-        val autoFocusField = args[11] as String
+        prefs.useKg
+    ) { allExercises, templates, timerState, allSessions, useKg ->
+        AwDataGroup(allExercises, templates, timerState, allSessions, useKg)
+    }
+    private val awPrefs: kotlinx.coroutines.flow.Flow<AwPrefsGroup> = combine(
+        prefs.restAutoStart, prefs.autoFocusField
+    ) { restAutoStart, autoFocusField -> AwPrefsGroup(restAutoStart, autoFocusField) }
+
+    val uiState: StateFlow<ActiveWorkoutUiState> = combine(
+        awCore, awData, awPrefs
+    ) { core, data, pref ->
+        val id = core.activeId
+        val isSaving = core.isSaving
+        val restoredWorkout = core.restoredWorkout
+        val currentSummary = core.summary
+        val allExercises = data.allExercises
+        val templates = data.templates
+        val timerState = data.timerState
+        val allSessions = data.allSessions
+        val useKg = data.useKg
+        val restAutoStart = pref.restAutoStart
+        val autoFocusField = pref.autoFocusField
 
         val session = id?.let { workouts.getSessionById(it) }
         val prescriptions = id?.let { workouts.getPrescriptionsForSession(it) }.orEmpty()
@@ -271,6 +302,8 @@ class ActiveWorkoutViewModel @Inject constructor(
         if (id <= 0) return
         viewModelScope.launch {
             workouts.setSessionRating(id, rating.coerceIn(1, 5))
+            // Best-effort: regenerating the Training DNA snapshot is non-critical and
+            // must never fail the rating save, so failures are intentionally ignored.
             try { trainingDnaRepository.generateDNA() } catch (_: Exception) {}
         }
     }

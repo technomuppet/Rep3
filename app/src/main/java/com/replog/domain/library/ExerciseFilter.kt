@@ -16,11 +16,15 @@ data class ExerciseFilterState(
     val equipment: Set<String> = emptySet(),
     val difficulties: Set<String> = emptySet(),
     val patterns: Set<String> = emptySet(),       // movement-pattern families
+    val goals: Set<String> = emptySet(),          // Sprint 13: Hypertrophy / Strength / Fat Loss
+    val experiences: Set<String> = emptySet(),    // Sprint 13: First Week / Building Up / Experienced
+    val equipmentPresets: Set<String> = emptySet(), // Sprint 13: No Equipment / Home Workout / Machine Only
     val query: String = ""
 ) {
     val isEmpty: Boolean
         get() = muscles.isEmpty() && equipment.isEmpty() && difficulties.isEmpty() &&
-            patterns.isEmpty() && query.isBlank()
+            patterns.isEmpty() && goals.isEmpty() && experiences.isEmpty() &&
+            equipmentPresets.isEmpty() && query.isBlank()
 }
 
 object ExerciseFilter {
@@ -33,6 +37,76 @@ object ExerciseFilter {
 
     /** Movement-pattern family chips. */
     val PATTERNS: List<String> = listOf("Push", "Pull", "Legs", "Hinge", "Core", "Conditioning", "Shoulders")
+
+    /** Sprint 13: goal chips. Mapped onto existing attributes, no new data. */
+    val GOALS: List<String> = listOf("Hypertrophy", "Strength", "Fat Loss")
+
+    /** Sprint 13: experience chips, mapped onto difficulty. */
+    val EXPERIENCES: List<String> = listOf("First Week", "Building Up", "Experienced")
+
+    /** Sprint 13: convenience equipment presets. */
+    val EQUIPMENT_PRESETS: List<String> = listOf("No Equipment", "Home Workout", "Machine Only")
+
+    private val experienceToDifficulty: Map<String, String> = mapOf(
+        "First Week" to "beginner",
+        "Building Up" to "intermediate",
+        "Experienced" to "advanced"
+    )
+
+    private val homeFriendlyEquipment = setOf("bodyweight", "none", "dumbbell", "band", "kettlebell")
+    private val noEquipment = setOf("bodyweight", "none")
+    private val machineEquipment = setOf("machine", "smith machine", "cable")
+
+    /** Public single-goal check reused by WhyThisExercise (no logic duplication). */
+    fun matchesGoalPublic(ex: Exercise, goal: String?): Boolean {
+        val g = goalLabelFor(goal) ?: return false
+        return matchesGoal(ex, setOf(g))
+    }
+
+    /** Maps a profile goal enum name to the goal chip label used by matchesGoal. */
+    private fun goalLabelFor(goal: String?): String? = when (goal?.uppercase()) {
+        "HYPERTROPHY" -> "Hypertrophy"
+        "STRENGTH" -> "Strength"
+        "FAT_LOSS" -> "Fat Loss"
+        else -> null
+    }
+
+    private fun matchesGoal(ex: Exercise, goals: Set<String>): Boolean {
+        if (goals.isEmpty()) return true
+        val pattern = ex.movementPattern.lowercase()
+        val cat = ex.category.lowercase()
+        val type = ex.type.lowercase()
+        return goals.any { goal ->
+            when (goal.lowercase()) {
+                // Hypertrophy: strength-type resistance work (exclude pure cardio).
+                "hypertrophy" -> type != "cardio" && cat != "cardio"
+                // Strength: the big compound patterns.
+                "strength" -> listOf("squat", "hinge", "press", "row", "pull", "olympic").any { pattern.contains(it) }
+                // Fat loss: conditioning / cardio / full-body.
+                "fat loss" -> type == "cardio" || cat == "cardio" || cat == "full body" || pattern.contains("conditioning")
+                else -> true
+            }
+        }
+    }
+
+    private fun matchesExperience(ex: Exercise, experiences: Set<String>): Boolean {
+        if (experiences.isEmpty()) return true
+        val diff = ex.difficulty.lowercase()
+        return experiences.any { experienceToDifficulty[it] == diff }
+    }
+
+    private fun matchesEquipmentPreset(ex: Exercise, presets: Set<String>): Boolean {
+        if (presets.isEmpty()) return true
+        val eq = ex.equipment.lowercase()
+        return presets.any { preset ->
+            when (preset.lowercase()) {
+                "no equipment" -> eq in noEquipment
+                "home workout" -> eq in homeFriendlyEquipment
+                "machine only" -> eq in machineEquipment
+                else -> true
+            }
+        }
+    }
 
     /** Map a muscle-group chip to the fine-grained muscle names it should match. */
     private val groupToMuscles: Map<String, Set<String>> = mapOf(
@@ -62,6 +136,9 @@ object ExerciseFilter {
                 (equip.isEmpty() || ex.equipment.lowercase() in equip) &&
                 (diffs.isEmpty() || ex.difficulty.lowercase() in diffs) &&
                 (pats.isEmpty() || patternFamily(ex) in pats) &&
+                matchesGoal(ex, f.goals) &&
+                matchesExperience(ex, f.experiences) &&
+                matchesEquipmentPreset(ex, f.equipmentPresets) &&
                 (q.isBlank() || matchesQuery(ex, q))
         }
     }
