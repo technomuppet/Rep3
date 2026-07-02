@@ -41,7 +41,7 @@ import com.replog.data.model.WorkoutTemplate
         RestDayOverride::class
     ],
     version = 16,
-    exportSchema = false
+    exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun exerciseDao(): ExerciseDao
