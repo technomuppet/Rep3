@@ -114,11 +114,11 @@ object KettlebellsRenderer : EquipmentRenderer {
         val span = hypot((rightWrist.x - leftWrist.x).toDouble(), (rightWrist.y - leftWrist.y).toDouble()).toFloat()
         if (span < referenceSize * 0.5f) {
             val mid = Offset((leftWrist.x + rightWrist.x) * 0.5f, (leftWrist.y + rightWrist.y) * 0.5f + referenceSize * 0.12f)
-            drawKettlebell(this, mid, referenceSize)
+            drawKettlebell(mid, referenceSize)
         } else {
             listOf(leftWrist, rightWrist).forEach { wrist ->
                 val pos = Offset(wrist.x, wrist.y + referenceSize * 0.12f)
-                drawKettlebell(this, pos, referenceSize * 0.85f)
+                drawKettlebell(pos, referenceSize * 0.85f)
             }
         }
     }

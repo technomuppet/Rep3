@@ -20,12 +20,5 @@ fun MuscleBodyDiagram(exercise: Exercise, modifier: Modifier = Modifier) {
                 modifier = modifier
             )
         }
-        is VisualEngineAdapter.AnatomyRenderMode.LegacyBoxes -> {
-            // RC20.4: Legacy boxes removed, fallback to vector engine with empty secondary if needed
-            AnatomicalMuscleDiagram(
-                anatomySpec = mode.spec,
-                modifier = modifier
-            )
-        }
     }
 }
