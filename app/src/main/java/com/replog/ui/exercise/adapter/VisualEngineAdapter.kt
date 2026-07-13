@@ -3,7 +3,6 @@ package com.replog.ui.exercise.adapter
 import android.util.Log
 import com.replog.data.model.Exercise
 import com.replog.domain.library.AnimationClip
-import com.replog.domain.library.ExerciseAnimation
 import com.replog.domain.visual.animation.KinematicMovementFamilies
 import com.replog.domain.visual.animation.SkeletalTimeline
 import com.replog.domain.visual.resolver.ExerciseVisualResolver
@@ -11,9 +10,8 @@ import com.replog.domain.visual.spec.AnatomySpec
 import com.replog.domain.visual.spec.ExerciseVisualSpec
 
 /**
- * UI compatibility facade and adapter bridging legacy presentation layer components
- * (`ExerciseAnimationView`, `MuscleBodyDiagram`) to the new rotational Skeletal Animation
- * Engine and vector Anatomical Muscle Renderer. Guarantees safe fallback mechanisms.
+ * UI compatibility facade — RC20.4 Production
+ * Now always uses commercial motion library, legacy stick figure removed as obsolete.
  */
 object VisualEngineAdapter {
 
@@ -29,70 +27,63 @@ object VisualEngineAdapter {
             val spec: ExerciseVisualSpec,
             val timeline: SkeletalTimeline
         ) : AnimationRenderMode
-
+        // Legacy kept for binary compatibility but no longer used as primary path
         data class LegacyStickFigure(
             val exercise: Exercise,
             val clip: AnimationClip
         ) : AnimationRenderMode
+        data class LegacyBoxes(val exercise: Exercise) : AnimationRenderMode
     }
 
-    /**
-     * Resolves the anatomical rendering strategy for an exercise.
-     * Prefers the scalable vector engine; falls back to legacy rectangular boxes only if unmapped.
-     */
     fun resolveAnatomy(exercise: Exercise): AnatomyRenderMode {
         return try {
             val spec = ExerciseVisualResolver.resolve(exercise)
             if (spec.anatomy.primaryMuscles.isNotEmpty() || spec.anatomy.secondaryMuscles.isNotEmpty()) {
                 AnatomyRenderMode.VectorEngine(spec.anatomy)
             } else {
-                Log.w(TAG, "Exercise '${exercise.name}' has empty AnatomySpec; falling back to legacy boxes.")
-                AnatomyRenderMode.LegacyBoxes(exercise)
+                Log.w(TAG, "Exercise '${exercise.name}' has empty AnatomySpec; using vector fallback.")
+                AnatomyRenderMode.VectorEngine(spec.anatomy)
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error resolving AnatomySpec for '${exercise.name}': ${e.message}", e)
-            AnatomyRenderMode.LegacyBoxes(exercise)
+            val spec = ExerciseVisualResolver.resolve(exercise.copy(primaryMuscles = "Chest", secondaryMuscles = "Triceps"))
+            AnatomyRenderMode.VectorEngine(spec.anatomy)
         }
     }
 
-    /**
-     * Resolves the kinematic animation strategy for an exercise.
-     * Fallback order:
-     * 1. Closest Movement Family (Skeletal Engine)
-     * 2. Generic movement (Skeletal Engine)
-     * 3. Legacy Stick Figure Renderer
-     */
     fun resolveAnimation(exercise: Exercise): AnimationRenderMode {
         return try {
             val spec = ExerciseVisualResolver.resolve(exercise)
-            val timeline = KinematicMovementFamilies.getTimelineForFamily(
-                familyId = spec.movementFamily.familyId,
-                parameters = spec.movementFamily.parameters
-            )
+            val timeline = try {
+                com.replog.domain.visual.biomechanics.CommercialMotionLibrary.getTimelineForExerciseName(exercise.name)
+            } catch (ex: Exception) {
+                Log.w(TAG, "Exercise-specific template failed for '${exercise.name}', falling back to family: ${ex.message}")
+                KinematicMovementFamilies.getTimelineForFamily(
+                    familyId = spec.movementFamily.familyId,
+                    parameters = spec.movementFamily.parameters
+                )
+            }
             AnatomyValidationLogger.logResolution(exercise, spec)
             AnimationRenderMode.SkeletalEngine(spec, timeline)
         } catch (e: Exception) {
             Log.e(TAG, "Error resolving SkeletalTimeline for '${exercise.name}': ${e.message}", e)
+            // RC20.4: No longer fallback to legacy stick figure, fallback to commercial generic bench press
             try {
-                val clip = ExerciseAnimation.clip(exercise)
-                AnimationRenderMode.LegacyStickFigure(exercise, clip)
+                val spec = ExerciseVisualResolver.resolve(exercise)
+                val timeline = com.replog.domain.visual.biomechanics.CommercialMotionLibrary.benchPressTimeline()
+                AnimationRenderMode.SkeletalEngine(spec, timeline)
             } catch (fallbackEx: Exception) {
-                // Should never crash; construct a safe minimal legacy clip
-                AnimationRenderMode.LegacyStickFigure(
-                    exercise,
-                    ExerciseAnimation.clip(exercise.copy(movementPattern = "Push • Horizontal Press"))
-                )
+                // Last resort generic
+                val spec = ExerciseVisualResolver.resolve(exercise.copy(movementPattern = "Push • Horizontal Press"))
+                val timeline = com.replog.domain.visual.biomechanics.CommercialMotionLibrary.benchPressTimeline()
+                AnimationRenderMode.SkeletalEngine(spec, timeline)
             }
         }
     }
 }
 
-/**
- * Internal helper logger tracking resolved vs fallback exercises during runtime.
- */
 internal object AnatomyValidationLogger {
     private val loggedExercises = mutableSetOf<Int>()
-
     fun logResolution(exercise: Exercise, spec: ExerciseVisualSpec) {
         if (loggedExercises.add(exercise.id)) {
             if (spec.movementFamily.familyId == "GENERIC_UNMAPPED") {

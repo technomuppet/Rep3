@@ -17,6 +17,7 @@ import com.replog.domain.visual.spec.SupportType
 /**
  * Pure domain translator resolving an Exercise data entity into an immutable
  * ExerciseVisualSpec without relying on UI, Compose, or Canvas code.
+ * RC20.4 Critical Fixes: Hip thrust orientation, dip foot locking, support types.
  */
 object ExerciseVisualResolver {
 
@@ -83,41 +84,26 @@ object ExerciseVisualResolver {
     }
 
     private fun resolveMovementFamily(pat: String, name: String, cat: String): MovementFamilyMetadata {
-        // 1. Olympic Lifts
         if (pat.contains("olympic") || name.contains("snatch") || name.contains("clean") || name.contains("jerk")) {
             return MovementFamily.OLYMPIC_LIFT
         }
-
-        // 2. Squat variations
         if (name.contains("hack squat")) return MovementFamily.HACK_SQUAT
         if (name.contains("front squat") || name.contains("goblet squat")) return MovementFamily.FRONT_SQUAT
         if (name.contains("split squat")) return MovementFamily.SPLIT_SQUAT
         if (pat.contains("squat") || name.contains("squat")) return MovementFamily.SQUAT
-
-        // 3. Lunge variations
         if (pat.contains("lunge") || name.contains("lunge")) return MovementFamily.LUNGE
-
-        // 4. Leg Press
         if (name.contains("leg press")) return MovementFamily.LEG_PRESS
-
-        // 5. Hip Thrust / Glute Bridge
         if (name.contains("hip thrust") || name.contains("frog pump") || name.contains("glute bridge")) {
             return MovementFamily.HIP_THRUST
         }
-
-        // 6. Leg Extensions & Curls & Calves
         if (name.contains("leg extension") || name.contains("terminal knee extension")) return MovementFamily.LEG_EXTENSION
         if (name.contains("leg curl")) return MovementFamily.LEG_CURL
         if (pat.contains("calf") || name.contains("calf")) return MovementFamily.CALF_RAISE
-
-        // 7. Hinge variations
         if (name.contains("romanian deadlift") || name.contains("rdl")) return MovementFamily.ROMANIAN_DEADLIFT
         if (name.contains("deadlift") || name.contains("rack pull")) return MovementFamily.DEADLIFT
         if (pat.contains("hinge") || name.contains("good morning") || name.contains("swing") || name.contains("pull through")) {
             return MovementFamily.HIP_HINGE
         }
-
-        // 8. Pressing variations
         if (name.contains("incline machine press") || name.contains("smith machine incline")) return MovementFamily.INCLINE_PUSH
         if (name.contains("decline machine press") || name.contains("smith machine decline")) return MovementFamily.DECLINE_PUSH
         if (name.contains("machine chest press") || name.contains("hammer strength chest press") || name.contains("machine press")) {
@@ -135,13 +121,9 @@ object ExerciseVisualResolver {
         if (pat.contains("horizontal press") || name.contains("bench press") || name.contains("floor press") || name.contains("push up") || name.contains("chest press") || name.contains("squeeze press") || name.contains("dips")) {
             return MovementFamily.HORIZONTAL_PUSH
         }
-
-        // 9. Fly & Crossover
         if (pat.contains("chest fly") || name.contains("pec deck") || name.contains("crossover") || name.contains("fly") || name.contains("around the world")) {
             return MovementFamily.CABLE_FLY
         }
-
-        // 10. Pulling variations
         if (name.contains("pullover")) return MovementFamily.PULLOVER
         if (name.contains("face pull")) return MovementFamily.FACE_PULL
         if (name.contains("lat pulldown") || name.contains("pulldown")) return MovementFamily.LAT_PULLDOWN
@@ -153,8 +135,6 @@ object ExerciseVisualResolver {
         if (pat.contains("horizontal row") || pat.contains("vertical pull") || name.contains("row")) {
             return MovementFamily.HORIZONTAL_PULL
         }
-
-        // 11. Isolation Upper
         if (name.contains("preacher curl") || name.contains("spider curl")) return MovementFamily.PREACHER_CURL
         if (name.contains("hammer curl")) return MovementFamily.HAMMER_CURL
         if (pat.contains("elbow flexion") || name.contains("curl")) {
@@ -172,16 +152,12 @@ object ExerciseVisualResolver {
             return MovementFamily.REAR_DELT_FLY
         }
         if (pat.contains("shrug") || name.contains("shrug")) return MovementFamily.SHRUG
-
-        // 12. Core & Conditioning
         if (name.contains("plank") || name.contains("bear crawl")) return MovementFamily.PLANK
         if (name.contains("crunch") || name.contains("sit up") || name.contains("rollout")) return MovementFamily.CRUNCH
         if (name.contains("leg raise") || name.contains("oblique raise")) return MovementFamily.LEG_RAISE
         if (name.contains("russian twist") || name.contains("pallof") || name.contains("rotation")) return MovementFamily.CORE_ROTATION
         if (pat.contains("carry") || name.contains("carry") || name.contains("walk")) return MovementFamily.CARRY
         if (pat.contains("conditioning") || cat == "cardio" || name.contains("wall ball")) return MovementFamily.CONDITIONING
-
-        // 13. Category Fallback
         return when (cat) {
             "chest" -> MovementFamily.HORIZONTAL_PUSH
             "back" -> MovementFamily.HORIZONTAL_PULL
@@ -200,6 +176,16 @@ object ExerciseVisualResolver {
         name: String,
         eq: EquipmentType
     ): Pair<Float, SupportType> {
+        // RC20.4 Critical Fixes
+        if (family.id == "HIP_THRUST" || name.contains("hip thrust") || name.contains("glute bridge") || name.contains("frog pump")) {
+            return 0.0f to SupportType.SUPINE_LYING
+        }
+        if (name.contains("dip") || name.contains("dips")) {
+            return 0.0f to SupportType.HANGING
+        }
+        if (name.contains("hanging leg") || (name.contains("hanging") && name.contains("raise"))) {
+            return 0.0f to SupportType.HANGING
+        }
         if (family.id == "INCLINE_PUSH" || name.contains("incline")) {
             return 30.0f to SupportType.SEATED_INCLINE
         }
@@ -217,7 +203,7 @@ object ExerciseVisualResolver {
         if (family.id in setOf("PULL_UP", "HANGING")) {
             return 0.0f to SupportType.HANGING
         }
-        if (family.id in setOf("PLANK", "CRUNCH")) {
+        if (family.id in setOf("PLANK", "CRUNCH", "LEG_RAISE")) {
             return 0.0f to if (family.id == "PLANK") SupportType.PRONE_LYING else SupportType.SUPINE_LYING
         }
         if (name.contains("chest supported")) {
@@ -226,8 +212,11 @@ object ExerciseVisualResolver {
         if (name.contains("seated")) {
             return 85.0f to SupportType.SEATED_FLAT
         }
-        if (family.id == "LAT_PULLDOWN" || family.id == "CABLE_ROW" || family.id == "LEG_PRESS" || family.id == "MACHINE_PRESS") {
+        if (family.id == "LAT_PULLDOWN" || family.id == "CABLE_ROW" || family.id == "LEG_PRESS" || family.id == "MACHINE_PRESS" || family.id == "MACHINE_PULL") {
             return 85.0f to SupportType.SEATED_FLAT
+        }
+        if (family.id == "CALF_RAISE") {
+            return 0.0f to SupportType.STANDING
         }
         return 0.0f to SupportType.STANDING
     }
@@ -271,10 +260,7 @@ object ExerciseVisualResolver {
     }
 
     private fun parseCsv(csv: String): Set<String> =
-        csv.split(",")
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
-            .toSet()
+        csv.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
 
     private fun buildParameters(benchAngle: Float, grip: GripType, stance: StanceType): Map<String, Float> {
         val map = mutableMapOf<String, Float>()

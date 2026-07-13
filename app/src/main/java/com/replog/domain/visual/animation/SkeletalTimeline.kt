@@ -9,7 +9,7 @@ enum class PlaybackMode {
 data class Keyframe(
     val timeSeconds: Float,
     val pose: SkeletalPose,
-    val easingToNext: EasingCurve = EasingCurve.EASE_IN_OUT
+    val easingToNext: EasingCurve = EasingCurve.EASE_IN_OUT_CUBIC
 )
 
 /**

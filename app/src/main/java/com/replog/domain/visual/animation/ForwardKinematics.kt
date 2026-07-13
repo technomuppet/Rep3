@@ -1,6 +1,7 @@
 package com.replog.domain.visual.animation
 
 import androidx.compose.ui.geometry.Offset
+import com.replog.domain.visual.biomechanics.BiomechanicalJointModel
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -18,9 +19,11 @@ data class SolvedSkeleton(
 }
 
 /**
- * Pure Forward Kinematics (FK) solver computing hierarchical world coordinates
- * from local joint rotation deltas while preserving invariant bone lengths and
- * enforcing strict anatomical rotation limits.
+ * Commercial Forward Kinematics (FK) solver with realistic biomechanical limits.
+ * RC20.3 — Now uses BiomechanicalJointModel for clamping with anatomical limits,
+ * preserves invariant bone lengths, enforces no impossible positions.
+ *
+ * Part of hybrid FK/IK system: FK for spine/pelvis, IK for limbs via HybridSolver.
  */
 object ForwardKinematicsSolver {
 
@@ -33,8 +36,9 @@ object ForwardKinematicsSolver {
     ): SolvedSkeleton {
         val solvedMap = mutableMapOf<JointId, SolvedJoint>()
 
-        // 1. Solve Root Pelvis
-        val pelvisRot = JointId.PELVIS.defaultConstraint.clamp(jointRotations[JointId.PELVIS] ?: 0f)
+        // 1. Solve Root Pelvis with realistic limits (pelvis tilt -20..20 not -180..180)
+        val pelvisRaw = jointRotations[JointId.PELVIS] ?: 0f
+        val pelvisRot = BiomechanicalJointModel.clamp(JointId.PELVIS, pelvisRaw)
         solvedMap[JointId.PELVIS] = SolvedJoint(
             id = JointId.PELVIS,
             parentId = null,
@@ -42,7 +46,7 @@ object ForwardKinematicsSolver {
             worldRotationDegrees = pelvisRot,
             localPositionOffset = Offset.Zero,
             worldPositionOffset = rootPosition,
-            constraint = JointId.PELVIS.defaultConstraint
+            constraint = JointId.PELVIS.defaultConstraint // keep for compatibility, but clamped via biomechanical model
         )
 
         // 2. Solve hierarchy in topological parent-first order
@@ -60,7 +64,8 @@ object ForwardKinematicsSolver {
             val bone = BoneCatalog.getBoneToChild(jointId) ?: continue
 
             val rawRot = jointRotations[jointId] ?: 0f
-            val clampedLocalRot = jointId.defaultConstraint.clamp(rawRot)
+            // RC20.3: Clamp using biomechanical model with realistic anatomical limits
+            val clampedLocalRot = BiomechanicalJointModel.clamp(jointId, rawRot)
             val worldAngleDeg = parentSolved.worldRotationDegrees + bone.defaultOrientationDegrees + clampedLocalRot
             val worldAngleRad = worldAngleDeg * DEG_TO_RAD
 
