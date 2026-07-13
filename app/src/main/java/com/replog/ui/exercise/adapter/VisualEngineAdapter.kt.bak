@@ -19,6 +19,7 @@ object VisualEngineAdapter {
 
     sealed interface AnatomyRenderMode {
         data class VectorEngine(val spec: AnatomySpec) : AnatomyRenderMode
+        data class LegacyBoxes(val exercise: Exercise) : AnatomyRenderMode
     }
 
     sealed interface AnimationRenderMode {
