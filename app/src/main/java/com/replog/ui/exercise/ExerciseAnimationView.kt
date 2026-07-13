@@ -36,25 +36,93 @@ import com.replog.domain.library.AnimationClip
 import com.replog.domain.library.ExerciseAnimation
 import com.replog.domain.library.Point
 import com.replog.domain.library.Pose
+import com.replog.domain.visual.animation.ForwardKinematicsSolver
+import com.replog.domain.visual.animation.SkeletalRenderer
+import com.replog.ui.exercise.adapter.VisualEngineAdapter
 
 /**
- * Renders the lightweight keyframe animation (Phase 5) as a moving stick figure on
- * a Compose Canvas, with Play/Pause and Restart controls. Frames are generated
- * locally by [ExerciseAnimation]; there is no video, GIF or photo and no
- * downloaded media. The clock is advanced manually with withFrameNanos so the
- * user can pause and restart it. A content description names the movement for
- * screen readers (Phase 8).
+ * Exercise animation demonstration presentation facade (Phase 4 Integration).
+ * Automatically prefers the rotational Forward Kinematics Skeletal Animation Engine
+ * while retaining legacy stick figure rendering as a safe fallback.
  */
 @Composable
 fun ExerciseAnimationView(exercise: Exercise, modifier: Modifier = Modifier) {
-    val clip = remember(exercise.id, exercise.movementPattern, exercise.equipment) {
-        ExerciseAnimation.clip(exercise)
+    when (val mode = remember(exercise.id, exercise.movementPattern, exercise.equipment) {
+        VisualEngineAdapter.resolveAnimation(exercise)
+    }) {
+        is VisualEngineAdapter.AnimationRenderMode.SkeletalEngine -> {
+            var playing by remember(exercise.id) { mutableStateOf(true) }
+            var elapsedSeconds by remember(exercise.id) { mutableFloatStateOf(0f) }
+
+            LaunchedEffect(exercise.id, playing, mode.timeline.durationSeconds) {
+                if (!playing) return@LaunchedEffect
+                var lastTime = withFrameNanos { it }
+                while (true) {
+                    val now = withFrameNanos { it }
+                    val deltaSeconds = (now - lastTime) / 1_000_000_000f
+                    lastTime = now
+                    elapsedSeconds += deltaSeconds
+                }
+            }
+
+            val boneColor = MaterialTheme.colorScheme.primary
+            val implementColor = MaterialTheme.colorScheme.tertiary
+            val jointColor = MaterialTheme.colorScheme.onSurface
+
+            Column(modifier = modifier) {
+                Canvas(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp)
+                        .semantics { contentDescription = "Animated demonstration of ${exercise.name}" }
+                ) {
+                    val pose = mode.timeline.evaluate(elapsedSeconds, mode.spec.playbackSpeed)
+                    val solved = ForwardKinematicsSolver.solve(pose.jointRotations, pose.rootPositionOffset)
+                    SkeletalRenderer.drawSkeleton(
+                        drawScope = this,
+                        skeleton = solved,
+                        boneColor = boneColor,
+                        jointColor = jointColor,
+                        implementColor = implementColor,
+                        equipmentType = mode.spec.equipment.type
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { playing = !playing }) {
+                        Icon(
+                            if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = if (playing) "Pause animation" else "Play animation"
+                        )
+                    }
+                    IconButton(onClick = { elapsedSeconds = 0f; playing = true }) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Restart animation")
+                    }
+                    Text(
+                        if (playing) "Playing" else "Paused",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+        is VisualEngineAdapter.AnimationRenderMode.LegacyStickFigure -> {
+            LegacyExerciseAnimationView(exercise = exercise, clip = mode.clip, modifier = modifier)
+        }
     }
+}
+
+/**
+ * Legacy single-line stick figure animation retained strictly as fallback.
+ */
+@Composable
+private fun LegacyExerciseAnimationView(exercise: Exercise, clip: AnimationClip, modifier: Modifier = Modifier) {
     var playing by remember(exercise.id) { mutableStateOf(true) }
-    // phase in 0..1 across one cycle
     var phase by remember(exercise.id) { mutableFloatStateOf(0f) }
 
-    // Advance the phase only while playing. Restarting sets playing=true & phase=0.
     LaunchedEffect(exercise.id, playing, clip.cycleMillis) {
         if (!playing) return@LaunchedEffect
         var last = withFrameNanos { it }
@@ -104,7 +172,6 @@ fun ExerciseAnimationView(exercise: Exercise, modifier: Modifier = Modifier) {
     }
 }
 
-/** Safe fallback used only if a clip somehow has no keyframes. */
 private val NEUTRAL_POSE = Pose(
     head = Point(0.5f, 0.10f),
     shoulder = Point(0.5f, 0.22f),
@@ -123,8 +190,6 @@ private fun lerpNullable(a: Point?, b: Point?, f: Float): Point? =
 
 private fun interpolate(clip: AnimationClip, t: Float): Pose {
     val frames = clip.keyframes
-    // Defensive guards: an empty clip should never occur (ExerciseAnimation.clip
-    // always returns >= 2 frames), but guard so the renderer can never throw.
     if (frames.isEmpty()) return NEUTRAL_POSE
     if (frames.size == 1) return frames[0]
     val segments = frames.size - 1
@@ -141,7 +206,7 @@ private fun interpolate(clip: AnimationClip, t: Float): Pose {
         hip = lerp(a.hip, b.hip, local),
         knee = lerp(a.knee, b.knee, local),
         foot = lerp(a.foot, b.foot, local),
-	implement = lerpNullable(a.implement, b.implement, local)
+        implement = lerpNullable(a.implement, b.implement, local)
     )
 }
 
@@ -151,21 +216,15 @@ private fun DrawScope.drawFigure(pose: Pose, figure: Color, implementColor: Colo
     val stroke = size.width * 0.018f
     fun line(a: Point, b: Point) = drawLine(figure, p(a), p(b), strokeWidth = stroke, cap = StrokeCap.Round)
 
-    // Head
     drawCircle(figure, radius = size.width * 0.045f, center = p(pose.head))
-    // Spine
     line(pose.shoulder, pose.hip)
-    // Arm (shoulder -> elbow -> hand)
     line(pose.shoulder, pose.elbow)
     line(pose.elbow, pose.hand)
-    // Leg (hip -> knee -> foot)
     line(pose.hip, pose.knee)
     line(pose.knee, pose.foot)
-    // Joints
     listOf(pose.shoulder, pose.elbow, pose.hand, pose.hip, pose.knee, pose.foot).forEach {
         drawCircle(joint, radius = size.width * 0.012f, center = p(it))
     }
-    // Implement (bar / dumbbell) if present
     pose.implement?.let {
         val c = p(it)
         drawLine(

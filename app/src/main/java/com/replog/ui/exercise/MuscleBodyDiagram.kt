@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -27,19 +26,34 @@ import androidx.compose.ui.unit.dp
 import com.replog.data.model.Exercise
 import com.replog.domain.library.MuscleMap
 import com.replog.domain.library.MuscleRegion
+import com.replog.domain.visual.anatomy.AnatomicalMuscleDiagram
+import com.replog.ui.exercise.adapter.VisualEngineAdapter
 
 /**
- * Code-drawn body diagrams (Phase 4). No GIFs, photos or videos and no image
- * assets - a simple vector silhouette is drawn with Compose Canvas and the
- * targeted muscle regions are highlighted. Primary regions use a filled tint;
- * secondary regions use a lighter, outlined fill so the distinction does NOT rely
- * on colour alone (Phase 8). A spoken content description is provided for
- * TalkBack, and a text legend reinforces the colour coding.
- *
- * Footprint: pure code, effectively 0 KB of assets.
+ * Body diagram presentation facade (Phase 3 Integration).
+ * Automatically prefers the production vector Anatomical Muscle Renderer while
+ * retaining legacy rectangular box rendering as a safe fallback.
  */
 @Composable
 fun MuscleBodyDiagram(exercise: Exercise, modifier: Modifier = Modifier) {
+    when (val mode = VisualEngineAdapter.resolveAnatomy(exercise)) {
+        is VisualEngineAdapter.AnatomyRenderMode.VectorEngine -> {
+            AnatomicalMuscleDiagram(
+                anatomySpec = mode.spec,
+                modifier = modifier
+            )
+        }
+        is VisualEngineAdapter.AnatomyRenderMode.LegacyBoxes -> {
+            LegacyMuscleBodyDiagram(exercise = exercise, modifier = modifier)
+        }
+    }
+}
+
+/**
+ * Legacy code-drawn body diagrams retained strictly as fallback.
+ */
+@Composable
+private fun LegacyMuscleBodyDiagram(exercise: Exercise, modifier: Modifier = Modifier) {
     val primary = MuscleMap.primaryRegions(exercise)
     val secondary = MuscleMap.secondaryRegions(exercise)
     val primaryColor = MaterialTheme.colorScheme.primary
@@ -85,7 +99,6 @@ private fun BodyView(
                 .height(220.dp)
         ) {
             drawSilhouette(silhouette, outline)
-            // Highlight regions belonging to this side.
             REGION_BOXES.filter { it.key.side == side }.forEach { (region, box) ->
                 when {
                     region in primary -> drawRegion(box, primaryColor, filled = true)
@@ -105,11 +118,9 @@ private fun LegendDot(color: Color, label: String) {
     }
 }
 
-// Normalised region rectangles (x, y, w, h in 0..1) over the silhouette.
 private data class Box(val x: Float, val y: Float, val w: Float, val h: Float)
 
 private val REGION_BOXES: Map<MuscleRegion, Box> = mapOf(
-    // Front
     MuscleRegion.FRONT_DELTS to Box(0.30f, 0.20f, 0.40f, 0.06f),
     MuscleRegion.SIDE_DELTS to Box(0.26f, 0.21f, 0.48f, 0.05f),
     MuscleRegion.INNER_THIGHS to Box(0.42f, 0.52f, 0.16f, 0.14f),
@@ -120,7 +131,6 @@ private val REGION_BOXES: Map<MuscleRegion, Box> = mapOf(
     MuscleRegion.ABS to Box(0.38f, 0.34f, 0.24f, 0.12f),
     MuscleRegion.OBLIQUES to Box(0.32f, 0.36f, 0.36f, 0.08f),
     MuscleRegion.QUADS to Box(0.34f, 0.52f, 0.32f, 0.16f),
-    // Back
     MuscleRegion.TRAPS to Box(0.36f, 0.18f, 0.28f, 0.06f),
     MuscleRegion.REAR_DELTS to Box(0.28f, 0.20f, 0.44f, 0.05f),
     MuscleRegion.UPPER_BACK to Box(0.34f, 0.24f, 0.32f, 0.08f),
@@ -135,14 +145,10 @@ private val REGION_BOXES: Map<MuscleRegion, Box> = mapOf(
 private fun DrawScope.drawSilhouette(fill: Color, outline: Color) {
     val w = size.width
     val h = size.height
-    // Head
     drawCircle(fill, radius = w * 0.09f, center = Offset(w * 0.5f, h * 0.10f))
-    // Torso
     drawRoundRectN(fill, 0.32f, 0.18f, 0.36f, 0.30f)
-    // Arms
     drawRoundRectN(fill, 0.18f, 0.20f, 0.10f, 0.26f)
     drawRoundRectN(fill, 0.72f, 0.20f, 0.10f, 0.26f)
-    // Legs
     drawRoundRectN(fill, 0.34f, 0.48f, 0.14f, 0.44f)
     drawRoundRectN(fill, 0.52f, 0.48f, 0.14f, 0.44f)
 }
@@ -161,7 +167,6 @@ private fun DrawScope.drawRegion(box: Box, color: Color, filled: Boolean) {
     if (filled) {
         drawRect(color = color.copy(alpha = 0.85f), topLeft = topLeft, size = s)
     } else {
-        // Outlined (pattern-style) highlight so it is distinguishable without colour.
         drawRect(color = color.copy(alpha = 0.18f), topLeft = topLeft, size = s)
         drawRect(
             color = color,
