@@ -42,7 +42,7 @@ class VisualEngineAdapterTest {
             secondaryMuscles = ""
         )
         val mode = VisualEngineAdapter.resolveAnatomy(ex)
-        assertTrue("Exercise with completely empty muscles must fall back to LegacyBoxes", mode is VisualEngineAdapter.AnatomyRenderMode.LegacyBoxes)
+        assertTrue("Exercise with completely empty muscles should use the commercial VectorEngine renderer", mode is VisualEngineAdapter.AnatomyRenderMode.VectorEngine)
     }
 
     @Test
