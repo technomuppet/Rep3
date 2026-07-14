@@ -49,7 +49,9 @@ object BodyOrientationEngine {
         skeleton: SolvedSkeleton,
         bodyOrientation: BodyOrientation,
         supportType: SupportType,
-        benchAngle: Float
+        benchAngle: Float,
+        familyId: String = "",
+        equipmentType: String = ""
     ): SolvedSkeleton {
         if (bodyOrientation == BodyOrientation.STANDING && supportType == SupportType.STANDING) {
             return skeleton // no transform needed
@@ -57,17 +59,26 @@ object BodyOrientationEngine {
 
         val pelvisOrig = skeleton.getWorldPosition(JointId.PELVIS)
 
+        val isFloorExercise = familyId in setOf("PLANK", "CRUNCH", "LEG_RAISE") ||
+                familyId.lowercase().contains("rollout") ||
+                familyId.lowercase().contains("wheel") ||
+                equipmentType == "BODYWEIGHT" ||
+                supportType == SupportType.PRONE_LYING ||
+                supportType == SupportType.SUPINE_LYING && (familyId == "CRUNCH" || familyId == "LEG_RAISE")
+
         // Determine rotation angles per body part
         val (upperRotationDeg, lowerRotationDeg, rootShift) = when (bodyOrientation) {
             BodyOrientation.STANDING -> Triple(0f, 0f, Offset(0f, 0f))
             BodyOrientation.SEATED -> Triple(0f, 0f, Offset(0f, 0.08f)) // pelvis lower
             BodyOrientation.SUPINE -> {
-                // For flat bench, upper body horizontal head left => -90 deg around pelvis/chest
-                // Lower body: thighs horizontal? For bench press legs bent feet flat, we keep thighs slightlyangled
-                // Upper -90, lower 0- small? Actually keep lower vertical
-                Triple(-90f, 0f, Offset(0f, 0.05f))
+                // Floor exercises lie completely flat; bench press keeps legs vertical
+                val lowerRot = if (isFloorExercise) -90f else 0f
+                Triple(-90f, lowerRot, Offset(0f, 0.05f))
             }
-            BodyOrientation.PRONE -> Triple(90f, 0f, Offset(0f, 0.05f))
+            BodyOrientation.PRONE -> {
+                val lowerRot = if (isFloorExercise) 90f else 0f
+                Triple(90f, lowerRot, Offset(0f, 0.05f))
+            }
             BodyOrientation.SIDE_LYING -> Triple(-90f, -10f, Offset(0f, 0.05f))
             BodyOrientation.HANGING -> Triple(0f, 0f, Offset(0f, -0.15f)) // pelvis higher
             BodyOrientation.INVERTED -> Triple(180f, 180f, Offset(0f, -0.2f))

@@ -176,6 +176,9 @@ object ExerciseVisualResolver {
         name: String,
         eq: EquipmentType
     ): Pair<Float, SupportType> {
+        if (name.contains("rollout") || name.contains("ab wheel")) {
+            return 0.0f to SupportType.PRONE_LYING
+        }
         // RC20.4 Critical Fixes
         if (family.id == "HIP_THRUST" || name.contains("hip thrust") || name.contains("glute bridge") || name.contains("frog pump")) {
             return 0.0f to SupportType.SUPINE_LYING

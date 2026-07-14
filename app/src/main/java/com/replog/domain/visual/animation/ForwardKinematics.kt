@@ -19,11 +19,8 @@ data class SolvedSkeleton(
 }
 
 /**
- * Commercial Forward Kinematics (FK) solver with realistic biomechanical limits.
- * RC20.3 — Now uses BiomechanicalJointModel for clamping with anatomical limits,
- * preserves invariant bone lengths, enforces no impossible positions.
- *
- * Part of hybrid FK/IK system: FK for spine/pelvis, IK for limbs via HybridSolver.
+ * Authoritative Forward Kinematics (FK) solver aligned with the 15-point (24-joint bilateral) body rig.
+ * Traverses parent-first, clamps angles to biomechanical limits, and preserves constant bone lengths.
  */
 object ForwardKinematicsSolver {
 
@@ -36,7 +33,7 @@ object ForwardKinematicsSolver {
     ): SolvedSkeleton {
         val solvedMap = mutableMapOf<JointId, SolvedJoint>()
 
-        // 1. Solve Root Pelvis with realistic limits (pelvis tilt -20..20 not -180..180)
+        // 1. Solve Root Pelvis
         val pelvisRaw = jointRotations[JointId.PELVIS] ?: 0f
         val pelvisRot = BiomechanicalJointModel.clamp(JointId.PELVIS, pelvisRaw)
         solvedMap[JointId.PELVIS] = SolvedJoint(
@@ -46,16 +43,23 @@ object ForwardKinematicsSolver {
             worldRotationDegrees = pelvisRot,
             localPositionOffset = Offset.Zero,
             worldPositionOffset = rootPosition,
-            constraint = JointId.PELVIS.defaultConstraint // keep for compatibility, but clamped via biomechanical model
+            constraint = JointId.PELVIS.defaultConstraint
         )
 
-        // 2. Solve hierarchy in topological parent-first order
+        // 2. Authoritative 24-joint traversal list (includes compatibility legacy fallbacks)
         val evaluationOrder = listOf(
-            JointId.CHEST, JointId.UPPER_CHEST, JointId.NECK, JointId.HEAD,
-            JointId.LEFT_SHOULDER, JointId.LEFT_ELBOW, JointId.LEFT_WRIST,
-            JointId.RIGHT_SHOULDER, JointId.RIGHT_ELBOW, JointId.RIGHT_WRIST,
-            JointId.LEFT_HIP, JointId.LEFT_KNEE, JointId.LEFT_ANKLE, JointId.LEFT_FOOT,
-            JointId.RIGHT_HIP, JointId.RIGHT_KNEE, JointId.RIGHT_ANKLE, JointId.RIGHT_FOOT
+            // Central Spine
+            JointId.LOWER_SPINE, JointId.MID_SPINE, JointId.UPPER_SPINE, JointId.NECK, JointId.HEAD,
+            // Legacy chest chain
+            JointId.CHEST, JointId.UPPER_CHEST,
+            // Left Arm
+            JointId.LEFT_SHOULDER, JointId.LEFT_ELBOW, JointId.LEFT_WRIST, JointId.LEFT_HAND,
+            // Right Arm
+            JointId.RIGHT_SHOULDER, JointId.RIGHT_ELBOW, JointId.RIGHT_WRIST, JointId.RIGHT_HAND,
+            // Left Leg
+            JointId.LEFT_HIP, JointId.LEFT_KNEE, JointId.LEFT_ANKLE, JointId.LEFT_HEEL, JointId.LEFT_TOE, JointId.LEFT_FOOT,
+            // Right Leg
+            JointId.RIGHT_HIP, JointId.RIGHT_KNEE, JointId.RIGHT_ANKLE, JointId.RIGHT_HEEL, JointId.RIGHT_TOE, JointId.RIGHT_FOOT
         )
 
         for (jointId in evaluationOrder) {
@@ -64,7 +68,6 @@ object ForwardKinematicsSolver {
             val bone = BoneCatalog.getBoneToChild(jointId) ?: continue
 
             val rawRot = jointRotations[jointId] ?: 0f
-            // RC20.3: Clamp using biomechanical model with realistic anatomical limits
             val clampedLocalRot = BiomechanicalJointModel.clamp(jointId, rawRot)
             val worldAngleDeg = parentSolved.worldRotationDegrees + bone.defaultOrientationDegrees + clampedLocalRot
             val worldAngleRad = worldAngleDeg * DEG_TO_RAD

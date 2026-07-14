@@ -33,7 +33,7 @@ object PoseInterpolator {
             val angleB = poseB.getRotation(jointId)
             // Preserve all joints that have any non-zero or are explicitly needed for motion
             // If both zero, keep zero (no allocation needed but we include for correctness)
-            if (angleA != 0f || angleB != 0f || jointId in setOf(JointId.PELVIS, JointId.CHEST, JointId.UPPER_CHEST)) {
+            if (angleA != 0f || angleB != 0f || jointId in setOf(JointId.PELVIS, JointId.CHEST, JointId.UPPER_CHEST, JointId.LOWER_SPINE, JointId.MID_SPINE, JointId.UPPER_SPINE)) {
                 // Shortest-angle interpolation
                 val diff = shortestAngleDiff(angleA, angleB)
                 val interpolated = angleA + diff * easedT

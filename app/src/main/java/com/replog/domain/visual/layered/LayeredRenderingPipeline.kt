@@ -56,7 +56,9 @@ object LayeredRenderingPipeline {
             skeleton = skeleton,
             bodyOrientation = spec.bodyOrientation,
             supportType = spec.supportType,
-            benchAngle = spec.benchAngle
+            benchAngle = spec.benchAngle,
+            familyId = spec.movementFamily.familyId,
+            equipmentType = spec.equipment.type.name
         )
 
         val orientedToScreen = context.toScreen

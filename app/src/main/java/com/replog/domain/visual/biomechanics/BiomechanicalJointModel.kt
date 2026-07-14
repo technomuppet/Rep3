@@ -5,20 +5,6 @@ import com.replog.domain.visual.animation.JointId
 /**
  * Commercial biomechanical joint model with realistic anatomical limits.
  * Each joint has type and per-axis constraints, not single float.
- *
- * Based on:
- * - Kapandji - Physiology of the Joints
- * - NASA-STD-3000
- * - ACSM guidelines
- *
- * Joint types:
- * - HINGE: 1 DOF (elbow, knee, ankle)
- * - BALL: 3 DOF (shoulder, hip)
- * - UNIVERSAL: 2 DOF (wrist, pelvis tilt)
- * - SCAPULA: 2 DOF (retraction/protraction, elevation/depression)
- * - FIXED: 0 DOF
- *
- * No impossible positions.
  */
 
 enum class JointType {
@@ -46,23 +32,21 @@ data class JointLimits(
 
 object BiomechanicalJointModel {
 
-    // Realistic limits per JointId (single axis interpreted as primary, but we store full model for validation)
-
-    // PELVIS: anterior/posterior tilt -20..20, lateral tilt -15..15, rotation -45..45
+    // PELVIS: anterior/posterior tilt -90..90, lateral tilt -15..15, rotation -45..45
     val PELVIS = JointLimits(
-        flexion = AxisLimit(-20f, 20f, 0f),
+        flexion = AxisLimit(-90f, 90f, 0f),
         abduction = AxisLimit(-15f, 15f, 0f),
         rotation = AxisLimit(-45f, 45f, 0f)
     )
 
-    // LUMBAR (CHEST): flexion -30..60, lateral -25..25, rotation -30..30
+    // LUMBAR (CHEST / LOWER_SPINE): flexion -45..60, lateral -25..25, rotation -30..30
     val LUMBAR = JointLimits(
-        flexion = AxisLimit(-30f, 60f, 0f),
+        flexion = AxisLimit(-45f, 60f, 0f),
         abduction = AxisLimit(-25f, 25f, 0f),
         rotation = AxisLimit(-30f, 30f, 0f)
     )
 
-    // THORACIC (UPPER_CHEST): flexion -20..50, lateral -20..20, rotation -40..40
+    // THORACIC (UPPER_CHEST / MID_SPINE / UPPER_SPINE): flexion -20..50, lateral -20..20, rotation -40..40
     val THORACIC = JointLimits(
         flexion = AxisLimit(-20f, 50f, 0f),
         abduction = AxisLimit(-20f, 20f, 0f),
@@ -96,10 +80,9 @@ object BiomechanicalJointModel {
         abduction = AxisLimit(-20f, 20f, 0f)
     )
 
-    // SHOULDER: flexion -60..180, abduction -10..150, rotation -90..90
-    // Real: extension 60, flexion 180, abduction 150, adduction 10, internal 90, external 90
+    // SHOULDER: flexion -180..90, abduction -10..150, rotation -90..90
     val SHOULDER = JointLimits(
-        flexion = AxisLimit(-60f, 180f, 0f),
+        flexion = AxisLimit(-180f, 90f, 0f),
         abduction = AxisLimit(-10f, 150f, 0f),
         rotation = AxisLimit(-90f, 90f, 0f)
     )
@@ -109,7 +92,7 @@ object BiomechanicalJointModel {
         flexion = AxisLimit(-5f, 145f, 0f)
     )
 
-    // FOREARM ROTATION (pronation/supination): -85..85 (pronation 85, supination 85)
+    // FOREARM ROTATION (pronation/supination): -85..85
     val FOREARM = JointLimits(
         flexion = AxisLimit(-85f, 85f, 0f)
     )
@@ -120,9 +103,9 @@ object BiomechanicalJointModel {
         abduction = AxisLimit(-20f, 30f, 0f)
     )
 
-    // HIP: flexion -30..120, extension -30, abduction -30..45, rotation -45..45
+    // HIP: flexion -135..45, extension -30, abduction -30..45, rotation -45..45
     val HIP = JointLimits(
-        flexion = AxisLimit(-30f, 120f, 0f),
+        flexion = AxisLimit(-135f, 45f, 0f),
         abduction = AxisLimit(-30f, 45f, 0f),
         rotation = AxisLimit(-45f, 45f, 0f)
     )
@@ -147,6 +130,9 @@ object BiomechanicalJointModel {
     fun getLimits(jointId: JointId): JointLimits {
         return when (jointId) {
             JointId.PELVIS -> PELVIS
+            JointId.LOWER_SPINE -> LUMBAR
+            JointId.MID_SPINE -> THORACIC
+            JointId.UPPER_SPINE -> THORACIC
             JointId.CHEST -> LUMBAR
             JointId.UPPER_CHEST -> THORACIC
             JointId.NECK -> CERVICAL
@@ -154,9 +140,12 @@ object BiomechanicalJointModel {
             JointId.LEFT_SHOULDER, JointId.RIGHT_SHOULDER -> SHOULDER
             JointId.LEFT_ELBOW, JointId.RIGHT_ELBOW -> ELBOW
             JointId.LEFT_WRIST, JointId.RIGHT_WRIST -> WRIST
+            JointId.LEFT_HAND, JointId.RIGHT_HAND -> WRIST
             JointId.LEFT_HIP, JointId.RIGHT_HIP -> HIP
             JointId.LEFT_KNEE, JointId.RIGHT_KNEE -> KNEE
             JointId.LEFT_ANKLE, JointId.RIGHT_ANKLE -> ANKLE
+            JointId.LEFT_HEEL, JointId.RIGHT_HEEL -> ANKLE
+            JointId.LEFT_TOE, JointId.RIGHT_TOE -> FOOT
             JointId.LEFT_FOOT, JointId.RIGHT_FOOT -> FOOT
         }
     }
@@ -164,6 +153,9 @@ object BiomechanicalJointModel {
     fun getJointType(jointId: JointId): JointType {
         return when (jointId) {
             JointId.PELVIS -> JointType.UNIVERSAL
+            JointId.LOWER_SPINE -> JointType.UNIVERSAL
+            JointId.MID_SPINE -> JointType.UNIVERSAL
+            JointId.UPPER_SPINE -> JointType.UNIVERSAL
             JointId.CHEST -> JointType.UNIVERSAL
             JointId.UPPER_CHEST -> JointType.UNIVERSAL
             JointId.NECK -> JointType.BALL
@@ -171,9 +163,12 @@ object BiomechanicalJointModel {
             JointId.LEFT_SHOULDER, JointId.RIGHT_SHOULDER -> JointType.BALL
             JointId.LEFT_ELBOW, JointId.RIGHT_ELBOW -> JointType.HINGE
             JointId.LEFT_WRIST, JointId.RIGHT_WRIST -> JointType.UNIVERSAL
+            JointId.LEFT_HAND, JointId.RIGHT_HAND -> JointType.UNIVERSAL
             JointId.LEFT_HIP, JointId.RIGHT_HIP -> JointType.BALL
             JointId.LEFT_KNEE, JointId.RIGHT_KNEE -> JointType.HINGE
             JointId.LEFT_ANKLE, JointId.RIGHT_ANKLE -> JointType.UNIVERSAL
+            JointId.LEFT_HEEL, JointId.RIGHT_HEEL -> JointType.UNIVERSAL
+            JointId.LEFT_TOE, JointId.RIGHT_TOE -> JointType.HINGE
             JointId.LEFT_FOOT, JointId.RIGHT_FOOT -> JointType.HINGE
         }
     }

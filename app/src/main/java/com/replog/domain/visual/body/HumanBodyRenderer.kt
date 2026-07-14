@@ -15,11 +15,8 @@ import com.replog.domain.visual.camera.CameraSystem
 import kotlin.math.hypot
 
 /**
- * Commercial human body renderer replacing pipe-like stick figure.
- * RC23 Overhaul: Implements professional 2.5D depth-sorted limb layering.
- * Instead of completely culling far-side limbs (which makes the figure look amputated),
- * far-side limbs are drawn first with realistic shadows, followed by the pelvis and torso,
- * and then near-side limbs are drawn in front.
+ * Authoritative human body renderer supporting the 15-point (24-joint) body rig.
+ * Dynamically resolves both new spine/heel/toe structures and legacy fallbacks.
  */
 object HumanBodyRenderer {
 
@@ -68,25 +65,35 @@ object HumanBodyRenderer {
             return toScreen(world)
         }
 
+        // Central Spine / Head (Support both 15-point rig and legacy fallback)
         val pelvis = screenPos(JointId.PELVIS)
-        val chest = screenPos(JointId.CHEST)
-        val upperChest = screenPos(JointId.UPPER_CHEST)
+        val lowerSpine = if (skeleton.getJoint(JointId.LOWER_SPINE) != null) screenPos(JointId.LOWER_SPINE) else screenPos(JointId.CHEST)
+        val midSpine = if (skeleton.getJoint(JointId.MID_SPINE) != null) screenPos(JointId.MID_SPINE) else screenPos(JointId.CHEST)
+        val upperSpine = if (skeleton.getJoint(JointId.UPPER_SPINE) != null) screenPos(JointId.UPPER_SPINE) else screenPos(JointId.UPPER_CHEST)
         val neck = screenPos(JointId.NECK)
         val head = screenPos(JointId.HEAD)
+
+        // Arms
         val leftShoulder = screenPos(JointId.LEFT_SHOULDER)
         val rightShoulder = screenPos(JointId.RIGHT_SHOULDER)
         val leftElbow = screenPos(JointId.LEFT_ELBOW)
         val rightElbow = screenPos(JointId.RIGHT_ELBOW)
         val leftWrist = screenPos(JointId.LEFT_WRIST)
         val rightWrist = screenPos(JointId.RIGHT_WRIST)
+        val leftHand = if (skeleton.getJoint(JointId.LEFT_HAND) != null) screenPos(JointId.LEFT_HAND) else leftWrist
+        val rightHand = if (skeleton.getJoint(JointId.RIGHT_HAND) != null) screenPos(JointId.RIGHT_HAND) else rightWrist
+
+        // Legs
         val leftHip = screenPos(JointId.LEFT_HIP)
         val rightHip = screenPos(JointId.RIGHT_HIP)
         val leftKnee = screenPos(JointId.LEFT_KNEE)
         val rightKnee = screenPos(JointId.RIGHT_KNEE)
         val leftAnkle = screenPos(JointId.LEFT_ANKLE)
         val rightAnkle = screenPos(JointId.RIGHT_ANKLE)
-        val leftFoot = screenPos(JointId.LEFT_FOOT)
-        val rightFoot = screenPos(JointId.RIGHT_FOOT)
+        val leftHeel = if (skeleton.getJoint(JointId.LEFT_HEEL) != null) screenPos(JointId.LEFT_HEEL) else screenPos(JointId.LEFT_FOOT)
+        val rightHeel = if (skeleton.getJoint(JointId.RIGHT_HEEL) != null) screenPos(JointId.RIGHT_HEEL) else screenPos(JointId.RIGHT_FOOT)
+        val leftToe = if (skeleton.getJoint(JointId.LEFT_TOE) != null) screenPos(JointId.LEFT_TOE) else screenPos(JointId.LEFT_FOOT)
+        val rightToe = if (skeleton.getJoint(JointId.RIGHT_TOE) != null) screenPos(JointId.RIGHT_TOE) else screenPos(JointId.RIGHT_FOOT)
 
         val shoulderWidthScreen = hypot((rightShoulder.x - leftShoulder.x).toDouble(), (rightShoulder.y - leftShoulder.y).toDouble()).toFloat()
             .coerceAtLeast(referenceSize * 0.18f)
@@ -132,9 +139,10 @@ object HumanBodyRenderer {
             val hip = if (side == "LEFT") leftHip else rightHip
             val knee = if (side == "LEFT") leftKnee else rightKnee
             val ankle = if (side == "LEFT") leftAnkle else rightAnkle
-            val foot = if (side == "LEFT") leftFoot else rightFoot
+            val heel = if (side == "LEFT") leftHeel else rightHeel
+            val toe = if (side == "LEFT") leftToe else rightToe
 
-            val footDir = Offset(foot.x - ankle.x, foot.y - ankle.y)
+            val footDir = Offset(toe.x - ankle.x, toe.y - ankle.y)
             val footVec = if (hypot(footDir.x.toDouble(), footDir.y.toDouble()) > 2f) footDir else Offset(20f, 0f)
 
             val skinCol = if (isFar) palette.skinShadow else palette.skin
@@ -154,6 +162,7 @@ object HumanBodyRenderer {
             val shoulder = if (side == "LEFT") leftShoulder else rightShoulder
             val elbow = if (side == "LEFT") leftElbow else rightElbow
             val wrist = if (side == "LEFT") leftWrist else rightWrist
+            val hand = if (side == "LEFT") leftHand else rightHand
 
             val skinCol = if (isFar) palette.skinShadow else palette.skin
             val shirtCol = if (isFar) darkenColor(palette.shirt, 0.75f) else palette.shirt
@@ -163,7 +172,7 @@ object HumanBodyRenderer {
             // Forearm
             drawCapsule(elbow, wrist, forearmStart, forearmEnd, skinCol)
             // Hand
-            val forearmDir = Offset(wrist.x - elbow.x, wrist.y - elbow.y)
+            val forearmDir = Offset(hand.x - elbow.x, hand.y - elbow.y)
             drawHand(wrist, forearmDir, handRadius, skinCol)
         }
 
@@ -175,7 +184,7 @@ object HumanBodyRenderer {
             // Draw Central Trunk (Pelvis & Torso)
             val pelvisCenterScreen = Offset((leftHip.x + rightHip.x) * 0.5f, (leftHip.y + rightHip.y) * 0.5f)
             drawPelvis(pelvisCenterScreen, pelvisWidth, referenceSize * Anthropometry.PELVIS_HEIGHT * 0.6f, palette.shorts, palette.outline)
-            drawTorso(leftShoulder, rightShoulder, chest, pelvis, shoulderWidthScreen, chestBottomWidth, waistWidth, pelvisWidth * 0.85f, palette.shirt, palette.outline)
+            drawTorso(leftShoulder, rightShoulder, midSpine, pelvis, shoulderWidthScreen, chestBottomWidth, waistWidth, pelvisWidth * 0.85f, palette.shirt, palette.outline)
 
             // Draw Near-Side Limbs (unshadowed foreground)
             drawLeg(nearSide, isFar = false)
@@ -187,14 +196,14 @@ object HumanBodyRenderer {
 
             val pelvisCenterScreen = Offset((leftHip.x + rightHip.x) * 0.5f, (leftHip.y + rightHip.y) * 0.5f)
             drawPelvis(pelvisCenterScreen, pelvisWidth, referenceSize * Anthropometry.PELVIS_HEIGHT * 0.6f, palette.shorts, palette.outline)
-            drawTorso(leftShoulder, rightShoulder, chest, pelvis, shoulderWidthScreen, chestBottomWidth, waistWidth, pelvisWidth * 0.85f, palette.shirt, palette.outline)
+            drawTorso(leftShoulder, rightShoulder, midSpine, pelvis, shoulderWidthScreen, chestBottomWidth, waistWidth, pelvisWidth * 0.85f, palette.shirt, palette.outline)
 
             drawArm("LEFT", isFar = false)
             drawArm("RIGHT", isFar = false)
         }
 
         // Neck and Head are always drawn in front
-        drawCapsule(neck, upperChest, neckRadius * 1.8f, neckRadius * 2.2f, palette.skin)
+        drawCapsule(neck, upperSpine, neckRadius * 1.8f, neckRadius * 2.2f, palette.skin)
         drawHead(head, headRadius, neck, neckRadius, palette.skin, palette.hair)
     }
 
