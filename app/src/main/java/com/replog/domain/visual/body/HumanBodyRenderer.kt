@@ -16,8 +16,10 @@ import kotlin.math.hypot
 
 /**
  * Commercial human body renderer replacing pipe-like stick figure.
- * RC20.4: Added camera system support for front/rear/left/right side views,
- * automatic best-view selection, and prevention of left/right limb overlap.
+ * RC23 Overhaul: Implements professional 2.5D depth-sorted limb layering.
+ * Instead of completely culling far-side limbs (which makes the figure look amputated),
+ * far-side limbs are drawn first with realistic shadows, followed by the pelvis and torso,
+ * and then near-side limbs are drawn in front.
  */
 object HumanBodyRenderer {
 
@@ -43,6 +45,15 @@ object HumanBodyRenderer {
                 )
             }
         }
+    }
+
+    private fun darkenColor(color: Color, factor: Float): Color {
+        return Color(
+            red = (color.red * factor).coerceIn(0f, 1f),
+            green = (color.green * factor).coerceIn(0f, 1f),
+            blue = (color.blue * factor).coerceIn(0f, 1f),
+            alpha = color.alpha
+        )
     }
 
     fun DrawScope.drawHumanBody(
@@ -99,58 +110,90 @@ object HumanBodyRenderer {
         val waistWidth = shoulderWidthScreen * 0.58f
         val pelvisWidth = shoulderWidthScreen * 0.78f
 
-        val cullLeft = CameraSystem.shouldCullLeftSide(cameraView)
-        val cullRight = CameraSystem.shouldCullRightSide(cameraView)
-
-        // Feet
-        val leftFootDir = Offset(leftFoot.x - leftAnkle.x, leftFoot.y - leftAnkle.y)
-        val rightFootDir = Offset(rightFoot.x - rightAnkle.x, rightFoot.y - rightAnkle.y)
-        val leftFootVec = if (hypot(leftFootDir.x.toDouble(), leftFootDir.y.toDouble()) > 2f) leftFootDir else Offset(20f, 0f)
-        val rightFootVec = if (hypot(rightFootDir.x.toDouble(), rightFootDir.y.toDouble()) > 2f) rightFootDir else Offset(20f, 0f)
-
-        if (!cullLeft) drawFoot(leftAnkle, leftFootVec, footLength, footThickness, palette.shoe)
-        if (!cullRight) drawFoot(rightAnkle, rightFootVec, footLength, footThickness, palette.shoe)
-
-        // Lower legs
-        if (!cullLeft) {
-            drawCapsule(leftKnee, leftAnkle, shankStart, shankMid, palette.skin)
-            drawCapsule(Offset((leftKnee.x + leftAnkle.x) * 0.5f, (leftKnee.y + leftAnkle.y) * 0.5f), leftAnkle, shankMid, shankEnd, palette.skin)
-        }
-        if (!cullRight) {
-            drawCapsule(rightKnee, rightAnkle, shankStart, shankMid, palette.skin)
-            drawCapsule(Offset((rightKnee.x + rightAnkle.x) * 0.5f, (rightKnee.y + rightAnkle.y) * 0.5f), rightAnkle, shankMid, shankEnd, palette.skin)
+        // 2.5D Depth Sorting: Determine far and near sides based on cameraView
+        val farSide: String
+        val nearSide: String
+        when (cameraView) {
+            CameraSystem.CameraView.RIGHT_SIDE -> {
+                farSide = "LEFT"
+                nearSide = "RIGHT"
+            }
+            CameraSystem.CameraView.LEFT_SIDE -> {
+                farSide = "RIGHT"
+                nearSide = "LEFT"
+            }
+            else -> {
+                farSide = ""
+                nearSide = ""
+            }
         }
 
-        // Thighs
-        if (!cullLeft) drawCapsule(leftHip, leftKnee, thighStart, thighEnd, palette.shorts)
-        if (!cullRight) drawCapsule(rightHip, rightKnee, thighStart, thighEnd, palette.shorts)
+        fun DrawScope.drawLeg(side: String, isFar: Boolean) {
+            val hip = if (side == "LEFT") leftHip else rightHip
+            val knee = if (side == "LEFT") leftKnee else rightKnee
+            val ankle = if (side == "LEFT") leftAnkle else rightAnkle
+            val foot = if (side == "LEFT") leftFoot else rightFoot
 
-        // Pelvis
-        val pelvisCenterScreen = Offset((leftHip.x + rightHip.x) * 0.5f, (leftHip.y + rightHip.y) * 0.5f)
-        drawPelvis(pelvisCenterScreen, pelvisWidth, referenceSize * Anthropometry.PELVIS_HEIGHT * 0.6f, palette.shorts, palette.outline)
+            val footDir = Offset(foot.x - ankle.x, foot.y - ankle.y)
+            val footVec = if (hypot(footDir.x.toDouble(), footDir.y.toDouble()) > 2f) footDir else Offset(20f, 0f)
 
-        // Torso
-        drawTorso(leftShoulder, rightShoulder, chest, pelvis, shoulderWidthScreen, chestBottomWidth, waistWidth, pelvisWidth * 0.85f, palette.shirt, palette.outline)
+            val skinCol = if (isFar) palette.skinShadow else palette.skin
+            val shortsCol = if (isFar) darkenColor(palette.shorts, 0.75f) else palette.shorts
+            val shoeCol = if (isFar) darkenColor(palette.shoe, 0.75f) else palette.shoe
 
-        // Upper arms
-        if (!cullLeft) drawCapsule(leftShoulder, leftElbow, upperArmStart, upperArmEnd, palette.shirt)
-        if (!cullRight) drawCapsule(rightShoulder, rightElbow, upperArmStart, upperArmEnd, palette.shirt)
-
-        // Forearms
-        if (!cullLeft) drawCapsule(leftElbow, leftWrist, forearmStart, forearmEnd, palette.skin)
-        if (!cullRight) drawCapsule(rightElbow, rightWrist, forearmStart, forearmEnd, palette.skin)
-
-        // Hands
-        if (!cullLeft) {
-            val leftForearmDir = Offset(leftWrist.x - leftElbow.x, leftWrist.y - leftElbow.y)
-            drawHand(leftWrist, leftForearmDir, handRadius, palette.skin)
-        }
-        if (!cullRight) {
-            val rightForearmDir = Offset(rightWrist.x - rightElbow.x, rightWrist.y - rightElbow.y)
-            drawHand(rightWrist, rightForearmDir, handRadius, palette.skin)
+            // Thigh
+            drawCapsule(hip, knee, thighStart, thighEnd, shortsCol)
+            // Lower Leg (Shank)
+            drawCapsule(knee, ankle, shankStart, shankMid, skinCol)
+            drawCapsule(Offset((knee.x + ankle.x) * 0.5f, (knee.y + ankle.y) * 0.5f), ankle, shankMid, shankEnd, skinCol)
+            // Foot
+            drawFoot(ankle, footVec, footLength, footThickness, shoeCol)
         }
 
-        // Neck and head always visible
+        fun DrawScope.drawArm(side: String, isFar: Boolean) {
+            val shoulder = if (side == "LEFT") leftShoulder else rightShoulder
+            val elbow = if (side == "LEFT") leftElbow else rightElbow
+            val wrist = if (side == "LEFT") leftWrist else rightWrist
+
+            val skinCol = if (isFar) palette.skinShadow else palette.skin
+            val shirtCol = if (isFar) darkenColor(palette.shirt, 0.75f) else palette.shirt
+
+            // Upper Arm
+            drawCapsule(shoulder, elbow, upperArmStart, upperArmEnd, shirtCol)
+            // Forearm
+            drawCapsule(elbow, wrist, forearmStart, forearmEnd, skinCol)
+            // Hand
+            val forearmDir = Offset(wrist.x - elbow.x, wrist.y - elbow.y)
+            drawHand(wrist, forearmDir, handRadius, skinCol)
+        }
+
+        if (farSide.isNotEmpty()) {
+            // Draw Far-Side Limbs (shadowed background)
+            drawLeg(farSide, isFar = true)
+            drawArm(farSide, isFar = true)
+
+            // Draw Central Trunk (Pelvis & Torso)
+            val pelvisCenterScreen = Offset((leftHip.x + rightHip.x) * 0.5f, (leftHip.y + rightHip.y) * 0.5f)
+            drawPelvis(pelvisCenterScreen, pelvisWidth, referenceSize * Anthropometry.PELVIS_HEIGHT * 0.6f, palette.shorts, palette.outline)
+            drawTorso(leftShoulder, rightShoulder, chest, pelvis, shoulderWidthScreen, chestBottomWidth, waistWidth, pelvisWidth * 0.85f, palette.shirt, palette.outline)
+
+            // Draw Near-Side Limbs (unshadowed foreground)
+            drawLeg(nearSide, isFar = false)
+            drawArm(nearSide, isFar = false)
+        } else {
+            // Front/Rear View: Draw symmetrically
+            drawLeg("LEFT", isFar = false)
+            drawLeg("RIGHT", isFar = false)
+
+            val pelvisCenterScreen = Offset((leftHip.x + rightHip.x) * 0.5f, (leftHip.y + rightHip.y) * 0.5f)
+            drawPelvis(pelvisCenterScreen, pelvisWidth, referenceSize * Anthropometry.PELVIS_HEIGHT * 0.6f, palette.shorts, palette.outline)
+            drawTorso(leftShoulder, rightShoulder, chest, pelvis, shoulderWidthScreen, chestBottomWidth, waistWidth, pelvisWidth * 0.85f, palette.shirt, palette.outline)
+
+            drawArm("LEFT", isFar = false)
+            drawArm("RIGHT", isFar = false)
+        }
+
+        // Neck and Head are always drawn in front
         drawCapsule(neck, upperChest, neckRadius * 1.8f, neckRadius * 2.2f, palette.skin)
         drawHead(head, headRadius, neck, neckRadius, palette.skin, palette.hair)
     }

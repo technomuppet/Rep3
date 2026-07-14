@@ -1,6 +1,5 @@
 package com.replog.ui.exercise.adapter
 
-import android.util.Log
 import com.replog.data.model.Exercise
 import com.replog.domain.library.AnimationClip
 import com.replog.domain.visual.animation.KinematicMovementFamilies
@@ -10,8 +9,8 @@ import com.replog.domain.visual.spec.AnatomySpec
 import com.replog.domain.visual.spec.ExerciseVisualSpec
 
 /**
- * UI compatibility facade — RC20.4 Production
- * Now always uses commercial motion library, legacy stick figure removed as obsolete.
+ * UI compatibility facade — RC23 Production
+ * Safe for JVM unit tests (uses safe println logging instead of android.util.Log).
  */
 object VisualEngineAdapter {
 
@@ -40,11 +39,12 @@ object VisualEngineAdapter {
             if (spec.anatomy.primaryMuscles.isNotEmpty() || spec.anatomy.secondaryMuscles.isNotEmpty()) {
                 AnatomyRenderMode.VectorEngine(spec.anatomy)
             } else {
-                Log.w(TAG, "Exercise '${exercise.name}' has empty AnatomySpec; using vector fallback.")
+                println("WARN: $TAG: Exercise '${exercise.name}' has empty AnatomySpec; using vector fallback.")
                 AnatomyRenderMode.VectorEngine(spec.anatomy)
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error resolving AnatomySpec for '${exercise.name}': ${e.message}", e)
+            println("ERROR: $TAG: Error resolving AnatomySpec for '${exercise.name}': ${e.message}")
+            e.printStackTrace()
             val spec = ExerciseVisualResolver.resolve(exercise.copy(primaryMuscles = "Chest", secondaryMuscles = "Triceps"))
             AnatomyRenderMode.VectorEngine(spec.anatomy)
         }
@@ -56,7 +56,7 @@ object VisualEngineAdapter {
             val timeline = try {
                 com.replog.domain.visual.biomechanics.CommercialMotionLibrary.getTimelineForExerciseName(exercise.name)
             } catch (ex: Exception) {
-                Log.w(TAG, "Exercise-specific template failed for '${exercise.name}', falling back to family: ${ex.message}")
+                println("WARN: $TAG: Exercise-specific template failed for '${exercise.name}', falling back to family: ${ex.message}")
                 KinematicMovementFamilies.getTimelineForFamily(
                     familyId = spec.movementFamily.familyId,
                     parameters = spec.movementFamily.parameters
@@ -65,7 +65,8 @@ object VisualEngineAdapter {
             AnatomyValidationLogger.logResolution(exercise, spec)
             AnimationRenderMode.SkeletalEngine(spec, timeline)
         } catch (e: Exception) {
-            Log.e(TAG, "Error resolving SkeletalTimeline for '${exercise.name}': ${e.message}", e)
+            println("ERROR: $TAG: Error resolving SkeletalTimeline for '${exercise.name}': ${e.message}")
+            e.printStackTrace()
             // RC20.4: No longer fallback to legacy stick figure, fallback to commercial generic bench press
             try {
                 val spec = ExerciseVisualResolver.resolve(exercise)
@@ -86,7 +87,7 @@ internal object AnatomyValidationLogger {
     fun logResolution(exercise: Exercise, spec: ExerciseVisualSpec) {
         if (loggedExercises.add(exercise.id)) {
             if (spec.movementFamily.familyId == "GENERIC_UNMAPPED") {
-                Log.i("VisualEngineAdapter", "Unmapped pattern for exercise #${exercise.id} '${exercise.name}'; using generic skeletal timeline.")
+                println("INFO: VisualEngineAdapter: Unmapped pattern for exercise #${exercise.id} '${exercise.name}'; using generic skeletal timeline.")
             }
         }
     }

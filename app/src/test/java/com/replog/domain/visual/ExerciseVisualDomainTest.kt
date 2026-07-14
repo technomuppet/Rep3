@@ -130,7 +130,7 @@ class ExerciseVisualDomainTest {
         val list = listOf(
             Exercise(id = 1, name = "Barbell Bench Press", category = "Chest", equipment = "Barbell", movementPattern = "Push • Horizontal Press", primaryMuscles = "Chest"),
             Exercise(id = 2, name = "Lat Pulldown", category = "Back", equipment = "Cable", movementPattern = "Pull • Vertical Pull", primaryMuscles = "Lats"),
-            Exercise(id = 3, name = "Weird Machine Exercise", category = "Unknown", equipment = "Alien Machine", movementPattern = "Unknown", primaryMuscles = "")
+            Exercise(id = 3, name = "Weird Machine Exercise", category = "Unknown", equipment = "Alien Device", movementPattern = "Unknown", primaryMuscles = "")
         )
 
         val report = ExerciseVisualValidator.validateCatalog(list)

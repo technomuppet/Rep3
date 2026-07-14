@@ -310,8 +310,8 @@ object SquatRackRenderer : EquipmentRenderer {
 
 object FlatBenchRenderer : EquipmentRenderer {
     override fun draw(drawScope: DrawScope, skeleton: SolvedSkeleton, toScreen: (Offset) -> Offset, equipmentSpec: EquipmentSpec, implementColor: Color, secondaryColor: Color, referenceSize: Float) = with(drawScope) {
-        val pelvis = toScreen(skeleton.getWorldPosition(JointId.PELVIS))
-        val benchTopY = pelvis.y + referenceSize * 0.18f
+        val floorY = size.height * 0.92f
+        val benchTopY = floorY - referenceSize * 0.95f
         drawRect(Color(0xFF3F3F3F), Offset(size.width * 0.2f, benchTopY - referenceSize * 0.1f), Size(size.width * 0.6f, referenceSize * 0.2f))
         drawRect(Color(0xFF616161), Offset(size.width * 0.25f, benchTopY + referenceSize * 0.1f), Size(referenceSize * 0.08f, referenceSize * 0.35f))
         drawRect(Color(0xFF616161), Offset(size.width * 0.68f, benchTopY + referenceSize * 0.1f), Size(referenceSize * 0.08f, referenceSize * 0.35f))
@@ -325,12 +325,13 @@ object FlatBenchRenderer : EquipmentRenderer {
 
 object InclineBenchRenderer : EquipmentRenderer {
     override fun draw(drawScope: DrawScope, skeleton: SolvedSkeleton, toScreen: (Offset) -> Offset, equipmentSpec: EquipmentSpec, implementColor: Color, secondaryColor: Color, referenceSize: Float) = with(drawScope) {
-        val pelvis = toScreen(skeleton.getWorldPosition(JointId.PELVIS))
+        val floorY = size.height * 0.92f
+        val benchTopY = floorY - referenceSize * 0.95f
         val benchLen = size.width * 0.65f
         val angleRad = Math.toRadians(30.0).toFloat()
         val dx = kotlin.math.cos(angleRad) * benchLen
         val dy = kotlin.math.sin(angleRad) * benchLen
-        val start = Offset(pelvis.x - benchLen * 0.3f, pelvis.y + referenceSize * 0.15f)
+        val start = Offset(size.width * 0.5f - benchLen * 0.3f, benchTopY + referenceSize * 0.15f)
         val end = Offset(start.x + dx, start.y - dy)
         drawLine(Color(0xFF3F3F3F), start, end, strokeWidth = referenceSize * 0.22f, cap = StrokeCap.Round)
         drawRect(Color(0xFF3F3F3F), Offset(start.x - referenceSize * 0.15f, start.y), Size(referenceSize * 0.4f, referenceSize * 0.15f))
@@ -344,12 +345,13 @@ object InclineBenchRenderer : EquipmentRenderer {
 
 object DeclineBenchRenderer : EquipmentRenderer {
     override fun draw(drawScope: DrawScope, skeleton: SolvedSkeleton, toScreen: (Offset) -> Offset, equipmentSpec: EquipmentSpec, implementColor: Color, secondaryColor: Color, referenceSize: Float) = with(drawScope) {
-        val pelvis = toScreen(skeleton.getWorldPosition(JointId.PELVIS))
+        val floorY = size.height * 0.92f
+        val benchTopY = floorY - referenceSize * 0.95f
         val benchLen = size.width * 0.65f
         val angleRad = Math.toRadians(-15.0).toFloat()
         val dx = kotlin.math.cos(angleRad) * benchLen
         val dy = kotlin.math.sin(angleRad) * benchLen
-        val start = Offset(pelvis.x - benchLen * 0.35f, pelvis.y + referenceSize * 0.12f)
+        val start = Offset(size.width * 0.5f - benchLen * 0.35f, benchTopY + referenceSize * 0.12f)
         val end = Offset(start.x + dx, start.y + dy)
         drawLine(Color(0xFF3F3F3F), start, end, strokeWidth = referenceSize * 0.22f, cap = StrokeCap.Round)
     }
@@ -362,12 +364,13 @@ object DeclineBenchRenderer : EquipmentRenderer {
 object AdjustableBenchRenderer : EquipmentRenderer {
     override fun draw(drawScope: DrawScope, skeleton: SolvedSkeleton, toScreen: (Offset) -> Offset, equipmentSpec: EquipmentSpec, implementColor: Color, secondaryColor: Color, referenceSize: Float) = with(drawScope) {
         val benchAngle = equipmentSpec.benchAngle
-        val pelvis = toScreen(skeleton.getWorldPosition(JointId.PELVIS))
+        val floorY = size.height * 0.92f
+        val benchTopY = floorY - referenceSize * 0.95f
         val benchLen = size.width * 0.6f
         val angleRad = Math.toRadians(benchAngle.toDouble()).toFloat()
         val dx = kotlin.math.cos(angleRad) * benchLen
         val dy = -kotlin.math.sin(angleRad) * benchLen
-        val start = Offset(pelvis.x - benchLen * 0.3f, pelvis.y + referenceSize * 0.15f)
+        val start = Offset(size.width * 0.5f - benchLen * 0.3f, benchTopY + referenceSize * 0.15f)
         val end = Offset(start.x + dx, start.y + dy)
         drawLine(Color(0xFF3F3F3F), start, end, strokeWidth = referenceSize * 0.22f, cap = StrokeCap.Round)
         drawCircle(Color(0xFF616161), referenceSize * 0.06f, start)

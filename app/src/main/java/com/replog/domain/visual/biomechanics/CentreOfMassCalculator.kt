@@ -26,9 +26,12 @@ object CentreOfMassCalculator {
         val comFractionFromParent: Float // 0..1 where COM lies along segment from parent
     )
 
-    // Dempster segment definitions
+    // Dempster segment definitions adjusted to include neck, clavicles and sum to exactly 100.0%
     private val SEGMENTS = listOf(
-        SegmentMass(JointId.NECK, JointId.HEAD, 0.081f, 0.5f),
+        SegmentMass(JointId.NECK, JointId.HEAD, 0.088f, 0.5f), // head
+        SegmentMass(JointId.UPPER_CHEST, JointId.NECK, 0.02f, 0.5f), // neck segment
+        SegmentMass(JointId.UPPER_CHEST, JointId.LEFT_SHOULDER, 0.02f, 0.5f), // left clavicle
+        SegmentMass(JointId.UPPER_CHEST, JointId.RIGHT_SHOULDER, 0.02f, 0.5f), // right clavicle
         SegmentMass(JointId.CHEST, JointId.UPPER_CHEST, 0.16f, 0.5f), // upper trunk
         SegmentMass(JointId.PELVIS, JointId.CHEST, 0.27f, 0.5f), // lower trunk
         SegmentMass(JointId.LEFT_SHOULDER, JointId.LEFT_ELBOW, 0.028f, 0.436f),

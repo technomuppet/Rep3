@@ -54,12 +54,12 @@ class SkeletalAnimationEngineTest {
     @Test
     fun testJointConstraintClampingPreventingHyperextension() {
         val invalidRotations = mapOf(
-            JointId.LEFT_ELBOW to 250f // Exceeds max 150 deg limit
+            JointId.LEFT_ELBOW to 250f // Exceeds max 145 deg limit in BiomechanicalJointModel
         )
         val solved = ForwardKinematicsSolver.solve(invalidRotations)
         val elbowSolved = solved.getJoint(JointId.LEFT_ELBOW)
         assertNotNull(elbowSolved)
-        assertEquals(150f, elbowSolved!!.localRotationDegrees, 0.001f)
+        assertEquals(145f, elbowSolved!!.localRotationDegrees, 0.001f)
     }
 
     @Test

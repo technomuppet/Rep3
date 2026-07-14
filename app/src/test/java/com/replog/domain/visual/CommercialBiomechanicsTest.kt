@@ -35,6 +35,7 @@ class CommercialBiomechanicsTest {
         assertNotNull(result.midFootWorld)
         // COM should be above feet Y < foot Y? Actually COM Y should be above feet (smaller Y because Y down? World Y 0 top)
         // For standing, COM Y should be around 0.5-0.6, feet Y 0.9, so COM Y < feet Y
+        println("DEBUG COM Y: ${result.comWorld.y}, LEFT FOOT Y: ${result.leftFoot.y}")
         assertTrue(result.comWorld.y < result.leftFoot.y)
     }
 

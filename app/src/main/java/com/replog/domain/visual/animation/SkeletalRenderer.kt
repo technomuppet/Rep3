@@ -51,14 +51,8 @@ object SkeletalRenderer {
             val height = size.height
             fun toScreen(pt: Offset) = Offset(width * pt.x, height * pt.y)
             val referenceSize = HumanBodyRenderer.computeReferenceSize(width, height)
-            val oriented = BodyOrientationEngine.orient(
-                skeleton = skeleton,
-                bodyOrientation = spec.bodyOrientation,
-                supportType = spec.supportType,
-                benchAngle = spec.benchAngle
-            )
             val context = LayeredRenderingPipeline.RenderContext(
-                skeleton = oriented,
+                skeleton = skeleton,
                 spec = spec,
                 primaryColor = boneColor,
                 tertiaryColor = implementColor,

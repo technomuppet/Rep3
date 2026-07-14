@@ -144,20 +144,19 @@ object IKSolver {
         shankLen: Float,
         footLen: Float
     ): Triple<Offset, Offset, Offset> {
-        // For foot locking, we want foot at footTarget, ankle offset from foot by footLen
-        // Simplify: solve hip->knee->ankle to ankleTarget where ankleTarget = footTarget - footLen vector
-        val ankleTarget = Offset(footTarget.x - footLen * 0.5f, footTarget.y) // foot forward from ankle
+        val footHeight = com.replog.domain.visual.body.Anthropometry.FOOT_HEIGHT
+        // Correct flat ankle: raise ankle target by footHeight above floor
+        val ankleTarget = Offset(footTarget.x - footLen * 0.5f, footTarget.y - footHeight)
 
         val chain = listOf(hip, knee, ankle)
         val lengths = listOf(thighLen, shankLen)
         val solved = solveFABRIK(chain, lengths, ankleTarget)
 
-        // Foot remains at target, but compute foot position from solved ankle + footLen
         val solvedAnkle = solved[2]
-        val footDir = Offset(foot.x - ankle.x, foot.y - ankle.y)
-        val footDirLen = hypot(footDir.x.toDouble(), footDir.y.toDouble()).toFloat()
-        val normalizedFoot = if (footDirLen > 0.0001f) Offset(footDir.x / footDirLen, footDir.y / footDirLen) else Offset(1f, 0f)
-        val solvedFoot = Offset(solvedAnkle.x + normalizedFoot.x * footLen, solvedAnkle.y + normalizedFoot.y * footLen)
+        // Compute exact horizontal offset dx to preserve footLen invariance while foot remains flat on the floor
+        val dy = footHeight
+        val dx = kotlin.math.sqrt((footLen * footLen - dy * dy).coerceAtLeast(0f))
+        val solvedFoot = Offset(solvedAnkle.x + dx, footTarget.y)
 
         return Triple(solved[1], solvedAnkle, solvedFoot)
     }

@@ -43,7 +43,7 @@ import com.replog.domain.visual.biomechanics.StabilisationEngine
 import com.replog.ui.exercise.adapter.VisualEngineAdapter
 
 /**
- * Commercial animation view — RC20.4 Production Release Candidate
+ * Commercial animation view — RC23 Production Release Candidate
  * - Isolated Canvas recomposition (only Canvas updates each frame)
  * - Cached topBar/bottomBar (removed repeated FK solves)
  * - Pre-baked timeline lookup (zero allocations per frame for timeline evaluation)
@@ -51,6 +51,7 @@ import com.replog.ui.exercise.adapter.VisualEngineAdapter
  * - Zero avoidable allocations, stable 60 FPS
  * - Camera system auto best-view, muscle synchronisation
  * - No legacy stick figure — commercial only
+ * - RC23: Added fixed starting foot positions caching for 100% stable foot-locking.
  */
 @Composable
 fun ExerciseAnimationView(exercise: Exercise, modifier: Modifier = Modifier) {
@@ -106,6 +107,15 @@ private fun CommercialAnimationCanvas(
         CachedBarEnds(topBar, bottomBar)
     }
 
+    // RC23: Cache starting foot positions to enforce absolute foot-locking (zero sliding feet)
+    val cachedFootPositions = remember(mode.timeline) {
+        val startPose = mode.timeline.evaluate(0f, 1f)
+        val startSolved = ForwardKinematicsSolver.solve(startPose.jointRotations, startPose.rootPositionOffset)
+        val leftFootWorld = startSolved.getWorldPosition(JointId.LEFT_FOOT)
+        val rightFootWorld = startSolved.getWorldPosition(JointId.RIGHT_FOOT)
+        CachedFootPositions(leftFootWorld, rightFootWorld)
+    }
+
     Column(modifier = modifier) {
         AnimationCanvasContent(
             exercise = exercise,
@@ -114,6 +124,7 @@ private fun CommercialAnimationCanvas(
             resetKey = resetKey,
             bakedTimeline = bakedTimeline,
             cachedBarEnds = cachedBarEnds,
+            cachedFootPositions = cachedFootPositions,
             modifier = Modifier.fillMaxWidth().height(240.dp)
         )
 
@@ -148,6 +159,7 @@ private fun CommercialAnimationCanvas(
 }
 
 private data class CachedBarEnds(val topBar: Offset, val bottomBar: Offset)
+private data class CachedFootPositions(val leftFoot: Offset, val rightFoot: Offset)
 private data class BakedFrame(val pose: com.replog.domain.visual.animation.SkeletalPose, val time: Float)
 
 private fun bakeTimeline(timeline: SkeletalTimeline, fps: Int): List<BakedFrame> {
@@ -166,6 +178,7 @@ private fun AnimationCanvasContent(
     resetKey: Int,
     bakedTimeline: List<BakedFrame>,
     cachedBarEnds: CachedBarEnds,
+    cachedFootPositions: CachedFootPositions,
     modifier: Modifier = Modifier
 ) {
     var elapsedSeconds by remember(resetKey, exercise.id) { mutableFloatStateOf(0f) }
@@ -225,8 +238,10 @@ private fun AnimationCanvasContent(
         val gripWidthWorld = mode.spec.movementFamily.parameters["gripWidthFactor"]?.let { it * 0.18f } ?: 0.18f
         val leftHandTarget = Offset(desiredBar.x - gripWidthWorld * 0.5f, desiredBar.y)
         val rightHandTarget = Offset(desiredBar.x + gripWidthWorld * 0.5f, desiredBar.y)
-        val leftFootWorld = baseSolved.getWorldPosition(JointId.LEFT_FOOT)
-        val rightFootWorld = baseSolved.getWorldPosition(JointId.RIGHT_FOOT)
+
+        // RC23: Absolute foot positions cached from starting frame (prevents foot sliding entirely)
+        val leftFootWorld = cachedFootPositions.leftFoot
+        val rightFootWorld = cachedFootPositions.rightFoot
         val footLock = mode.spec.supportType.name != "HANGING" && mode.spec.bodyOrientation.name != "HANGING"
 
         val targets = HybridSolver.Targets(
