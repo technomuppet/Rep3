@@ -13,6 +13,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -31,6 +33,64 @@ private object RenderStyles {
 
 object MuscleRenderer {
 
+    /**
+     * Modern modular drawing pass — Version 2 Visual Engine
+     * Consumes independent BodyRegion structures and draws them individually.
+     * Fully decoupled from exercise specifications or raw bodies.
+     */
+    fun drawRegions(
+        drawScope: DrawScope,
+        regions: List<BodyRegion>,
+        silhouettePath: Path,
+        primaryRegions: Set<MuscleRegion>,
+        secondaryRegions: Set<MuscleRegion>,
+        palette: AnatomyPalette,
+        activations: List<MuscleActivationEngine.Activation>
+    ) {
+        with(drawScope) {
+            val scaleX = size.width / 500f
+            val scaleY = size.height / 1000f
+            
+            withTransform({ scale(scaleX, scaleY, pivot = Offset.Zero) }) {
+                // 1. Draw base human silhouette
+                drawPath(path = silhouettePath, color = palette.bodyFill)
+                drawPath(path = silhouettePath, color = palette.bodyOutline, style = RenderStyles.silhouetteStroke)
+
+                val activationMap = activations.associateBy { it.region }
+
+                // 2. Draw each independent muscle region individually
+                for (region in regions) {
+                    val isPrimary = primaryRegions.contains(region.id)
+                    val isSecondary = secondaryRegions.contains(region.id)
+                    
+                    if (!isPrimary && !isSecondary) {
+                        // Inactive muscle region is drawn subdued
+                        drawPath(path = region.path, color = palette.bodyFill.copy(alpha = 0.5f))
+                        continue
+                    }
+
+                    val act = activationMap[region.id]
+                    val factor = act?.factor ?: 0.5f
+
+                    if (isPrimary) {
+                        // Primary muscles: thick outline and animated activation fill opacity
+                        val alpha = (0.45f + 0.5f * factor).coerceIn(0.4f, 0.95f)
+                        val strokeWidth = 5f + 2f * factor
+                        drawPath(path = region.path, color = palette.primaryFill.copy(alpha = alpha))
+                        drawPath(path = region.path, color = palette.primaryOutline, style = Stroke(width = strokeWidth))
+                    } else if (isSecondary) {
+                        // Secondary muscles: moderate opacity and dashed border
+                        val alpha = (0.18f + 0.37f * factor).coerceIn(0.15f, 0.7f)
+                        val phaseAdjust = if (act?.phase == MuscleActivationEngine.Phase.ECCENTRIC) 0.9f else 1f
+                        drawPath(path = region.path, color = palette.secondaryFill.copy(alpha = alpha * phaseAdjust))
+                        drawPath(path = region.path, color = palette.secondaryOutline, style = RenderStyles.secondaryStroke)
+                    }
+                }
+            }
+        }
+    }
+
+    // Retained for backward compatibility
     fun drawBody(
         drawScope: DrawScope,
         body: VectorBody,
@@ -38,22 +98,20 @@ object MuscleRenderer {
         secondaryRegions: Set<MuscleRegion>,
         palette: AnatomyPalette
     ) {
-        drawBodyWithActivation(
+        val isFront = body.side == BodySide.FRONT
+        val regions = V2AnatomyModel.loadRegionsForSide(isFront)
+        drawRegions(
             drawScope = drawScope,
-            body = body,
+            regions = regions,
+            silhouettePath = if (isFront) V2AnatomyModel.frontSilhouette else V2AnatomyModel.rearSilhouette,
             primaryRegions = primaryRegions,
             secondaryRegions = secondaryRegions,
-            activations = emptyList(),
-            palette = palette
+            palette = palette,
+            activations = emptyList()
         )
     }
 
-    /**
-     * RC20.4: Synchronised muscle activation with animation progress.
-     * Primary muscles visibly contract (alpha 0.45-0.95 based on activation factor),
-     * secondary appropriately lower (0.2-0.7), supports eccentric vs concentric via phase.
-     * Drive from movement phase, not fake.
-     */
+    // Retained for backward compatibility
     fun drawBodyWithActivation(
         drawScope: DrawScope,
         body: VectorBody,
@@ -62,47 +120,17 @@ object MuscleRenderer {
         activations: List<MuscleActivationEngine.Activation>,
         palette: AnatomyPalette
     ) {
-        with(drawScope) {
-            val scaleX = size.width / 500f
-            val scaleY = size.height / 1000f
-            withTransform({ scale(scaleX, scaleY, pivot = Offset.Zero) }) {
-                drawPath(path = body.silhouettePath, color = palette.bodyFill)
-                drawPath(path = body.silhouettePath, color = palette.bodyOutline, style = RenderStyles.silhouetteStroke)
-
-                // Build activation map for quick lookup
-                val activationMap = activations.associateBy { it.region }
-
-                // Secondary with activation-based alpha
-                for (region in secondaryRegions) {
-                    val path = body.regionPaths[region] ?: continue
-                    val act = activationMap[region]
-                    val baseAlpha = 0.28f
-                    val factor = act?.factor ?: 0.5f
-                    // Secondary alpha 0.18-0.55 based on factor
-                    val alpha = (0.18f + 0.37f * factor).coerceIn(0.15f, 0.7f)
-                    // Eccentric vs concentric emphasis: if eccentric, slightly lower alpha
-                    val phaseAdjust = if (act?.phase == MuscleActivationEngine.Phase.ECCENTRIC) 0.9f else 1f
-                    drawPath(path = path, color = palette.secondaryFill.copy(alpha = alpha * phaseAdjust))
-                    drawPath(path = path, color = palette.secondaryOutline, style = RenderStyles.secondaryStroke)
-                }
-
-                // Primary with activation-based alpha and stroke emphasis
-                for (region in primaryRegions) {
-                    val path = body.regionPaths[region] ?: continue
-                    val act = activationMap[region]
-                    val factor = act?.factor ?: 0.85f
-                    // Primary alpha 0.45-0.95 based on activation, visible contraction
-                    val alpha = (0.45f + 0.5f * factor).coerceIn(0.4f, 0.95f)
-                    val strokeWidth = 5f + 2f * factor // thicker when contracted
-                    drawPath(path = path, color = palette.primaryFill.copy(alpha = alpha))
-                    drawPath(
-                        path = path,
-                        color = palette.primaryOutline,
-                        style = Stroke(width = strokeWidth)
-                    )
-                }
-            }
-        }
+        val isFront = body.side == BodySide.FRONT
+        val regions = V2AnatomyModel.loadRegionsForSide(isFront)
+        drawRegions(
+            drawScope = drawScope,
+            regions = regions,
+            silhouettePath = if (isFront) V2AnatomyModel.frontSilhouette else V2AnatomyModel.rearSilhouette,
+            primaryRegions = primaryRegions,
+            secondaryRegions = secondaryRegions,
+            palette = palette,
+            activations = activations
+        )
     }
 }
 
@@ -136,26 +164,30 @@ fun AnatomicalMuscleDiagram(
     ) {
         Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
             Canvas(modifier = Modifier.fillMaxWidth().height(240.dp)) {
-                MuscleRenderer.drawBodyWithActivation(
+                val regions = V2AnatomyModel.loadRegionsForSide(isFront = true)
+                MuscleRenderer.drawRegions(
                     drawScope = this,
-                    body = VectorBody.FRONT,
+                    regions = regions,
+                    silhouettePath = V2AnatomyModel.frontSilhouette,
                     primaryRegions = primaryRegions,
                     secondaryRegions = secondaryRegions,
-                    activations = activations,
-                    palette = palette
+                    palette = palette,
+                    activations = activations
                 )
             }
             Text("Anterior (Front)", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
         }
         Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
             Canvas(modifier = Modifier.fillMaxWidth().height(240.dp)) {
-                MuscleRenderer.drawBodyWithActivation(
+                val regions = V2AnatomyModel.loadRegionsForSide(isFront = false)
+                MuscleRenderer.drawRegions(
                     drawScope = this,
-                    body = VectorBody.BACK,
+                    regions = regions,
+                    silhouettePath = V2AnatomyModel.rearSilhouette,
                     primaryRegions = primaryRegions,
                     secondaryRegions = secondaryRegions,
-                    activations = activations,
-                    palette = palette
+                    palette = palette,
+                    activations = activations
                 )
             }
             Text("Posterior (Back)", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)

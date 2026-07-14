@@ -1,6 +1,7 @@
 package com.replog.domain.visual.body
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -8,15 +9,17 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import kotlin.math.sqrt
 
 /**
- * High-performance volumetric capsule drawer with path pooling for zero allocations.
- * RC20.4: Removed per-frame Path creation, pooled reusable Paths, zero avoidable allocations.
+ * High-performance premium volumetric vector human illustrator with path pooling.
+ * RC27 Overhaul: Implements mathematically perfect tapered polygons for limbs,
+ * distinct joint articulation caps, and zero-allocation path recycling.
  */
 object VolumetricRenderer {
 
-    // Path pooling for torso and pelvis to avoid per-frame allocation (RC20.4 optimization)
+    // Path pooling for torso, pelvis, and limb contours to avoid per-frame allocation
     private val chestPath = Path()
     private val abdomenPath = Path()
     private val pelvisPath = Path()
+    private val limbPath = Path()
 
     fun DrawScope.drawCapsule(
         start: Offset,
@@ -32,10 +35,37 @@ object VolumetricRenderer {
             drawCircle(color = color, radius = thicknessStart * 0.5f, center = start)
             return
         }
-        val avgThickness = (thicknessStart + thicknessEnd) * 0.5f
-        drawLine(color = color, start = start, end = end, strokeWidth = avgThickness, cap = StrokeCap.Round)
-        drawCircle(color = color, radius = thicknessStart * 0.5f, center = start)
-        drawCircle(color = color, radius = thicknessEnd * 0.5f, center = end)
+
+        // Perpendicular unit vector math for exact anatomical taper
+        val ux = dx / length
+        val uy = dy / length
+        val vx = -uy
+        val vy = ux
+
+        val rStart = thicknessStart * 0.5f
+        val rEnd = thicknessEnd * 0.5f
+
+        // Define the 4 corners of the tapered quad
+        val p1 = Offset(start.x + vx * rStart, start.y + vy * rStart)
+        val p2 = Offset(start.x - vx * rStart, start.y - vy * rStart)
+        val p3 = Offset(end.x - vx * rEnd, end.y - vy * rEnd)
+        val p4 = Offset(end.x + vx * rEnd, end.y + vy * rEnd)
+
+        // Draw tapered quad contour using limbPath pool (zero allocation)
+        limbPath.reset()
+        limbPath.moveTo(p1.x, p1.y)
+        limbPath.lineTo(p4.x, p4.y)
+        limbPath.lineTo(p3.x, p3.y)
+        limbPath.lineTo(p2.x, p2.y)
+        limbPath.close()
+
+        drawPath(path = limbPath, color = color)
+        drawCircle(color = color, radius = rStart, center = start)
+        drawCircle(color = color, radius = rEnd, center = end)
+
+        // Subtly outline joints for distinct premium articulation points
+        drawCircle(color = Color.White.copy(alpha = 0.12f), radius = rStart * 0.75f, center = start)
+        drawCircle(color = Color.White.copy(alpha = 0.12f), radius = rEnd * 0.75f, center = end)
     }
 
     fun DrawScope.drawLimbWithBulge(
@@ -67,7 +97,7 @@ object VolumetricRenderer {
     }
 
     /**
-     * Draws torso as volumetric shape with taper — now using pooled Paths to avoid per-frame allocation (RC20.4)
+     * Draws torso as volumetric shape with taper — using pooled Paths to avoid per-frame allocation
      */
     fun DrawScope.drawTorso(
         leftShoulder: Offset,
@@ -99,6 +129,7 @@ object VolumetricRenderer {
         val leftPelvisTop = Offset(pelvisCenter.x - pelvisWidth * 0.5f, pelvisCenter.y - 5f)
         val rightPelvisTop = Offset(pelvisCenter.x + pelvisWidth * 0.5f, pelvisCenter.y - 5f)
 
+        // Reuse pooled abdomenPath to avoid allocation
         abdomenPath.reset()
         abdomenPath.moveTo(leftChestBottom.x, leftChestBottom.y)
         abdomenPath.lineTo(rightChestBottom.x, rightChestBottom.y)
@@ -130,6 +161,7 @@ object VolumetricRenderer {
         val top = center.y - height * 0.5f
         val bottom = center.y + height * 0.5f
 
+        // Reuse pooled pelvisPath to avoid allocation
         pelvisPath.reset()
         pelvisPath.moveTo(left, top)
         pelvisPath.lineTo(right, top)
