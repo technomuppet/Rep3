@@ -121,7 +121,7 @@ class RestTimerService : Service() {
         val skip = PendingIntent.getService(this, 3, Intent(this, RestTimerService::class.java).apply { action = ACTION_SKIP }, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title)
             .setContentText(text)
             .setContentIntent(openIntent)
