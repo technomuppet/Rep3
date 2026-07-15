@@ -2,8 +2,8 @@ name: RepLog CI (build + verify)
 
 on:
   push:
-    branches: [ main, rc41-exercise-presentation, merge-rx2-into-fresh, rc19-product-completion ]
-  pull_request:
+    branches: [ main, rc41-exercise-presentation, merge-rx2-into-fresh, rc19-product-completion, rc* ]
+  pull_request: [ rc* ]
   workflow_dispatch:
 
 jobs:
