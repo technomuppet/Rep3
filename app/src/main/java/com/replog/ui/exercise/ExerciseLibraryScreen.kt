@@ -240,76 +240,168 @@ private fun ExerciseDetailDialog(
 ) {
     val scroll = rememberScrollState()
     val ex = insight.exercise
+    val anatomySpec = remember(ex) {
+        com.replog.domain.visual.resolver.ExerciseVisualResolver.resolve(ex).anatomy
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(ex.name) },
+        title = {
+            Column {
+                Text(ex.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "${ex.equipment} \u2022 ${ex.difficulty}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (ex.primaryMuscles.isNotBlank()) {
+                    Text("Primary: ${ex.primaryMuscles}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                }
+                if (ex.secondaryMuscles.isNotBlank()) {
+                    Text("Secondary: ${ex.secondaryMuscles}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
+                }
+            }
+        },
         text = {
             Column(
                 modifier = Modifier
                     .heightIn(max = 580.dp)
                     .verticalScroll(scroll),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-            // --- Always-visible summary (Phase 6): name + difficulty + muscles +
-            // equipment + purpose + three coaching cues. ---
-            Text(
-                "${ex.category} \u2022 ${ex.equipment} \u2022 ${ex.difficulty}",
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            if (ex.primaryMuscles.isNotBlank()) {
-                Text("Primary: ${ex.primaryMuscles}", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            if (ex.secondaryMuscles.isNotBlank()) {
-                Text("Secondary: ${ex.secondaryMuscles}", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            } else if (ex.muscles.isNotBlank()) {
-                Text(ex.muscles, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-
-            coaching?.let { c ->
-                // One plain-English sentence first - "what is this exercise" answered immediately.
-                Text(c.coaching.description, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text(c.coaching.purpose, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                // Reassurance up top to reduce a nervous beginner's anxiety.
+                // CARD 1: HOW TO PERFORM
                 RepLogCard {
-                    Text(c.coaching.reassurance, style = MaterialTheme.typography.bodyMedium)
-                }
-                RepLogCard {
-                    Text("Coaching cues", fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(4.dp))
-                    c.coaching.cues.forEach { cue -> Text("\u2713 $cue", style = MaterialTheme.typography.bodyMedium) }
-                }
-                ConfidenceCardView(c.confidence)
-            }
-
-            // --- Authoritative Exercise Presentation View (RC40) ---
-            com.replog.ui.exercise.presentation.ExercisePresentationView(ex)
-
-            // --- Experimental Core Animation Engine (Mothballed for R&D) ---
-            ExpandableSection("🔬 Experimental Procedural Animation Engine") {
-                Text("View the experimental, procedurally generated physics animation engine (R&D track).", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(8.dp))
-                MuscleBodyDiagram(ex)
-                Spacer(Modifier.height(8.dp))
-                ExerciseAnimationView(ex)
-            }
-
-            // --- Progressive-disclosure coaching sections (Phase 6). ---
-            coaching?.let { c ->
-                CoachingSections(exercise = ex, coaching = c.coaching, why = c.why, easier = c.easier)
-            }
-
-            if (swaps.isNotEmpty()) {
-                ExpandableSection("Swap / alternatives") {
-                    Text("Equipment busy or unavailable? Try one of these.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("HOW TO PERFORM", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.height(8.dp))
-                    swaps.forEach { s ->
-                        Column(Modifier.padding(vertical = 4.dp)) {
-                            Text(s.exercise.name, fontWeight = FontWeight.SemiBold)
-                            Text(s.matchReason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    coaching?.let { c ->
+                        Text("Starting position:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                        Text(c.coaching.steps.firstOrNull() ?: "Prepare posture, brace core, and stand stable.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.height(6.dp))
+                        Text("Movement:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                        Text(c.coaching.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.height(6.dp))
+                        Text("Breathing:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                        Text(c.coaching.breathing, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.height(6.dp))
+                        Text("Finish position:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                        Text(c.coaching.steps.getOrNull(2) ?: "Pause briefly at peak contraction to maximize tension.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.height(6.dp))
+                        Text("Range of motion:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                        Text(c.coaching.rangeOfMotion, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } ?: run {
+                        Text("Move the weight smoothly through its full range of motion under control, squeezing the target muscle.", style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+
+                // CARD 2: COACHING CUES
+                coaching?.let { c ->
+                    if (c.coaching.cues.isNotEmpty()) {
+                        RepLogCard {
+                            Text("COACHING CUES", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.height(8.dp))
+                            c.coaching.cues.forEach { cue ->
+                                Row(modifier = Modifier.padding(vertical = 2.dp)) {
+                                    Text("• ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                    Text(cue, style = MaterialTheme.typography.bodyMedium)
+                                }
+                            }
                         }
                     }
                 }
+
+                // CARD 3: TARGET MUSCLES
+                RepLogCard {
+                    Text("TARGET MUSCLES", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.height(8.dp))
+                    com.replog.domain.visual.anatomy.AnatomicalMuscleDiagram(
+                        anatomySpec = anatomySpec,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                // CARD 4: COMMON MISTAKES
+                coaching?.let { c ->
+                    if (c.coaching.mistakes.isNotEmpty()) {
+                        RepLogCard {
+                            Text("COMMON MISTAKES", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                            Spacer(Modifier.height(8.dp))
+                            c.coaching.mistakes.forEach { mistake ->
+                                Row(modifier = Modifier.padding(vertical = 2.dp)) {
+                                    Text("✗ ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                                    Text(mistake, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // CARD 5: SAFETY
+                coaching?.let { c ->
+                    if (c.coaching.safety.isNotEmpty()) {
+                        RepLogCard {
+                            Text("SAFETY", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                            Spacer(Modifier.height(8.dp))
+                            c.coaching.safety.forEach { advice ->
+                                Row(modifier = Modifier.padding(vertical = 2.dp)) {
+                                    Text("⚠ ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                                    Text(advice, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // CARD 6: EXERCISE DETAILS
+                RepLogCard {
+                    Text("EXERCISE DETAILS", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.height(8.dp))
+                    Text("Difficulty: ${ex.difficulty}", style = MaterialTheme.typography.bodyMedium)
+                    Text("Equipment: ${ex.equipment}", style = MaterialTheme.typography.bodyMedium)
+                    if (ex.movementPattern.isNotBlank()) {
+                        Text("Movement Pattern: ${ex.movementPattern}", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Text("Exercise Family: ${ex.category}", style = MaterialTheme.typography.bodyMedium)
+                }
+
+                if (swaps.isNotEmpty()) {
+                    ExpandableSection("Swap / alternatives") {
+                        Text("Equipment busy or unavailable? Try one of these.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.height(8.dp))
+                        swaps.forEach { s ->
+                            Column(Modifier.padding(vertical = 4.dp)) {
+                                Text(s.exercise.name, fontWeight = FontWeight.SemiBold)
+                                Text(s.matchReason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    StatCard("Best weight", formatWeight(insight.bestWeight, useKg), Modifier.weight(1f))
+                    StatCard("Est. 1RM", formatWeight(insight.bestEstimatedOneRm, useKg), Modifier.weight(1f))
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    StatCard("Total sets", insight.totalSets.toString(), Modifier.weight(1f))
+                    StatCard("Volume", formatWeight(insight.totalVolume, useKg), Modifier.weight(1f))
+                }
+
+                Text("Estimated 1RM trend", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                ProgressChart(history = insight.history, useKg = useKg)
+
+                Text("Recent sets", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                if (insight.history.isEmpty()) {
+                    InlineEmpty("No completed workout data yet. Log this exercise and finish a workout to build analytics.")
+                } else {
+                    insight.history.takeLast(8).reversed().forEach { set ->
+                        HistorySetRow(set, useKg)
+                    }
+                }
             }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } }
+    )
+}
 
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     StatCard("Best weight", formatWeight(insight.bestWeight, useKg), Modifier.weight(1f))

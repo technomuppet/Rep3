@@ -26,7 +26,7 @@ object ExercisePresentationFactory {
             lowerName.contains("romanian") || lowerName.contains("rdl") -> romanianDeadliftAsset(exercise)
             lowerName.contains("deadlift") -> deadliftAsset(exercise)
             lowerName.contains("front squat") -> frontSquatAsset(exercise)
-            lowerName.contains("bulgarian") || lowerName.contains("split squat") -> walkingLungeAsset(exercise)
+            lowerName.contains("bulgarian") || lowerName.contains("split squat") -> bulgarianSplitSquatAsset(exercise)
             lowerName.contains("lunge") -> walkingLungeAsset(exercise)
             lowerName.contains("hip thrust") -> hipThrustAsset(exercise)
             lowerName.contains("leg press") -> legPressAsset(exercise)
