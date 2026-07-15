@@ -281,23 +281,16 @@ private fun ExerciseDetailDialog(
                 ConfidenceCardView(c.confidence)
             }
 
-            // --- Muscle diagram + locally generated animation (Phases 4 & 5). ---
-            RepLogCard {
-                Text("Muscles worked", fontWeight = FontWeight.Bold)
+            // --- Authoritative Exercise Presentation View (RC40) ---
+            com.replog.ui.exercise.presentation.ExercisePresentationView(ex)
+
+            // --- Experimental Core Animation Engine (Mothballed for R&D) ---
+            ExpandableSection("🔬 Experimental Procedural Animation Engine") {
+                Text("View the experimental, procedurally generated physics animation engine (R&D track).", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(8.dp))
                 MuscleBodyDiagram(ex)
-            }
-            RepLogCard {
-                Text("Movement", fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(4.dp))
-                // Feature the brief, plain-English description alongside the
-                // generated movement preview (replaces the old media/GIF block).
-                coaching?.let { c ->
-                    Text(c.coaching.description, style = MaterialTheme.typography.bodyMedium)
-                    Spacer(Modifier.height(8.dp))
-                }
+                Spacer(Modifier.height(8.dp))
                 ExerciseAnimationView(ex)
-                Text("Generated locally - no video or images.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
 
             // --- Progressive-disclosure coaching sections (Phase 6). ---

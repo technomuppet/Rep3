@@ -45,7 +45,8 @@ object MuscleRenderer {
         primaryRegions: Set<MuscleRegion>,
         secondaryRegions: Set<MuscleRegion>,
         palette: AnatomyPalette,
-        activations: List<MuscleActivationEngine.Activation>
+        activations: List<MuscleActivationEngine.Activation>,
+        stabiliserRegions: Set<MuscleRegion> = emptySet()
     ) {
         with(drawScope) {
             val scaleX = size.width / 500f
@@ -62,8 +63,9 @@ object MuscleRenderer {
                 for (region in regions) {
                     val isPrimary = primaryRegions.contains(region.id)
                     val isSecondary = secondaryRegions.contains(region.id)
+                    val isStabiliser = stabiliserRegions.contains(region.id)
                     
-                    if (!isPrimary && !isSecondary) {
+                    if (!isPrimary && !isSecondary && !isStabiliser) {
                         // Inactive muscle region is drawn subdued
                         drawPath(path = region.path, color = palette.bodyFill.copy(alpha = 0.5f))
                         continue
@@ -84,6 +86,11 @@ object MuscleRenderer {
                         val phaseAdjust = if (act?.phase == MuscleActivationEngine.Phase.ECCENTRIC) 0.9f else 1f
                         drawPath(path = region.path, color = palette.secondaryFill.copy(alpha = alpha * phaseAdjust))
                         drawPath(path = region.path, color = palette.secondaryOutline, style = RenderStyles.secondaryStroke)
+                    } else if (isStabiliser) {
+                        // Stabiliser muscles: light blue-teal opacity and fine outline
+                        val alpha = (0.22f + 0.28f * factor).coerceIn(0.2f, 0.6f)
+                        drawPath(path = region.path, color = palette.stabiliserFill.copy(alpha = alpha))
+                        drawPath(path = region.path, color = palette.stabiliserOutline, style = Stroke(width = 3f))
                     }
                 }
             }
@@ -107,7 +114,8 @@ object MuscleRenderer {
             primaryRegions = primaryRegions,
             secondaryRegions = secondaryRegions,
             palette = palette,
-            activations = emptyList()
+            activations = emptyList(),
+            stabiliserRegions = emptySet()
         )
     }
 
@@ -129,7 +137,8 @@ object MuscleRenderer {
             primaryRegions = primaryRegions,
             secondaryRegions = secondaryRegions,
             palette = palette,
-            activations = activations
+            activations = activations,
+            stabiliserRegions = emptySet()
         )
     }
 }
@@ -144,6 +153,15 @@ fun AnatomicalMuscleDiagram(
 ) {
     val primaryRegions = remember(anatomySpec.primaryMuscles) { MuscleMap.mapPrimary(anatomySpec) }
     val secondaryRegions = remember(anatomySpec.secondaryMuscles) { MuscleMap.mapSecondary(anatomySpec) }
+    val stabiliserRegions = remember(anatomySpec.stabiliserMuscles) {
+        anatomySpec.stabiliserMuscles.mapNotNull { name ->
+            try {
+                MuscleRegion.valueOf(name.uppercase())
+            } catch (e: Exception) {
+                null
+            }
+        }.toSet()
+    }
 
     val activations = if (progress != null && familyId != null) {
         remember(anatomySpec, progress, familyId) {
@@ -155,6 +173,7 @@ fun AnatomicalMuscleDiagram(
         append("Anatomical vector diagram. ")
         append("Primary: ${if (primaryRegions.isEmpty()) "none" else primaryRegions.joinToString { it.displayName }}. ")
         append("Secondary: ${if (secondaryRegions.isEmpty()) "none" else secondaryRegions.joinToString { it.displayName }}.")
+        if (stabiliserRegions.isNotEmpty()) append(" Stabilisers: ${stabiliserRegions.joinToString { it.displayName }}.")
         if (activations.isNotEmpty()) append(" Activation synchronized with movement phase.")
     }
 
@@ -172,7 +191,8 @@ fun AnatomicalMuscleDiagram(
                     primaryRegions = primaryRegions,
                     secondaryRegions = secondaryRegions,
                     palette = palette,
-                    activations = activations
+                    activations = activations,
+                    stabiliserRegions = stabiliserRegions
                 )
             }
             Text("Anterior (Front)", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
@@ -187,7 +207,8 @@ fun AnatomicalMuscleDiagram(
                     primaryRegions = primaryRegions,
                     secondaryRegions = secondaryRegions,
                     palette = palette,
-                    activations = activations
+                    activations = activations,
+                    stabiliserRegions = stabiliserRegions
                 )
             }
             Text("Posterior (Back)", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
