@@ -403,31 +403,6 @@ private fun ExerciseDetailDialog(
     )
 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    StatCard("Best weight", formatWeight(insight.bestWeight, useKg), Modifier.weight(1f))
-                    StatCard("Est. 1RM", formatWeight(insight.bestEstimatedOneRm, useKg), Modifier.weight(1f))
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    StatCard("Total sets", insight.totalSets.toString(), Modifier.weight(1f))
-                    StatCard("Volume", formatWeight(insight.totalVolume, useKg), Modifier.weight(1f))
-                }
-
-                Text("Estimated 1RM trend", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                ProgressChart(history = insight.history, useKg = useKg)
-
-                Text("Recent sets", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                if (insight.history.isEmpty()) {
-                    InlineEmpty("No completed workout data yet. Log this exercise and finish a workout to build analytics.")
-                } else {
-                    insight.history.takeLast(8).reversed().forEach { set ->
-                        HistorySetRow(set, useKg)
-                    }
-                }
-            }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } }
-    )
-}
 
 @Composable
 private fun ProgressChart(history: List<ExerciseSetHistory>, useKg: Boolean) {
