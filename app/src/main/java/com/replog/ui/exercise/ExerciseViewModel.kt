@@ -94,6 +94,7 @@ class ExerciseViewModel @Inject constructor(
                     exercise = exercise,
                     history = history,
                     bestWeight = history.maxOfOrNull { it.weight } ?: 0.0,
+                    bestReps = history.maxByOrNull { it.weight }?.reps ?: 0,
                     bestEstimatedOneRm = history.maxOfOrNull { it.estimatedOneRm } ?: 0.0,
                     bestVolumeSet = history.maxOfOrNull { it.volume } ?: 0.0,
                     totalVolume = history.sumOf { it.volume },

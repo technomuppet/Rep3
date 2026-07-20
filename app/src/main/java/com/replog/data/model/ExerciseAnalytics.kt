@@ -18,6 +18,7 @@ data class ExerciseInsight(
     val exercise: Exercise,
     val history: List<ExerciseSetHistory>,
     val bestWeight: Double,
+    val bestReps: Int,
     val bestEstimatedOneRm: Double,
     val bestVolumeSet: Double,
     val totalVolume: Double,
