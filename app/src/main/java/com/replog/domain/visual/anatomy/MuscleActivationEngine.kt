@@ -28,7 +28,7 @@ object MuscleActivationEngine {
     /**
      * Calculates activation per region based on anatomy spec and progress.
      * @param spec anatomy primary/secondary
-     * @param progress 0..1 where 0 = top/lockout, 1 = bottom/stretch (from ExerciseAnimationView t)
+     * @param progress 0..1 where 0 = top/lockout, 1 = bottom/stretch
      * @param familyId movement family for family-specific curves
      * @param marker pose marker for phase detection
      */

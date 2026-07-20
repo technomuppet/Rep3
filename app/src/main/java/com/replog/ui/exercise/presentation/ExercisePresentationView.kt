@@ -1,9 +1,5 @@
 package com.replog.ui.exercise.presentation
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -63,13 +59,9 @@ fun ExercisePresentationView(exercise: Exercise, modifier: Modifier = Modifier) 
             }
         }
 
-        // 2. Pose Diagram with Coaching Overlays
-        AnimatedContent(
-            targetState = selectedPose,
-            transitionSpec = { fadeIn().togetherWith(fadeOut()) },
-            label = "PoseAnimation"
-        ) { currentPose ->
-            Row(
+        // 2. Pose Diagram with Coaching Overlays (Static — NO ANIMATION per RC44)
+        val currentPose = selectedPose
+        Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(240.dp)
@@ -84,17 +76,7 @@ fun ExercisePresentationView(exercise: Exercise, modifier: Modifier = Modifier) 
                         drawHumanPose(this, currentPose, size.width, size.height)
                         drawCues(this, currentPose, size.width, size.height)
                     }
-                    if (asset.useFrameAnimation) {
-                        Text(
-                            "🎞️ Frame Animation Active",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White,
-                            modifier = Modifier
-                                .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(4.dp))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                                .align(Alignment.BottomCenter)
-                        )
-                    }
+
                 }
                 
                 // Right: Stage Description Card
@@ -200,7 +182,6 @@ fun ExercisePresentationView(exercise: Exercise, modifier: Modifier = Modifier) 
                     Text(mistake, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-        }
     }
 }
 

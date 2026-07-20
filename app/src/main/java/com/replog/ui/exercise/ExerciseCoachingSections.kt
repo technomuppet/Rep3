@@ -1,6 +1,5 @@
 package com.replog.ui.exercise
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,146 +7,171 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.replog.data.model.Exercise
 import com.replog.domain.library.CoachingInfo
-import com.replog.domain.library.ConfidenceCard
-import com.replog.domain.library.EasierAlternative
 import com.replog.ui.components.RepLogCard
 
 /**
- * Reusable progressive-disclosure section (Phase 6). Header is always visible and
- * tappable; body expands on demand. Uses the app's existing ExpandMore/ExpandLess
- * idiom. Accessible: the whole header row carries a state-describing
- * contentDescription for TalkBack.
+ * Premium educational coaching sections — RC44
+ * Zero animation. All sections always visible for educational clarity.
  */
 @Composable
-fun ExpandableSection(
-    title: String,
-    modifier: Modifier = Modifier,
-    initiallyExpanded: Boolean = false,
-    content: @Composable () -> Unit
-) {
-    var expanded by remember { mutableStateOf(initiallyExpanded) }
-    RepLogCard(onClick = { expanded = !expanded }, modifier = modifier) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .semantics { contentDescription = if (expanded) "$title, expanded. Tap to collapse." else "$title, collapsed. Tap to expand." }
-        ) {
-            Text(title, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-            Icon(if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, contentDescription = null)
-        }
-        AnimatedVisibility(visible = expanded) {
-            Column(modifier = Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                content()
-            }
-        }
-    }
-}
-
-/** The always-visible confidence card (Phase 2). */
-@Composable
-fun ConfidenceCardView(card: ConfidenceCard, modifier: Modifier = Modifier) {
-    RepLogCard(modifier = modifier) {
-        Text("Beginner confidence", fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(6.dp))
-        LabeledRow("Difficulty", "${difficultyMarker(card.difficulty)} ${card.difficulty}")
-        LabeledRow("Equipment", card.equipment)
-        LabeledRow("Estimated learning time", "${card.estimatedLearningMinutes} minutes")
-        LabeledRow("Ideal experience", card.idealExperience)
-    }
-}
-
-/** Collapsed-by-default coaching sections (Phase 6). */
-@Composable
-fun CoachingSections(
-    exercise: Exercise,
+fun CoachingCueSections(
     coaching: CoachingInfo,
-    why: String,
-    easier: EasierAlternative?,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        ExpandableSection("How to Perform") {
-            coaching.steps.forEachIndexed { i, s -> Text("${i + 1}. $s", style = MaterialTheme.typography.bodyMedium) }
-            Spacer(Modifier.height(4.dp))
-            Text("How far to move", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
-            Text(coaching.rangeOfMotion, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        ExpandableSection("What You Should Feel") {
-            Text("You should mainly feel:", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
-            coaching.feel.forEach { Text("\u2022 $it", style = MaterialTheme.typography.bodyMedium) }
-            Spacer(Modifier.height(6.dp))
-            Text("You should NOT feel:", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
-            coaching.notFeel.forEach { Text("\u2022 $it", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            Spacer(Modifier.height(6.dp))
-            Text("If something hurts, stop and try the easier variation below.", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        ExpandableSection("Common Mistakes") {
-            coaching.mistakes.forEach { Text("- $it", style = MaterialTheme.typography.bodyMedium) }
-        }
-        ExpandableSection("Breathing") {
-            Text(coaching.breathing, style = MaterialTheme.typography.bodyMedium)
-        }
-        ExpandableSection("Tempo") {
-            Text(coaching.tempo, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-            Text(coaching.tempoExplanation, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        ExpandableSection("Safety") {
-            coaching.safety.forEach { Text("- $it", style = MaterialTheme.typography.bodyMedium) }
-        }
-        ExpandableSection("Why RepLog Recommends This") {
-            Text(why, style = MaterialTheme.typography.bodyMedium)
-        }
-        // Phase 3: the Alternatives section is ALWAYS shown - either a recommended
-        // easier variation, or an explanation of why none is suggested.
-        ExpandableSection("Alternatives", initiallyExpanded = false) {
-            if (easier != null) {
-                Text("Recommended first", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
-                Text(easier.exercise.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(easier.reason, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            } else {
-                val msg = when (exercise.difficulty.lowercase()) {
-                    "beginner" -> "This is already a beginner-friendly exercise, so there is no easier version to learn first."
-                    "custom" -> "This is a custom exercise, so RepLog does not suggest an easier variation."
-                    else -> "This is already one of the most accessible options for this movement, so there is no easier variation to recommend first."
+        // Setup — always visible
+        PremiumSectionCard(title = "SETUP", icon = "📍") {
+            coaching.steps.forEachIndexed { i, s ->
+                Row(modifier = Modifier.padding(vertical = 2.dp)) {
+                    Text("${i + 1}.  ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text(s, style = MaterialTheme.typography.bodyMedium)
                 }
-                Text(msg, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+
+        // Execution — always visible
+        PremiumSectionCard(title = "EXECUTION", icon = "💪") {
+            Text(coaching.description, style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.height(6.dp))
+            Text("Movement direction:", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+            Text(coaching.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+
+        // Lockout — derived from coaching steps/final position
+        PremiumSectionCard(title = "LOCKOUT", icon = "🔒") {
+            val lockoutText = when {
+                coaching.steps.isNotEmpty() -> coaching.steps.lastOrNull()
+                else -> "Hold the contraction briefly at peak range."
+            } ?: "Hold the contraction briefly at peak range."
+            Text("Finish position: $lockoutText", style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.height(4.dp))
+            Text("Hold the contraction for 1-2 seconds to maximise muscle activation before beginning the return phase.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+
+        // Breathing — always visible
+        PremiumSectionCard(title = "BREATHING", icon = "🫁") {
+            Text(coaching.breathing, style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.height(4.dp))
+            Text("Exhale during exertion. Inhale during the return. Never hold your breath under load.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+
+        // Bracing — always visible
+        PremiumSectionCard(title = "BRACING", icon = "🧱") {
+            Text("Brace your core before every rep. Take a sharp breath in, hold gently, and maintain tension throughout the movement.", style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.height(4.dp))
+            Text("This protects your spine and improves force transfer.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+
+        // Grip — always visible
+        PremiumSectionCard(title = "GRIP", icon = "✋") {
+            Text("Use a secure, neutral grip. Avoid a 'suicide' (thumbs-around) grip on barbell pressing. For dumbbells, maintain a neutral wrist position.", style = MaterialTheme.typography.bodyMedium)
+        }
+
+        // Foot Position — always visible
+        PremiumSectionCard(title = "FOOT POSITION", icon = "👣") {
+            val footNote = when {
+                coaching.steps.any { it.contains("foot", true) || it.contains("heel", true) || it.contains("toe", true) } ->
+                    coaching.steps.filter { it.contains("foot", true) || it.contains("heel", true) || it.contains("toe", true) }.joinToString(" ")
+                else -> "Plant feet firmly at shoulder width, weight distributed through the mid-foot."
+            }
+            Text(footNote, style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.height(4.dp))
+            Text("Stable feet create a stable lift. Do not let heels lift.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+
+        // Common Errors — redesigned with problem / why it matters / how to correct
+        PremiumSectionCard(title = "COMMON ERRORS", icon = "⚠️", errorColor = true) {
+            coaching.mistakes.forEachIndexed { i, mistake ->
+                Column(modifier = Modifier.padding(vertical = 6.dp)) {
+                    // Problem
+                    Row(modifier = Modifier.padding(vertical = 1.dp)) {
+                        Text("✗ PROBLEM:  ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                        Text(mistake, style = MaterialTheme.typography.bodyMedium)
+                    }
+                    // Why it matters
+                    Row(modifier = Modifier.padding(vertical = 1.dp)) {
+                        Text("  WHY IT MATTERS:  ", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.tertiary)
+                        Text("Reduces target-muscle activation, increases injury risk, and compromises movement quality.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    // How to correct
+                    Row(modifier = Modifier.padding(vertical = 1.dp)) {
+                        Text("  FIX:  ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        val fix = generateFixFromMistake(mistake)
+                        Text(fix, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+        }
+
+        // Safety — always visible
+        PremiumSectionCard(title = "SAFETY", icon = "🛡️", errorColor = true) {
+            coaching.safety.forEach { advice ->
+                Row(modifier = Modifier.padding(vertical = 2.dp)) {
+                    Text("•  ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                    Text(advice, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        }
+
+        // Advanced Tips — always visible
+        PremiumSectionCard(title = "ADVANCED TIPS", icon = "🚀") {
+            Text("Slow down the eccentric (lowering) phase to 3-4 seconds for increased time under tension. Focus on squeezing the target muscle at the peak contraction rather than moving the load quickly.", style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.height(4.dp))
+            Text("Use a full range of motion unless it causes discomfort. Partial ranges reduce total activation.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+
+        // Recovery Tips — always visible
+        PremiumSectionCard(title = "RECOVERY TIPS", icon = "🔄") {
+            Text("Rest 48-72 hours before training the same muscle group at high intensity. Prioritise protein intake (1.6-2.2 g per kg bodyweight) and 7-9 hours of sleep for optimal repair.", style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+/** Helper to generate a correction instruction from a common mistake text. */
+private fun generateFixFromMistake(mistake: String): String {
+    val lower = mistake.lowercase()
+    return when {
+        lower.contains("bounce") || lower.contains("swing") || lower.contains("momentum") ->
+            "Slow the tempo. Control every inch of the movement. If you must use momentum, reduce the load immediately."
+        lower.contains("elbow") || lower.contains("knee") || lower.contains("shoulder") ->
+            "Reset your posture: retract shoulders, tuck elbows to 45 degrees, or adjust foot stance before continuing."
+        lower.contains("back") || lower.contains("spine") || lower.contains("round") ->
+            "Lower the load. Brace your core with a sharp breath, and maintain a neutral spine from neck to pelvis."
+        lower.contains("range") || lower.contains("full") || lower.contains("deep") ->
+            "Reduce depth or load until mobility improves. Work within a pain-free range."
+        lower.contains("grip") || lower.contains("wrist") ->
+            "Adjust hand position. Use a secure neutral grip. Wrap thumbs around the bar for pressing."
+        lower.contains("speed") || lower.contains("fast") || lower.contains("rush") ->
+            "Count 2 seconds down, 1 second hold, 2 seconds up. Never sacrifice form for speed."
+        else -> "Reduce load by 20-30%, re-establish posture and tempo, and rebuild progressively."
     }
 }
 
 @Composable
-private fun LabeledRow(label: String, value: String) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-        Text(value, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+private fun PremiumSectionCard(
+    title: String,
+    icon: String,
+    modifier: Modifier = Modifier,
+    errorColor: Boolean = false,
+    content: @Composable () -> Unit
+) {
+    val titleColor = if (errorColor) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+    RepLogCard(modifier = modifier) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text(icon, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.padding(start = 6.dp))
+            Text(title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = titleColor)
+        }
+        Spacer(Modifier.height(8.dp))
+        content()
     }
-}
-
-/** A text marker that does not rely on colour alone (Phase 8). */
-private fun difficultyMarker(difficulty: String): String = when (difficulty.lowercase()) {
-    "beginner" -> "[Easy]"
-    "intermediate" -> "[Moderate]"
-    "advanced" -> "[Hard]"
-    else -> "[Custom]"
 }
