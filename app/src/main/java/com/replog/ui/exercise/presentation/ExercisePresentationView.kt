@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import com.replog.data.model.Exercise
 import com.replog.domain.visual.anatomy.*
 import com.replog.domain.visual.presentation.*
+import androidx.compose.ui.platform.LocalContext
 import com.replog.ui.components.RepLogCard
 
 @Composable
@@ -104,6 +105,7 @@ fun ExercisePresentationView(exercise: Exercise, modifier: Modifier = Modifier) 
         }
 
         // 3. Textbook Anatomy Muscle Diagram
+        val context = LocalContext.current
         RepLogCard {
             Text("Target Muscle Activation", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
@@ -113,7 +115,7 @@ fun ExercisePresentationView(exercise: Exercise, modifier: Modifier = Modifier) 
             ) {
                 Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                     Canvas(modifier = Modifier.fillMaxWidth().height(220.dp)) {
-                        val regions = V2AnatomyModel.loadRegionsForSide(isFront = true)
+                        val regions = V2AnatomyModel.loadRegionsForSide(isFront = true, context = context)
                         MuscleRenderer.drawRegions(
                             drawScope = this,
                             regions = regions,
@@ -131,7 +133,7 @@ fun ExercisePresentationView(exercise: Exercise, modifier: Modifier = Modifier) 
                 }
                 Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                     Canvas(modifier = Modifier.fillMaxWidth().height(220.dp)) {
-                        val regions = V2AnatomyModel.loadRegionsForSide(isFront = false)
+                        val regions = V2AnatomyModel.loadRegionsForSide(isFront = false, context = context)
                         MuscleRenderer.drawRegions(
                             drawScope = this,
                             regions = regions,

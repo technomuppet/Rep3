@@ -2,6 +2,7 @@ package com.replog.domain.visual.anatomy
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -97,50 +98,6 @@ object MuscleRenderer {
         }
     }
 
-    // Retained for backward compatibility
-    fun drawBody(
-        drawScope: DrawScope,
-        body: VectorBody,
-        primaryRegions: Set<MuscleRegion>,
-        secondaryRegions: Set<MuscleRegion>,
-        palette: AnatomyPalette
-    ) {
-        val isFront = body.side == BodySide.FRONT
-        val regions = V2AnatomyModel.loadRegionsForSide(isFront)
-        drawRegions(
-            drawScope = drawScope,
-            regions = regions,
-            silhouettePath = if (isFront) V2AnatomyModel.frontSilhouette else V2AnatomyModel.rearSilhouette,
-            primaryRegions = primaryRegions,
-            secondaryRegions = secondaryRegions,
-            palette = palette,
-            activations = emptyList(),
-            stabiliserRegions = emptySet()
-        )
-    }
-
-    // Retained for backward compatibility
-    fun drawBodyWithActivation(
-        drawScope: DrawScope,
-        body: VectorBody,
-        primaryRegions: Set<MuscleRegion>,
-        secondaryRegions: Set<MuscleRegion>,
-        activations: List<MuscleActivationEngine.Activation>,
-        palette: AnatomyPalette
-    ) {
-        val isFront = body.side == BodySide.FRONT
-        val regions = V2AnatomyModel.loadRegionsForSide(isFront)
-        drawRegions(
-            drawScope = drawScope,
-            regions = regions,
-            silhouettePath = if (isFront) V2AnatomyModel.frontSilhouette else V2AnatomyModel.rearSilhouette,
-            primaryRegions = primaryRegions,
-            secondaryRegions = secondaryRegions,
-            palette = palette,
-            activations = activations,
-            stabiliserRegions = emptySet()
-        )
-    }
 }
 
 @Composable
@@ -177,13 +134,15 @@ fun AnatomicalMuscleDiagram(
         if (activations.isNotEmpty()) append(" Activation synchronized with movement phase.")
     }
 
+    val context = LocalContext.current
+
     Row(
         modifier = modifier.fillMaxWidth().semantics { contentDescription = desc },
         horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
             Canvas(modifier = Modifier.fillMaxWidth().height(240.dp)) {
-                val regions = V2AnatomyModel.loadRegionsForSide(isFront = true)
+                val regions = V2AnatomyModel.loadRegionsForSide(isFront = true, context = context)
                 MuscleRenderer.drawRegions(
                     drawScope = this,
                     regions = regions,
@@ -199,7 +158,7 @@ fun AnatomicalMuscleDiagram(
         }
         Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
             Canvas(modifier = Modifier.fillMaxWidth().height(240.dp)) {
-                val regions = V2AnatomyModel.loadRegionsForSide(isFront = false)
+                val regions = V2AnatomyModel.loadRegionsForSide(isFront = false, context = context)
                 MuscleRenderer.drawRegions(
                     drawScope = this,
                     regions = regions,

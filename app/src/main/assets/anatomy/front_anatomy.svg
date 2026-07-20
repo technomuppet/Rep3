@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Professional Vector Anatomy Asset — Front Body
+  RC47: Independently addressable muscle regions for runtime activation rendering.
+  Each path uses a unique id mapped to MuscleRegion enum values.
+  The anatomy artwork exists as an external asset; the renderer loads,
+  maps, and applies activation colours only.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 1000" width="100%" height="100%">
+  <defs>
+    <style>
+      .region { fill-opacity: 0.35; stroke-width: 3; stroke-linejoin: round; }
+    </style>
+  </defs>
+
+  <!-- HEAD / NECK SILHOUETTE (not a muscle region; structural boundary) -->
+  <path id="body_silhouette_front" d="M250 30 C285 30, 295 70, 285 110 C275 130, 275 150, 280 150 C320 155, 360 160, 390 165 C415 185, 420 240, 415 350 L435 510 L440 565 L410 565 L395 510 L375 355 C365 255, 345 215, 345 215 C335 300, 325 380, 325 440 C335 470, 345 510, 340 550 C345 620, 340 690, 330 715 C345 780, 345 870, 330 925 L350 965 L280 965 L270 925 L255 715 L245 480 L235 715 L230 925 L220 965 L150 965 L170 925 C155 870, 155 780, 170 715 C160 690, 155 620, 160 550 C155 510, 165 470, 175 440 C175 380, 165 300, 155 215 C155 215, 135 255, 125 355 L105 510 L90 565 L60 565 L65 510 L85 350 C80 240, 85 185, 110 165 C140 160, 180 155, 220 150 C225 150, 225 130, 215 110 C205 70, 215 30, 250 30 Z" fill="#F5F5F5" stroke="#333333" stroke-width="4"/>
+
+  <!-- PRIMARY FRONT MUSCLE REGIONS -->
+  <path id="CHEST" class="region" d="M252 175 L335 175 L340 230 C325 255, 285 270, 252 260 Z" fill="#E8F4FD" stroke="#1E88E5"/>
+  <path id="UPPER_CHEST" class="region" d="M252 155 L330 155 L335 185 L252 185 Z" fill="#D6EAF8" stroke="#2196F3"/>
+  <path id="ANTERIOR_DELTOID" class="region" d="M340 170 C370 175, 385 200, 375 235 C365 235, 345 210, 340 195 Z" fill="#E3F2FD" stroke="#1976D2"/>
+  <path id="LATERAL_DELTOID" class="region" d="M375 170 C405 175, 415 210, 400 245 C390 235, 380 200, 375 185 Z" fill="#D0EBFF" stroke="#1565C0"/>
+  <path id="BICEPS" class="region" d="M365 245 C390 260, 385 310, 370 345 C360 335, 355 310, 355 275 Z" fill="#FFEDE0" stroke="#FF9800"/>
+  <path id="FOREARMS_ANTERIOR" class="region" d="M380 360 C410 380, 405 450, 395 500 C385 495, 375 430, 370 375 Z" fill="#FFF3E0" stroke="#FB8C00"/>
+  <path id="RECTUS_ABDOMINIS" class="region" d="M215 270 L285 270 C290 320, 285 380, 280 430 L220 430 C215 380, 210 320, 215 270 Z" fill="#FCE4EC" stroke="#E91E63"/>
+  <path id="OBLIQUES" class="region" d="M290 270 C320 275, 330 350, 325 430 L285 430 C285 350, 290 310, 290 270 Z M210 270 C180 275, 170 350, 175 430 L215 430 C215 350, 210 310, 210 270 Z" fill="#F8BBD0" stroke="#C2185B"/>
+  <path id="HIP_FLEXORS" class="region" d="M260 440 C295 440, 305 465, 295 485 L265 485 Z M240 440 C205 440, 195 465, 205 485 L235 485 Z" fill="#F3E5F5" stroke="#9C27B0"/>
+  <path id="QUADRICEPS" class="region" d="M262 495 C280 495, 330 530, 325 620 C320 670, 285 700, 275 700 C268 680, 260 570, 262 495 Z M238 495 C220 495, 170 530, 175 620 C180 670, 215 700, 225 700 C232 680, 240 570, 238 495 Z" fill="#E8F5E9" stroke="#4CAF50"/>
+  <path id="ADDUCTORS" class="region" d="M258 495 L250 495 L258 640 C265 640, 262 580, 258 495 Z M242 495 L250 495 L242 640 C235 640, 238 580, 242 495 Z" fill="#C8E6C9" stroke="#388E3C"/>
+  <path id="ABDUCTORS" class="region" d="M321 485 C323 540, 325 610, 332 660 C345 630, 340 520, 326 485 Z M179 485 C177 540, 175 610, 168 660 C155 630, 160 520, 174 485 Z" fill="#A5D6A7" stroke="#2E7D32"/>
+  <path id="TIBIALIS_ANTERIOR" class="region" d="M285 725 C310 725, 315 820, 295 910 L285 910 Z M215 725 C190 725, 185 820, 205 910 L215 910 Z" fill="#FFF8E1" stroke="#FFC107"/>
+
+  <!-- RC45 NEW FRONT REGIONS -->
+  <path id="MIDDLE_CHEST" class="region" d="M252 195 L335 195 L340 230 C325 250, 285 265, 252 255 Z" fill="#B3E5FC" stroke="#03A9F4"/>
+  <path id="LOWER_CHEST" class="region" d="M252 230 L335 230 L340 260 C325 275, 285 270, 252 255 Z" fill="#A7D8F8" stroke="#0288D1"/>
+  <path id="BRACHIALIS" class="region" d="M340 200 C365 215, 370 275, 350 320 C345 290, 345 240, 340 210 Z" fill="#FFE0B2" stroke="#FF5722"/>
+  <path id="TRANSVERSE_ABDOMINIS" class="region" d="M215 280 L285 280 C290 330, 285 390, 280 420 L220 420 C215 390, 210 330, 215 280 Z" fill="#F3E5F5" stroke="#8E24AA"/>
+
+  <!-- RC46 NEW FRONT REGIONS (independent derived vector paths) -->
+  <path id="RECTUS_FEMORIS" class="region" d="M250 500 L300 500 C295 580, 270 660, 250 680 C245 620, 245 540, 250 500 Z" fill="#FCE4EC" stroke="#E91E63"/>
+  <path id="VASTUS_LATERALIS" class="region" d="M280 500 C330 510, 325 620, 290 680 C280 640, 275 540, 280 500 Z" fill="#C8E6C9" stroke="#388E3C"/>
+  <path id="VASTUS_MEDIALIS" class="region" d="M220 500 C175 510, 170 620, 210 680 C225 640, 220 540, 220 500 Z" fill="#A5D6A7" stroke="#2E7D32"/>
+  <path id="VASTUS_INTERMEDIUS" class="region" d="M245 510 C275 510, 280 600, 255 680 C240 600, 240 540, 245 510 Z" fill="#81C784" stroke="#1B5E20"/>
+</svg>

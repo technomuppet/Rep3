@@ -13,6 +13,8 @@ object MuscleMap {
         "upper chest" to setOf(MuscleRegion.UPPER_CHEST),
         "clavicular" to setOf(MuscleRegion.UPPER_CHEST),
         "chest" to setOf(MuscleRegion.CHEST),
+        "middle chest" to setOf(MuscleRegion.MIDDLE_CHEST),
+        "lower chest" to setOf(MuscleRegion.LOWER_CHEST),
         "pectoral" to setOf(MuscleRegion.CHEST),
         "pec" to setOf(MuscleRegion.CHEST),
 
@@ -28,6 +30,7 @@ object MuscleMap {
 
         // Arms
         "bicep" to setOf(MuscleRegion.BICEPS),
+        "brachialis" to setOf(MuscleRegion.BRACHIALIS),
         "brachialis" to setOf(MuscleRegion.BICEPS),
         "tricep" to setOf(MuscleRegion.TRICEPS),
         "forearm" to setOf(MuscleRegion.FOREARMS_ANTERIOR, MuscleRegion.FOREARMS_POSTERIOR),
@@ -51,7 +54,8 @@ object MuscleMap {
         "oblique" to setOf(MuscleRegion.OBLIQUES),
         "abdom" to setOf(MuscleRegion.RECTUS_ABDOMINIS),
         "abs" to setOf(MuscleRegion.RECTUS_ABDOMINIS),
-        "core" to setOf(MuscleRegion.RECTUS_ABDOMINIS, MuscleRegion.OBLIQUES),
+        "core" to setOf(MuscleRegion.RECTUS_ABDOMINIS, MuscleRegion.OBLIQUES, MuscleRegion.TRANSVERSE_ABDOMINIS),
+        "transverse abdominis" to setOf(MuscleRegion.TRANSVERSE_ABDOMINIS),
 
         // Hips & Glutes
         "hip flexor" to setOf(MuscleRegion.HIP_FLEXORS),

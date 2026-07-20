@@ -24,6 +24,10 @@ enum class MuscleRegion(val id: String, val displayName: String, val side: BodyS
     ADDUCTORS("ADDUCTORS", "Thigh Adductors / Inner Thighs", BodySide.FRONT),
     ABDUCTORS("ABDUCTORS", "Thigh Abductors / Outer Thighs", BodySide.FRONT),
     TIBIALIS_ANTERIOR("TIBIALIS_ANTERIOR", "Tibialis Anterior / Shin", BodySide.FRONT),
+    MIDDLE_CHEST("MIDDLE_CHEST", "Middle Chest / Sternal Pectoral", BodySide.FRONT),
+    LOWER_CHEST("LOWER_CHEST", "Lower Chest / Costal Pectoral", BodySide.FRONT),
+    BRACHIALIS("BRACHIALIS", "Brachialis", BodySide.FRONT),
+    TRANSVERSE_ABDOMINIS("TRANSVERSE_ABDOMINIS", "Transverse Abdominis / Deep Core", BodySide.FRONT),
 
     // Back Body Regions
     POSTERIOR_DELTOID("POSTERIOR_DELTOID", "Posterior Deltoid / Rear Shoulder", BodySide.BACK),
@@ -39,7 +43,19 @@ enum class MuscleRegion(val id: String, val displayName: String, val side: BodyS
     GLUTE_MAXIMUS("GLUTE_MAXIMUS", "Gluteus Maximus", BodySide.BACK),
     GLUTE_MEDIUS("GLUTE_MEDIUS", "Gluteus Medius / Upper Hip", BodySide.BACK),
     HAMSTRINGS("HAMSTRINGS", "Hamstrings", BodySide.BACK),
-    CALVES("CALVES", "Gastrocnemius & Soleus / Calves", BodySide.BACK);
+    CALVES("CALVES", "Gastrocnemius & Soleus / Calves", BodySide.BACK),
+    GLUTE_MINIMUS("GLUTE_MINIMUS", "Gluteus Minimus", BodySide.BACK),
+    TERES_MINOR("TERES_MINOR", "Teres Minor", BodySide.BACK),
+    PERONEALS("PERONEALS", "Peroneals / Lateral Lower Leg", BodySide.BACK),
+    GASTROCNEMIUS("GASTROCNEMIUS", "Gastrocnemius", BodySide.BACK),
+    SOLEUS("SOLEUS", "Soleus", BodySide.BACK),
+    BICEPS_FEMORIS("BICEPS_FEMORIS", "Biceps Femoris", BodySide.BACK),
+    SEMITENDINOSUS("SEMITENDINOSUS", "Semitendinosus", BodySide.BACK),
+    SEMIMEMBRANOSUS("SEMIMEMBRANOSUS", "Semimembranosus", BodySide.BACK),
+    RECTUS_FEMORIS("RECTUS_FEMORIS", "Rectus Femoris", BodySide.FRONT),
+    VASTUS_LATERALIS("VASTUS_LATERALIS", "Vastus Lateralis", BodySide.FRONT),
+    VASTUS_MEDIALIS("VASTUS_MEDIALIS", "Vastus Medialis", BodySide.FRONT),
+    VASTUS_INTERMEDIUS("VASTUS_INTERMEDIUS", "Vastus Intermedius", BodySide.FRONT);
 
     companion object {
         val FRONT_REGIONS: List<MuscleRegion> = entries.filter { it.side == BodySide.FRONT }
