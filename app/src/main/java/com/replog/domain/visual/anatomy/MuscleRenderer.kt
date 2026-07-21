@@ -54,9 +54,17 @@ object MuscleRenderer {
             val scaleY = size.height / 1000f
             
             withTransform({ scale(scaleX, scaleY, pivot = Offset.Zero) }) {
+                // Phase 11 — Temporary diagnostic colour mode (single constant flag)
+                val useDiagnostic = AnatomyDiagnostics.DEBUG_RENDER_MODE
+
                 // 1. Draw base human silhouette
-                drawPath(path = silhouettePath, color = palette.bodyFill)
-                drawPath(path = silhouettePath, color = palette.bodyOutline, style = RenderStyles.silhouetteStroke)
+                if (useDiagnostic) {
+                    drawPath(path = silhouettePath, color = Color(0x00000000)) // Transparent silhouette
+                    drawPath(path = silhouettePath, color = Color(0xFF000000), style = RenderStyles.silhouetteStroke)
+                } else {
+                    drawPath(path = silhouettePath, color = palette.bodyFill)
+                    drawPath(path = silhouettePath, color = palette.bodyOutline, style = RenderStyles.silhouetteStroke)
+                }
 
                 val activationMap = activations.associateBy { it.region }
 
@@ -68,7 +76,11 @@ object MuscleRenderer {
                     
                     if (!isPrimary && !isSecondary && !isStabiliser) {
                         // Inactive muscle region is drawn subdued
-                        drawPath(path = region.path, color = palette.bodyFill.copy(alpha = 0.5f))
+                        if (useDiagnostic) {
+                            drawPath(path = region.path, color = Color(0xFF808080)) // Neutral grey
+                        } else {
+                            drawPath(path = region.path, color = palette.bodyFill.copy(alpha = 0.5f))
+                        }
                         continue
                     }
 
@@ -76,22 +88,40 @@ object MuscleRenderer {
                     val factor = act?.factor ?: 0.5f
 
                     if (isPrimary) {
-                        // Primary muscles: thick outline and animated activation fill opacity
-                        val alpha = (0.45f + 0.5f * factor).coerceIn(0.4f, 0.95f)
-                        val strokeWidth = 5f + 2f * factor
-                        drawPath(path = region.path, color = palette.primaryFill.copy(alpha = alpha))
-                        drawPath(path = region.path, color = palette.primaryOutline, style = Stroke(width = strokeWidth))
+                        if (useDiagnostic) {
+                            // Phase 11 — Diagnostic mode: solid red
+                            drawPath(path = region.path, color = Color(0xFFFF0000))
+                            drawPath(path = region.path, color = Color(0xFF000000), style = Stroke(width = 3f))
+                        } else {
+                            // Primary muscles: thick outline and animated activation fill opacity
+                            val alpha = (0.45f + 0.5f * factor).coerceIn(0.4f, 0.95f)
+                            val strokeWidth = 5f + 2f * factor
+                            drawPath(path = region.path, color = palette.primaryFill.copy(alpha = alpha))
+                            drawPath(path = region.path, color = palette.primaryOutline, style = Stroke(width = strokeWidth))
+                        }
                     } else if (isSecondary) {
-                        // Secondary muscles: moderate opacity and dashed border
-                        val alpha = (0.18f + 0.37f * factor).coerceIn(0.15f, 0.7f)
-                        val phaseAdjust = if (act?.phase == MuscleActivationEngine.Phase.ECCENTRIC) 0.9f else 1f
-                        drawPath(path = region.path, color = palette.secondaryFill.copy(alpha = alpha * phaseAdjust))
-                        drawPath(path = region.path, color = palette.secondaryOutline, style = RenderStyles.secondaryStroke)
+                        if (useDiagnostic) {
+                            // Phase 11 — Diagnostic mode: solid orange
+                            drawPath(path = region.path, color = Color(0xFFFFA500))
+                            drawPath(path = region.path, color = Color(0xFF000000), style = RenderStyles.secondaryStroke)
+                        } else {
+                            // Secondary muscles: moderate opacity and dashed border
+                            val alpha = (0.18f + 0.37f * factor).coerceIn(0.15f, 0.7f)
+                            val phaseAdjust = if (act?.phase == MuscleActivationEngine.Phase.ECCENTRIC) 0.9f else 1f
+                            drawPath(path = region.path, color = palette.secondaryFill.copy(alpha = alpha * phaseAdjust))
+                            drawPath(path = region.path, color = palette.secondaryOutline, style = RenderStyles.secondaryStroke)
+                        }
                     } else if (isStabiliser) {
-                        // Stabiliser muscles: light blue-teal opacity and fine outline
-                        val alpha = (0.22f + 0.28f * factor).coerceIn(0.2f, 0.6f)
-                        drawPath(path = region.path, color = palette.stabiliserFill.copy(alpha = alpha))
-                        drawPath(path = region.path, color = palette.stabiliserOutline, style = Stroke(width = 3f))
+                        if (useDiagnostic) {
+                            // Phase 11 — Diagnostic mode: solid blue
+                            drawPath(path = region.path, color = Color(0xFF0000FF))
+                            drawPath(path = region.path, color = Color(0xFF000000), style = Stroke(width = 3f))
+                        } else {
+                            // Stabiliser muscles: light blue-teal opacity and fine outline
+                            val alpha = (0.22f + 0.28f * factor).coerceIn(0.2f, 0.6f)
+                            drawPath(path = region.path, color = palette.stabiliserFill.copy(alpha = alpha))
+                            drawPath(path = region.path, color = palette.stabiliserOutline, style = Stroke(width = 3f))
+                        }
                     }
                 }
             }

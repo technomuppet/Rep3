@@ -120,13 +120,11 @@ fun ExercisePresentationView(exercise: Exercise, modifier: Modifier = Modifier) 
                             drawScope = this,
                             regions = regions,
                             silhouettePath = V2AnatomyModel.frontSilhouette,
-                            primaryRegions = if (selectedPoseIndex >= 2) asset.anatomySpec.primaryMuscles.map { MuscleRegion.valueOf(it.uppercase()) }.toSet() else emptySet(),
-                            secondaryRegions = if (selectedPoseIndex >= 1) asset.anatomySpec.secondaryMuscles.map { MuscleRegion.valueOf(it.uppercase()) }.toSet() else emptySet(),
+                            primaryRegions = asset.anatomySpec.primaryMuscles.mapNotNull { name -> try { MuscleRegion.valueOf(name.uppercase()) } catch (e: Exception) { null } }.toSet(),
+                            secondaryRegions = asset.anatomySpec.secondaryMuscles.mapNotNull { name -> try { MuscleRegion.valueOf(name.uppercase()) } catch (e: Exception) { null } }.toSet(),
                             palette = AnatomyPalette.default(),
                             activations = emptyList(),
-                            stabiliserRegions = if (selectedPoseIndex >= 1) asset.anatomySpec.stabiliserMuscles.mapNotNull {
-                                try { MuscleRegion.valueOf(it.uppercase()) } catch (e: Exception) { null }
-                            }.toSet() else emptySet()
+                            stabiliserRegions = asset.anatomySpec.stabiliserMuscles.mapNotNull { name -> try { MuscleRegion.valueOf(name.uppercase()) } catch (e: Exception) { null } }.toSet()
                         )
                     }
                     Text("Anterior (Front)", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
@@ -138,13 +136,11 @@ fun ExercisePresentationView(exercise: Exercise, modifier: Modifier = Modifier) 
                             drawScope = this,
                             regions = regions,
                             silhouettePath = V2AnatomyModel.rearSilhouette,
-                            primaryRegions = if (selectedPoseIndex >= 2) asset.anatomySpec.primaryMuscles.map { MuscleRegion.valueOf(it.uppercase()) }.toSet() else emptySet(),
-                            secondaryRegions = if (selectedPoseIndex >= 1) asset.anatomySpec.secondaryMuscles.map { MuscleRegion.valueOf(it.uppercase()) }.toSet() else emptySet(),
+                            primaryRegions = asset.anatomySpec.primaryMuscles.mapNotNull { name -> try { MuscleRegion.valueOf(name.uppercase()) } catch (e: Exception) { null } }.toSet(),
+                            secondaryRegions = asset.anatomySpec.secondaryMuscles.mapNotNull { name -> try { MuscleRegion.valueOf(name.uppercase()) } catch (e: Exception) { null } }.toSet(),
                             palette = AnatomyPalette.default(),
                             activations = emptyList(),
-                            stabiliserRegions = if (selectedPoseIndex >= 1) asset.anatomySpec.stabiliserMuscles.mapNotNull {
-                                try { MuscleRegion.valueOf(it.uppercase()) } catch (e: Exception) { null }
-                            }.toSet() else emptySet()
+                            stabiliserRegions = asset.anatomySpec.stabiliserMuscles.mapNotNull { name -> try { MuscleRegion.valueOf(name.uppercase()) } catch (e: Exception) { null } }.toSet()
                         )
                     }
                     Text("Posterior (Back)", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
