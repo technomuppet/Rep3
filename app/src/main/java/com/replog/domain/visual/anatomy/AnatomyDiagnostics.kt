@@ -167,6 +167,29 @@ object AnatomyDiagnostics {
         Log.d(TAG, "[SVG] FrontLoaded: $frontLoaded | BackLoaded: $backLoaded | Regions: ${regions.joinToString()}")
     }
 
+    fun auditSvgLoad(
+        assetName: String,
+        expectedIds: Int,
+        loadedIds: Int,
+        missingIds: List<String>,
+        exceptionMsg: String = ""
+    ) {
+        auditSvgLoad(
+            frontLoaded = loadedIds > 0,
+            backLoaded = loadedIds > 0,
+            regions = missingIds,
+            exceptionMsg = exceptionMsg
+        )
+
+        logSVGLoad(
+            assetName = assetName,
+            expectedIds = expectedIds,
+            loadedIds = loadedIds,
+            missingIds = missingIds,
+            unexpectedIds = emptyList()
+        )
+    }
+
     fun auditSvgMissingIds(missing: List<String>) {
         if (!ENABLED) return
         currentSession.svgMissingIds.clear()
