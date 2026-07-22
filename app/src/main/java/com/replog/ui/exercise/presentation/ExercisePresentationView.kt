@@ -110,7 +110,6 @@ fun ExercisePresentationView(exercise: Exercise, modifier: Modifier = Modifier) 
                     )
                 }
             }
-        }
 
         // 3. Textbook Anatomy Muscle Diagram
         val context = LocalContext.current
@@ -194,7 +193,6 @@ fun ExercisePresentationView(exercise: Exercise, modifier: Modifier = Modifier) 
         AnatomyDiagnostics.finalizeSession("VERIFIED_SOURCE_ONLY_RUNTIME_BLOCKED")
     }
 }
-
 private fun drawHumanPose(drawScope: DrawScope, pose: PoseIllustration, w: Float, h: Float) {
     with(drawScope) {
         fun screenOffset(name: String): Offset {
