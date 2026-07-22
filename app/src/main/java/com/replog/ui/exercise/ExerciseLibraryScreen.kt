@@ -435,7 +435,7 @@ private fun ExerciseDetailDialog(
                     Text("PERSONAL RECORDS", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.height(8.dp))
                     Text("Estimated 1RM: ${formatWeight(insight.bestEstimatedOneRm, useKg)} (best recorded)", style = MaterialTheme.typography.bodyMedium)
-                    Text("Best weight: ${formatWeight(insight.bestWeight, useKg)} for ${insight.bestReps} reps", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Best weight: ${formatWeight(insight.bestWeight, useKg)} for ${insight.totalSets} reps", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
 
                 // 11. VOLUME — Keep functionality

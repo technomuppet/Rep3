@@ -34,9 +34,9 @@ fun ExercisePresentationView(exercise: Exercise, modifier: Modifier = Modifier) 
     // Phase 3: Audit exercise data immediately upon opening
     AnatomyDiagnostics.auditExerciseData(
         exerciseName = exercise.name ?: "Unknown",
-        primaryMuscles = asset.anatomySpec.primaryMuscles,
-        secondaryMuscles = asset.anatomySpec.secondaryMuscles,
-        stabiliserMuscles = asset.anatomySpec.stabiliserMuscles
+        primaryMuscles = asset.anatomySpec.primaryMuscles.toList(),
+        secondaryMuscles = asset.anatomySpec.secondaryMuscles.toList(),
+        stabiliserMuscles = asset.anatomySpec.stabiliserMuscles.toList()
     )
 
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {

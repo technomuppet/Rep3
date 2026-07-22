@@ -1,0 +1,63 @@
+[33mcommit 2dbd3fc653d1141684b6e99fcfc80ba8fd333c3f[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mrc53-anatomy-diagnostics[m[33m, [m[1;31morigin/rc53-anatomy-diagnostics[m[33m, [m[1;32mrc19-product-completion[m[33m)[m
+Author: Trashmuppet <trashmuppet@gmail.com>
+Date:   Wed Jul 22 07:28:15 2026 +0100
+
+    Sync complete RL4 implementation
+
+ RC44_AUDIT_REPORT.md                                           | 176 [32m+++++++++[m
+ RC45_AUDIT_REPORT.md                                           | 184 [32m+++++++++[m
+ RC46_AUDIT_REPORT.md                                           | 155 [32m++++++++[m
+ RC47_5_AUDIT_REPORT.md                                         | 347 [32m+++++++++++++++++[m
+ RC47_6_AUDIT_REPORT.md                                         | 196 [32m++++++++++[m
+ RC47_AUDIT_REPORT.md                                           | 203 [32m++++++++++[m
+ RC49_DEBUG_REPORT.md                                           | 285 [32m++++++++++++++[m
+ RC50_FORENSIC_PIPELINE_AUDIT.md                                | 284 [32m++++++++++++++[m
+ app/src/main/assets/anatomy/back_anatomy.svg                   |  46 [32m+++[m
+ app/src/main/assets/anatomy/front_anatomy.svg                  |  45 [32m+++[m
+ .../com/replog/domain/visual/anatomy/AnatomyDiagnostics.kt     | 370 [32m++++++++++++++++++[m
+ .../java/com/replog/domain/visual/anatomy/AnatomyGeometry.kt   |  17 [31m-[m
+ app/src/main/java/com/replog/domain/visual/anatomy/BackBody.kt | 212 [31m----------[m
+ .../main/java/com/replog/domain/visual/anatomy/FrontBody.kt    | 217 [31m-----------[m
+ .../com/replog/domain/visual/anatomy/MuscleActivationEngine.kt |   4 [32m+[m[31m-[m
+ .../main/java/com/replog/domain/visual/anatomy/MuscleMap.kt    |  25 [32m+[m[31m-[m
+ .../main/java/com/replog/domain/visual/anatomy/MuscleRegion.kt |  18 [32m+[m[31m-[m
+ .../java/com/replog/domain/visual/anatomy/MuscleRenderer.kt    | 166 [32m+++++[m[31m---[m
+ .../java/com/replog/domain/visual/anatomy/SVGAnatomyLoader.kt  | 259 [32m+++++++++++++[m
+ .../java/com/replog/domain/visual/anatomy/V2AnatomyModel.kt    | 367 [32m++[m[31m----------------[m
+ .../main/java/com/replog/domain/visual/anatomy/VectorBody.kt   |  18 [31m-[m
+ .../com/replog/domain/visual/animation/SkeletalRenderer.kt     |  82 [31m----[m
+ .../java/com/replog/domain/visual/body/HumanBodyRenderer.kt    | 213 [31m----------[m
+ .../java/com/replog/domain/visual/body/VolumetricRenderer.kt   | 210 [31m----------[m
+ .../replog/domain/visual/layered/LayeredRenderingPipeline.kt   | 153 [31m--------[m
+ .../com/replog/domain/visual/validation/AnatomyValidator.kt    |  62 [31m---[m
+ .../domain/visual/validation/RenderingValidationSuite.kt       | 240 [31m------------[m
+ .../main/java/com/replog/ui/exercise/ExerciseAnimationView.kt  | 282 [31m--------------[m
+ .../java/com/replog/ui/exercise/ExerciseCoachingSections.kt    | 238 [32m+++++++[m[31m-----[m
+ .../main/java/com/replog/ui/exercise/ExerciseLibraryScreen.kt  | 405 [32m+++++++++++++++[m[31m----[m
+ .../java/com/replog/ui/exercise/ExerciseLibraryScreen.kt.bak   | 581 [32m++++++++++++++++++++++++++++[m
+ .../ui/exercise/presentation/ExercisePresentationView.kt       |  61 [32m++[m[31m-[m
+ 32 files changed, 3789 insertions(+), 2332 deletions(-)
+ create mode 100644 RC44_AUDIT_REPORT.md
+ create mode 100644 RC45_AUDIT_REPORT.md
+ create mode 100644 RC46_AUDIT_REPORT.md
+ create mode 100644 RC47_5_AUDIT_REPORT.md
+ create mode 100644 RC47_6_AUDIT_REPORT.md
+ create mode 100644 RC47_AUDIT_REPORT.md
+ create mode 100644 RC49_DEBUG_REPORT.md
+ create mode 100644 RC50_FORENSIC_PIPELINE_AUDIT.md
+ create mode 100644 app/src/main/assets/anatomy/back_anatomy.svg
+ create mode 100644 app/src/main/assets/anatomy/front_anatomy.svg
+ create mode 100644 app/src/main/java/com/replog/domain/visual/anatomy/AnatomyDiagnostics.kt
+ delete mode 100644 app/src/main/java/com/replog/domain/visual/anatomy/AnatomyGeometry.kt
+ delete mode 100644 app/src/main/java/com/replog/domain/visual/anatomy/BackBody.kt
+ delete mode 100644 app/src/main/java/com/replog/domain/visual/anatomy/FrontBody.kt
+ create mode 100644 app/src/main/java/com/replog/domain/visual/anatomy/SVGAnatomyLoader.kt
+ delete mode 100644 app/src/main/java/com/replog/domain/visual/anatomy/VectorBody.kt
+ delete mode 100644 app/src/main/java/com/replog/domain/visual/animation/SkeletalRenderer.kt
+ delete mode 100644 app/src/main/java/com/replog/domain/visual/body/HumanBodyRenderer.kt
+ delete mode 100644 app/src/main/java/com/replog/domain/visual/body/VolumetricRenderer.kt
+ delete mode 100644 app/src/main/java/com/replog/domain/visual/layered/LayeredRenderingPipeline.kt
+ delete mode 100644 app/src/main/java/com/replog/domain/visual/validation/AnatomyValidator.kt
+ delete mode 100644 app/src/main/java/com/replog/domain/visual/validation/RenderingValidationSuite.kt
+ delete mode 100644 app/src/main/java/com/replog/ui/exercise/ExerciseAnimationView.kt
+ create mode 100644 app/src/main/java/com/replog/ui/exercise/ExerciseLibraryScreen.kt.bak

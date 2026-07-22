@@ -22,7 +22,7 @@ object AnatomyDiagnostics {
     data class DiagnosticSession(
         val sessionId: String = System.currentTimeMillis().toString(),
         val timestamp: String = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US).format(Date()),
-        val exerciseName: String = "",
+        var exerciseName: String = "",
         val primaryRequested: MutableList<String> = mutableListOf(),
         val secondaryRequested: MutableList<String> = mutableListOf(),
         val stabiliserRequested: MutableList<String> = mutableListOf(),
@@ -30,22 +30,22 @@ object AnatomyDiagnostics {
         val secondaryMapped: MutableList<String> = mutableListOf(),
         val stabiliserMapped: MutableList<String> = mutableListOf(),
         val enumFailures: MutableList<String> = mutableListOf(),
-        val svgFrontLoaded: Boolean = false,
-        val svgBackLoaded: Boolean = false,
+        var svgFrontLoaded: Boolean = false,
+        var svgBackLoaded: Boolean = false,
         val svgRegions: MutableList<String> = mutableListOf(),
         val svgMissingIds: MutableList<String> = mutableListOf(),
-        val svgException: String = "",
-        val rendererPrimaryCount: Int = 0,
-        val rendererSecondaryCount: Int = 0,
-        val rendererStabiliserCount: Int = 0,
-        val rendererInactiveCount: Int = 0,
-        val rendererSilhouetteCount: Int = 0,
-        val totalDrawCalls: Int = 0,
+        var svgException: String = "",
+        var rendererPrimaryCount: Int = 0,
+        var rendererSecondaryCount: Int = 0,
+        var rendererStabiliserCount: Int = 0,
+        var rendererInactiveCount: Int = 0,
+        var rendererSilhouetteCount: Int = 0,
+        var totalDrawCalls: Int = 0,
         val pathsDrawn: MutableList<String> = mutableListOf(),
         val skippedPaths: MutableList<String> = mutableListOf(),
         val zeroAreaPaths: MutableList<String> = mutableListOf(),
         val warnings: MutableList<String> = mutableListOf(),
-        val finalVerdict: String = "UNVERIFIED"
+        var finalVerdict: String = "UNVERIFIED"
     ) {
         fun buildReport(): String = buildString {
             appendLine("=== ANATOMY DIAGNOSTIC SESSION ===")
@@ -96,7 +96,7 @@ object AnatomyDiagnostics {
                 baseDir.mkdirs()
                 Log.d(TAG, "[FILE] Created directory: ${baseDir.absolutePath}")
             }
-            val safeName = exerciseName.replace("[^A-Za-z0-9_\-]".toRegex(), "_")
+            val safeName = exerciseName.replace("[^A-Za-z0-9_-]".toRegex(), "_")
             val fileName = "${safeName}_${System.currentTimeMillis()}.txt"
             val file = File(baseDir, fileName)
             FileWriter(file).use { it.write(report) }

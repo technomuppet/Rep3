@@ -194,7 +194,7 @@ fun AnatomicalMuscleDiagram(
     val stabiliserRegions = remember(anatomySpec.stabiliserMuscles) {
         anatomySpec.stabiliserMuscles.mapNotNull { name ->
             try {
-                AnatomyDiagnostics.auditEnumConversion(name)
+                MuscleRegion.valueOf(name.uppercase())
             } catch (e: Exception) {
                 null
             }
