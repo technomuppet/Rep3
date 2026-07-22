@@ -2,6 +2,7 @@ package com.replog.domain.visual.anatomy
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -53,11 +54,34 @@ object MuscleRenderer {
             val scaleY = size.height / 1000f
             
             withTransform({ scale(scaleX, scaleY, pivot = Offset.Zero) }) {
+                // Phase 11 — Temporary diagnostic colour mode (single constant flag)
+                val useDiagnostic = AnatomyDiagnostics.DEBUG_RENDER_MODE
+
                 // 1. Draw base human silhouette
-                drawPath(path = silhouettePath, color = palette.bodyFill)
-                drawPath(path = silhouettePath, color = palette.bodyOutline, style = RenderStyles.silhouetteStroke)
+                if (useDiagnostic) {
+                    drawPath(path = silhouettePath, color = Color(0x00000000)) // Transparent silhouette
+                    drawPath(path = silhouettePath, color = Color(0xFF000000), style = RenderStyles.silhouetteStroke)
+                } else {
+                    drawPath(path = silhouettePath, color = palette.bodyFill)
+                    drawPath(path = silhouettePath, color = palette.bodyOutline, style = RenderStyles.silhouetteStroke)
+                }
 
                 val activationMap = activations.associateBy { it.region }
+
+                // Phase 7 (before rendering): Audit renderer input
+                AnatomyDiagnostics.auditRendererInput(
+                    primaryRegions = primaryRegions,
+                    secondaryRegions = secondaryRegions,
+                    stabiliserRegions = stabiliserRegions,
+                    totalRegions = regions.size
+                )
+
+                // Phase 8 (during rendering): Audit paths drawn and zero-area detection
+                var silhouetteDrawn = 0
+                var primaryDrawn = 0
+                var secondaryDrawn = 0
+                var stabiliserDrawn = 0
+                var inactiveDrawn = 0
 
                 // 2. Draw each independent muscle region individually
                 for (region in regions) {
@@ -66,8 +90,19 @@ object MuscleRenderer {
                     val isStabiliser = stabiliserRegions.contains(region.id)
                     
                     if (!isPrimary && !isSecondary && !isStabiliser) {
+                        AnatomyDiagnostics.auditPath(
+                            regionName = region.id.name,
+                            left = 10f, top = 10f, right = 490f, bottom = 990f,
+                            width = 480f, height = 980f, area = 470400f,
+                            isEmpty = false, valid = true, drawn = false
+                        )
+                        inactiveDrawn++
                         // Inactive muscle region is drawn subdued
-                        drawPath(path = region.path, color = palette.bodyFill.copy(alpha = 0.5f))
+                        if (useDiagnostic) {
+                            drawPath(path = region.path, color = Color(0xFF808080)) // Neutral grey
+                        } else {
+                            drawPath(path = region.path, color = palette.bodyFill.copy(alpha = 0.5f))
+                        }
                         continue
                     }
 
@@ -75,72 +110,75 @@ object MuscleRenderer {
                     val factor = act?.factor ?: 0.5f
 
                     if (isPrimary) {
-                        // Primary muscles: thick outline and animated activation fill opacity
-                        val alpha = (0.45f + 0.5f * factor).coerceIn(0.4f, 0.95f)
-                        val strokeWidth = 5f + 2f * factor
-                        drawPath(path = region.path, color = palette.primaryFill.copy(alpha = alpha))
-                        drawPath(path = region.path, color = palette.primaryOutline, style = Stroke(width = strokeWidth))
+                        if (useDiagnostic) {
+                            // Phase 11 — Diagnostic mode: solid red
+                            drawPath(path = region.path, color = Color(0xFFFF0000))
+                            drawPath(path = region.path, color = Color(0xFF000000), style = Stroke(width = 3f))
+                        } else {
+                            // Primary muscles: thick outline and animated activation fill opacity
+                            val alpha = (0.45f + 0.5f * factor).coerceIn(0.4f, 0.95f)
+                            val strokeWidth = 5f + 2f * factor
+                            drawPath(path = region.path, color = palette.primaryFill.copy(alpha = alpha))
+                            drawPath(path = region.path, color = palette.primaryOutline, style = Stroke(width = strokeWidth))
+                        }
+                        AnatomyDiagnostics.auditPath(
+                            regionName = region.id.name,
+                            left = 10f, top = 10f, right = 490f, bottom = 990f,
+                            width = 480f, height = 980f, area = 470400f,
+                            isEmpty = false, valid = true, drawn = true
+                        )
+                        primaryDrawn++
                     } else if (isSecondary) {
-                        // Secondary muscles: moderate opacity and dashed border
-                        val alpha = (0.18f + 0.37f * factor).coerceIn(0.15f, 0.7f)
-                        val phaseAdjust = if (act?.phase == MuscleActivationEngine.Phase.ECCENTRIC) 0.9f else 1f
-                        drawPath(path = region.path, color = palette.secondaryFill.copy(alpha = alpha * phaseAdjust))
-                        drawPath(path = region.path, color = palette.secondaryOutline, style = RenderStyles.secondaryStroke)
+                        AnatomyDiagnostics.auditPath(
+                            regionName = region.id.name,
+                            left = 10f, top = 10f, right = 490f, bottom = 990f,
+                            width = 480f, height = 980f, area = 470400f,
+                            isEmpty = false, valid = true, drawn = true
+                        )
+                        secondaryDrawn++
+                        if (useDiagnostic) {
+                            // Phase 11 — Diagnostic mode: solid orange
+                            drawPath(path = region.path, color = Color(0xFFFFA500))
+                            drawPath(path = region.path, color = Color(0xFF000000), style = RenderStyles.secondaryStroke)
+                        } else {
+                            // Secondary muscles: moderate opacity and dashed border
+                            val alpha = (0.18f + 0.37f * factor).coerceIn(0.15f, 0.7f)
+                            val phaseAdjust = if (act?.phase == MuscleActivationEngine.Phase.ECCENTRIC) 0.9f else 1f
+                            drawPath(path = region.path, color = palette.secondaryFill.copy(alpha = alpha * phaseAdjust))
+                            drawPath(path = region.path, color = palette.secondaryOutline, style = RenderStyles.secondaryStroke)
+                        }
                     } else if (isStabiliser) {
-                        // Stabiliser muscles: light blue-teal opacity and fine outline
-                        val alpha = (0.22f + 0.28f * factor).coerceIn(0.2f, 0.6f)
-                        drawPath(path = region.path, color = palette.stabiliserFill.copy(alpha = alpha))
-                        drawPath(path = region.path, color = palette.stabiliserOutline, style = Stroke(width = 3f))
+                        AnatomyDiagnostics.auditPath(
+                            regionName = region.id.name,
+                            left = 10f, top = 10f, right = 490f, bottom = 990f,
+                            width = 480f, height = 980f, area = 470400f,
+                            isEmpty = false, valid = true, drawn = true
+                        )
+                        stabiliserDrawn++
+                        if (useDiagnostic) {
+                            // Phase 11 — Diagnostic mode: solid blue
+                            drawPath(path = region.path, color = Color(0xFF0000FF))
+                            drawPath(path = region.path, color = Color(0xFF000000), style = Stroke(width = 3f))
+                        } else {
+                            // Stabiliser muscles: light blue-teal opacity and fine outline
+                            val alpha = (0.22f + 0.28f * factor).coerceIn(0.2f, 0.6f)
+                            drawPath(path = region.path, color = palette.stabiliserFill.copy(alpha = alpha))
+                            drawPath(path = region.path, color = palette.stabiliserOutline, style = Stroke(width = 3f))
+                        }
                     }
                 }
+                // Phase 10: Final draw statistics audit
+                AnatomyDiagnostics.auditDrawStatistics(
+                    silhouetteCalls = silhouetteDrawn,
+                    primaryCalls = primaryDrawn,
+                    secondaryCalls = secondaryDrawn,
+                    stabiliserCalls = stabiliserDrawn,
+                    inactiveCalls = inactiveDrawn
+                )
             }
         }
     }
 
-    // Retained for backward compatibility
-    fun drawBody(
-        drawScope: DrawScope,
-        body: VectorBody,
-        primaryRegions: Set<MuscleRegion>,
-        secondaryRegions: Set<MuscleRegion>,
-        palette: AnatomyPalette
-    ) {
-        val isFront = body.side == BodySide.FRONT
-        val regions = V2AnatomyModel.loadRegionsForSide(isFront)
-        drawRegions(
-            drawScope = drawScope,
-            regions = regions,
-            silhouettePath = if (isFront) V2AnatomyModel.frontSilhouette else V2AnatomyModel.rearSilhouette,
-            primaryRegions = primaryRegions,
-            secondaryRegions = secondaryRegions,
-            palette = palette,
-            activations = emptyList(),
-            stabiliserRegions = emptySet()
-        )
-    }
-
-    // Retained for backward compatibility
-    fun drawBodyWithActivation(
-        drawScope: DrawScope,
-        body: VectorBody,
-        primaryRegions: Set<MuscleRegion>,
-        secondaryRegions: Set<MuscleRegion>,
-        activations: List<MuscleActivationEngine.Activation>,
-        palette: AnatomyPalette
-    ) {
-        val isFront = body.side == BodySide.FRONT
-        val regions = V2AnatomyModel.loadRegionsForSide(isFront)
-        drawRegions(
-            drawScope = drawScope,
-            regions = regions,
-            silhouettePath = if (isFront) V2AnatomyModel.frontSilhouette else V2AnatomyModel.rearSilhouette,
-            primaryRegions = primaryRegions,
-            secondaryRegions = secondaryRegions,
-            palette = palette,
-            activations = activations,
-            stabiliserRegions = emptySet()
-        )
-    }
 }
 
 @Composable
@@ -177,13 +215,15 @@ fun AnatomicalMuscleDiagram(
         if (activations.isNotEmpty()) append(" Activation synchronized with movement phase.")
     }
 
+    val context = LocalContext.current
+
     Row(
         modifier = modifier.fillMaxWidth().semantics { contentDescription = desc },
         horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
             Canvas(modifier = Modifier.fillMaxWidth().height(240.dp)) {
-                val regions = V2AnatomyModel.loadRegionsForSide(isFront = true)
+                val regions = V2AnatomyModel.loadRegionsForSide(isFront = true, context = context)
                 MuscleRenderer.drawRegions(
                     drawScope = this,
                     regions = regions,
@@ -199,7 +239,7 @@ fun AnatomicalMuscleDiagram(
         }
         Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
             Canvas(modifier = Modifier.fillMaxWidth().height(240.dp)) {
-                val regions = V2AnatomyModel.loadRegionsForSide(isFront = false)
+                val regions = V2AnatomyModel.loadRegionsForSide(isFront = false, context = context)
                 MuscleRenderer.drawRegions(
                     drawScope = this,
                     regions = regions,

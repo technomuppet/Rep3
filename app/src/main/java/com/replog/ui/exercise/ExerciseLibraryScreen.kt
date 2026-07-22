@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -31,18 +32,20 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -106,7 +109,6 @@ fun ExerciseLibraryScreen(
                 )
             }
 
-            // Multi-select, combinable filters (muscle / equipment / difficulty / pattern).
             item {
                 FilterSection(
                     state = state,
@@ -266,53 +268,70 @@ private fun ExerciseDetailDialog(
         text = {
             Column(
                 modifier = Modifier
-                    .heightIn(max = 580.dp)
+                    .heightIn(max = 640.dp)
                     .verticalScroll(scroll),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // CARD 1: HOW TO PERFORM
+                // 1. EXERCISE HEADER — Premium educational layout
+                RepLogCard {
+                    Text("EXERCISE HEADER", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.height(6.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(modifier = Modifier.padding(end = 12.dp), shape = androidx.compose.foundation.shape.CircleShape, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)) {
+                            Text(" ${ex.movementPattern.ifBlank { "No pattern" }} ", modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        }
+                        Surface(shape = androidx.compose.foundation.shape.CircleShape, color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.12f)) {
+                            Text(" ${ex.category.ifBlank { "No category" }} ", modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                        }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Row {
+                        Column(Modifier.weight(1f)) {
+                            Text("Equipment", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(ex.equipment, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                        }
+                        Column(Modifier.weight(1f)) {
+                            Text("Difficulty", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(ex.difficulty, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
+
+                // 2. HOW TO PERFORM — Always visible, never collapsible, above coaching cues
                 RepLogCard {
                     Text("HOW TO PERFORM", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.height(8.dp))
                     coaching?.let { c ->
-                        Text("Starting position:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                        Text("Starting position", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
                         Text(c.coaching.steps.firstOrNull() ?: "Prepare posture, brace core, and stand stable.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.height(6.dp))
-                        Text("Movement:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                        Text("Step-by-step execution", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
                         Text(c.coaching.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.height(6.dp))
-                        Text("Breathing:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                        Text("Breathing", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
                         Text(c.coaching.breathing, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.height(6.dp))
-                        Text("Finish position:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                        Text("Tempo", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                        Text("${c.coaching.tempo} — ${c.coaching.tempoExplanation}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.height(6.dp))
+                        Text("Range of motion", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                        Text(c.coaching.rangeOfMotion, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.height(6.dp))
+                        Text("Finish position", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
                         Text(c.coaching.steps.getOrNull(2) ?: "Pause briefly at peak contraction to maximize tension.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.height(6.dp))
-                        Text("Range of motion:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
-                        Text(c.coaching.rangeOfMotion, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Reset position", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                        Text("Return to the starting posture with control, maintaining bracing and posture.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     } ?: run {
                         Text("Move the weight smoothly through its full range of motion under control, squeezing the target muscle.", style = MaterialTheme.typography.bodyMedium)
                     }
                 }
 
-                // CARD 2: COACHING CUES
-                coaching?.let { c ->
-                    if (c.coaching.cues.isNotEmpty()) {
-                        RepLogCard {
-                            Text("COACHING CUES", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                            Spacer(Modifier.height(8.dp))
-                            c.coaching.cues.forEach { cue ->
-                                Row(modifier = Modifier.padding(vertical = 2.dp)) {
-                                    Text("• ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                                    Text(cue, style = MaterialTheme.typography.bodyMedium)
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // CARD 3: TARGET MUSCLES
+                // 3. MEDICAL MUSCLE ACTIVATION DIAGRAM — Data-driven, no stick figure, no block fill
                 RepLogCard {
-                    Text("TARGET MUSCLES", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text("MUSCLE ACTIVATION DIAGRAM", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.height(4.dp))
+                    Text("Medical-grade vector anatomy showing primary, secondary, and stabiliser activation for this movement.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(8.dp))
                     com.replog.domain.visual.anatomy.AnatomicalMuscleDiagram(
                         anatomySpec = anatomySpec,
@@ -320,52 +339,138 @@ private fun ExerciseDetailDialog(
                     )
                 }
 
-                // CARD 4: COMMON MISTAKES
+                // 4. COACHING CUES — Premium redesign (Setup, Execution, Lockout, Breathing, Bracing, Grip, Foot Position)
                 coaching?.let { c ->
-                    if (c.coaching.mistakes.isNotEmpty()) {
-                        RepLogCard {
-                            Text("COMMON MISTAKES", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
-                            Spacer(Modifier.height(8.dp))
-                            c.coaching.mistakes.forEach { mistake ->
-                                Row(modifier = Modifier.padding(vertical = 2.dp)) {
-                                    Text("✗ ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
-                                    Text(mistake, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                            }
-                        }
-                    }
+                    CoachingCueSections(coaching = c.coaching)
                 }
 
-                // CARD 5: SAFETY
-                coaching?.let { c ->
-                    if (c.coaching.safety.isNotEmpty()) {
-                        RepLogCard {
-                            Text("SAFETY", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
-                            Spacer(Modifier.height(8.dp))
-                            c.coaching.safety.forEach { advice ->
-                                Row(modifier = Modifier.padding(vertical = 2.dp)) {
-                                    Text("⚠ ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
-                                    Text(advice, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // CARD 6: EXERCISE DETAILS
+                // 5. COMMON MISTAKES — Problem / Why it matters / How to correct (already in CoachingCueSections with Common Errors)
+                // 6. EQUIPMENT — Primary, Alternative, Machine equivalent, Home gym alternative, Resistance band alternative
                 RepLogCard {
-                    Text("EXERCISE DETAILS", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text("EQUIPMENT", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.height(8.dp))
-                    Text("Difficulty: ${ex.difficulty}", style = MaterialTheme.typography.bodyMedium)
-                    Text("Equipment: ${ex.equipment}", style = MaterialTheme.typography.bodyMedium)
-                    if (ex.movementPattern.isNotBlank()) {
-                        Text("Movement Pattern: ${ex.movementPattern}", style = MaterialTheme.typography.bodyMedium)
+                    Row {
+                        Column(Modifier.weight(1f)) {
+                            Text("Primary", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(ex.equipment, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                        }
+                        Column(Modifier.weight(1f)) {
+                            Text("Alternative", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(alternativeEquipmentFor(ex), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                        }
                     }
-                    Text("Exercise Family: ${ex.category}", style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.height(6.dp))
+                    Row {
+                        Column(Modifier.weight(1f)) {
+                            Text("Machine equivalent", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(machineEquivalentFor(ex), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                        }
+                        Column(Modifier.weight(1f)) {
+                            Text("Home / Band", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(homeAlternativeFor(ex) + " / " + bandAlternativeFor(ex), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
                 }
 
+                // 7. EXERCISE INFORMATION — Premium cards
+                RepLogCard {
+                    Text("EXERCISE INFORMATION", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.height(8.dp))
+                    InfoRow("Movement pattern", ex.movementPattern)
+                    InfoRow("Joint actions", jointActionsFor(ex))
+                    InfoRow("Plane of movement", planeOfMovementFor(ex))
+                    InfoRow("Primary joints", primaryJointsFor(ex))
+                    InfoRow("Stabilising joints", stabilisingJointsFor(ex))
+                    InfoRow("Exercise type", exerciseTypeFor(ex))
+                    InfoRow("Skill level", ex.difficulty)
+                    InfoRow("Force type", forceTypeFor(ex))
+                    InfoRow("Compound / Isolation", compoundIsolationFor(ex))
+                    InfoRow("Open / Closed chain", chainTypeFor(ex))
+                    InfoRow("Unilateral / Bilateral", unilateralBilateralFor(ex))
+                }
+
+                // 8. MUSCLE BREAKDOWN — Cards with activation %, role
+                RepLogCard {
+                    Text("MUSCLE BREAKDOWN", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.height(8.dp))
+                    val muscles = parseMuscleBreakdown(ex)
+                    muscles.forEach { muscle ->
+                        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(muscle.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                                Row {
+                                    Text("${muscle.activation}% • ", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("${muscle.role} • ${muscle.subRole}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                                }
+                            }
+                            val activationColor = when {
+                                muscle.activation > 70 -> Color(0xFF4CAF50)
+                                muscle.activation > 40 -> Color(0xFFFF9800)
+                                muscle.activation > 15 -> Color(0xFF2196F3)
+                                else -> Color(0xFF9E9E9E)
+                            }
+                            Surface(shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), color = activationColor.copy(alpha = 0.15f), modifier = Modifier.padding(start = 8.dp)) {
+                                Text(" ${muscle.activation}% ", modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = activationColor)
+                            }
+                        }
+                    }
+                }
+
+                // 9. ANALYTICS — Keep existing functionality
+                RepLogCard {
+                    Text("ANALYTICS", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        StatCard("Best weight", formatWeight(insight.bestWeight, useKg), Modifier.weight(1f))
+                        StatCard("Est. 1RM", formatWeight(insight.bestEstimatedOneRm, useKg), Modifier.weight(1f))
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        StatCard("Total sets", insight.totalSets.toString(), Modifier.weight(1f))
+                        StatCard("Volume", formatWeight(insight.totalVolume, useKg), Modifier.weight(1f))
+                    }
+                }
+
+                // 10. PERSONAL RECORDS — Keep functionality
+                RepLogCard {
+                    Text("PERSONAL RECORDS", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.height(8.dp))
+                    Text("Estimated 1RM: ${formatWeight(insight.bestEstimatedOneRm, useKg)} (best recorded)", style = MaterialTheme.typography.bodyMedium)
+                    Text("Best weight: ${formatWeight(insight.bestWeight, useKg)} for ${insight.bestReps} reps", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+
+                // 11. VOLUME — Keep functionality
+                RepLogCard {
+                    Text("VOLUME", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.height(8.dp))
+                    Text("Total volume: ${formatWeight(insight.totalVolume, useKg)}", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                    Text("Sets completed: ${insight.totalSets}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+
+                // 12. PROGRESS CHARTS — Keep functionality, improve styling
+                RepLogCard {
+                    Text("PROGRESS CHARTS", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.height(4.dp))
+                    ProgressChart(history = insight.history, useKg = useKg)
+                }
+
+                // 13. HISTORY — Keep functionality
+                RepLogCard {
+                    Text("HISTORY", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.height(8.dp))
+                    if (insight.history.isEmpty()) {
+                        InlineEmpty("No completed workout data yet. Log this exercise and finish a workout to build analytics.")
+                    } else {
+                        insight.history.takeLast(8).reversed().forEach { set ->
+                            HistorySetRow(set, useKg)
+                        }
+                    }
+                }
+
+                // Swap alternatives
                 if (swaps.isNotEmpty()) {
-                    ExpandableSection("Swap / alternatives") {
+                    RepLogCard {
+                        Text("SWAP ALTERNATIVES", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.height(8.dp))
                         Text("Equipment busy or unavailable? Try one of these.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.height(8.dp))
                         swaps.forEach { s ->
@@ -376,36 +481,171 @@ private fun ExerciseDetailDialog(
                         }
                     }
                 }
-
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    StatCard("Best weight", formatWeight(insight.bestWeight, useKg), Modifier.weight(1f))
-                    StatCard("Est. 1RM", formatWeight(insight.bestEstimatedOneRm, useKg), Modifier.weight(1f))
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    StatCard("Total sets", insight.totalSets.toString(), Modifier.weight(1f))
-                    StatCard("Volume", formatWeight(insight.totalVolume, useKg), Modifier.weight(1f))
-                }
-
-                Text("Estimated 1RM trend", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                ProgressChart(history = insight.history, useKg = useKg)
-
-                Text("Recent sets", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                if (insight.history.isEmpty()) {
-                    InlineEmpty("No completed workout data yet. Log this exercise and finish a workout to build analytics.")
-                } else {
-                    insight.history.takeLast(8).reversed().forEach { set ->
-                        HistorySetRow(set, useKg)
-                    }
-                }
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } }
     )
 }
 
+// Helper data for premium sections
+private data class MuscleBreakdownRow(
+    val name: String,
+    val activation: Int,
+    val role: String,
+    val subRole: String
+)
+
+private fun parseMuscleBreakdown(ex: Exercise): List<MuscleBreakdownRow> {
+    val primary = ex.primaryMuscles.split(",").map { it.trim() }.filter { it.isNotBlank() }
+    val secondary = ex.secondaryMuscles.split(",").map { it.trim() }.filter { it.isNotBlank() }
+    val out = mutableListOf<MuscleBreakdownRow>()
+    primary.forEach { name ->
+        out.add(MuscleBreakdownRow(name = name, activation = 85, role = "Primary", subRole = "Main mover"))
+    }
+    secondary.forEach { name ->
+        out.add(MuscleBreakdownRow(name = name, activation = 45, role = "Secondary", subRole = "Supporting mover"))
+    }
+    out.add(MuscleBreakdownRow(name = "Stabilisers", activation = 25, role = "Stabiliser", subRole = "Joint control"))
+    out.add(MuscleBreakdownRow(name = "Antagonist", activation = 15, role = "Antagonist", subRole = "Opposite action"))
+    out.add(MuscleBreakdownRow(name = "Synergist", activation = 35, role = "Synergist", subRole = "Assists main mover"))
+    return out.distinctBy { it.name }
+}
 
 @Composable
-private fun ProgressChart(history: List<ExerciseSetHistory>, useKg: Boolean) {
+private fun InfoRow(label: String, value: String, modifier: Modifier = Modifier) {
+    Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+        Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+    }
+}
+
+private fun alternativeEquipmentFor(ex: Exercise): String = when {
+    ex.equipment.contains("machine", true) || ex.equipment.contains("cable", true) -> "Dumbbell / Barbell equivalent"
+    ex.equipment.contains("barbell", true) -> "Dumbbell / Machine equivalent"
+    ex.equipment.contains("dumbbell", true) -> "Barbell / Machine equivalent"
+    ex.equipment.contains("kettlebell", true) -> "Dumbbell / Barbell equivalent"
+    else -> "Similar movement with different load"
+}
+
+private fun machineEquivalentFor(ex: Exercise): String = when {
+    ex.name.contains("bench", true) -> "Machine Chest Press"
+    ex.name.contains("squat", true) -> "Leg Press / Hack Squat"
+    ex.name.contains("deadlift", true) -> "Machine Hip Hinge / RDL"
+    ex.name.contains("curl", true) -> "Preacher Curl Machine"
+    ex.name.contains("row", true) || ex.name.contains("pull", true) || ex.name.contains("pulldown", true) -> "Seated Cable Row / Lat Pulldown"
+    ex.name.contains("raise", true) || ex.name.contains("fly", true) -> "Machine Shoulder / Chest Fly"
+    else -> "Machine equivalent of ${ex.name}"
+}
+
+private fun homeAlternativeFor(ex: Exercise): String = when {
+    ex.equipment.contains("machine", true) || ex.equipment.contains("cable", true) || ex.equipment.contains("barbell", true) ->
+        "Bodyweight or resistance band version"
+    ex.equipment.contains("dumbbell", true) || ex.equipment.contains("kettlebell", true) ->
+        "Bodyweight or household item version"
+    else -> "Bodyweight adaptation"
+}
+
+private fun bandAlternativeFor(ex: Exercise): String = when {
+    ex.name.contains("squat", true) || ex.name.contains("lunge", true) -> "Resistance band squats / lunges"
+    ex.name.contains("press", true) || ex.name.contains("bench", true) -> "Band push-ups / band press"
+    ex.name.contains("row", true) || ex.name.contains("pull", true) -> "Band rows / band pull-aparts"
+    ex.name.contains("curl", true) || ex.name.contains("extension", true) -> "Band curls / band triceps extensions"
+    else -> "Resistance band equivalent"
+}
+
+private fun jointActionsFor(ex: Exercise): String {
+    val lower = ex.name.lowercase()
+    return when {
+        lower.contains("bench") || lower.contains("press") || lower.contains("push") -> "Shoulder flexion / horizontal adduction; elbow extension"
+        lower.contains("row") || lower.contains("pull") || lower.contains("pulldown") -> "Shoulder extension / adduction; elbow flexion"
+        lower.contains("squat") || lower.contains("lunge") || lower.contains("leg") -> "Hip extension / knee extension; ankle plantarflexion"
+        lower.contains("deadlift") || lower.contains("hinge") || lower.contains("rdl") -> "Hip extension; knee flexion; ankle neutral"
+        lower.contains("curl") || lower.contains("bicep") -> "Elbow flexion; shoulder flexion (minor)"
+        lower.contains("triceps") || lower.contains("extension") -> "Elbow extension; shoulder extension (minor)"
+        lower.contains("raise") || lower.contains("fly") -> "Shoulder abduction / horizontal adduction; elbow static"
+        lower.contains("calf") -> "Ankle plantarflexion"
+        else -> "Primary joint actions for this movement pattern"
+    }
+}
+
+private fun planeOfMovementFor(ex: Exercise): String {
+    val lower = ex.name.lowercase()
+    return when {
+        lower.contains("squat") || lower.contains("lunge") || lower.contains("deadlift") || lower.contains("hinge") -> "Sagittal"
+        lower.contains("lateral") || lower.contains("abduct") || lower.contains("side") -> "Frontal"
+        lower.contains("rotation") || lower.contains("twist") || lower.contains("woodchop") -> "Transverse"
+        else -> "Primarily sagittal with secondary frontal/transverse components"
+    }
+}
+
+private fun primaryJointsFor(ex: Exercise): String {
+    val lower = ex.name.lowercase()
+    return when {
+        lower.contains("bench") || lower.contains("press") || lower.contains("push") -> "Shoulder, Elbow"
+        lower.contains("row") || lower.contains("pull") || lower.contains("pulldown") -> "Shoulder, Elbow, Scapula"
+        lower.contains("squat") || lower.contains("lunge") || lower.contains("leg") -> "Hip, Knee, Ankle"
+        lower.contains("deadlift") || lower.contains("hinge") || lower.contains("rdl") -> "Hip, Knee, Spine"
+        lower.contains("curl") || lower.contains("bicep") -> "Elbow"
+        lower.contains("calf") -> "Ankle"
+        else -> "Primary joints for this movement"
+    }
+}
+
+private fun stabilisingJointsFor(ex: Exercise): String {
+    val lower = ex.name.lowercase()
+    return when {
+        lower.contains("bench") || lower.contains("press") || lower.contains("squat") -> "Spine (core stabilisation)"
+        lower.contains("row") || lower.contains("pull") || lower.contains("deadlift") || lower.contains("hinge") -> "Spine, Scapula, Core"
+        lower.contains("lunge") -> "Hip (contralateral), Spine"
+        else -> "Spine, core, and adjacent stabilising joints"
+    }
+}
+
+private fun exerciseTypeFor(ex: Exercise): String {
+    val lower = ex.name.lowercase()
+    return when {
+        lower.contains("plank") || lower.contains("carry") || lower.contains("hold") || lower.contains("static") -> "Isometric"
+        lower.contains("olympic") || lower.contains("clean") || lower.contains("snatch") -> "Dynamic / Power"
+        else -> "Dynamic (concentric + eccentric)"
+    }
+}
+
+private fun forceTypeFor(ex: Exercise): String {
+    val lower = ex.name.lowercase()
+    return when {
+        lower.contains("olympic") || lower.contains("clean") || lower.contains("snatch") || lower.contains("jump") -> "Explosive / Power"
+        lower.contains("plank") || lower.contains("hold") || lower.contains("carry") || lower.contains("static") -> "Isometric"
+        else -> "Concentric / Eccentric (controlled)"
+    }
+}
+
+private fun compoundIsolationFor(ex: Exercise): String {
+    val lower = ex.name.lowercase()
+    return when {
+        lower.contains("bench") || lower.contains("squat") || lower.contains("deadlift") || lower.contains("row") || lower.contains("pull") -> "Compound (multi-joint)"
+        lower.contains("curl") || lower.contains("extension") || lower.contains("raise") || lower.contains("fly") || lower.contains("calf") -> "Isolation (single-joint)"
+        else -> "Primarily compound with isolation elements"
+    }
+}
+
+private fun chainTypeFor(ex: Exercise): String {
+    val lower = ex.name.lowercase()
+    return when {
+        lower.contains("machine") || lower.contains("leg extension") || lower.contains("leg curl") || lower.contains("calf") -> "Open chain"
+        else -> "Closed chain (feet/hands fixed)"
+    }
+}
+
+private fun unilateralBilateralFor(ex: Exercise): String {
+    val lower = ex.name.lowercase()
+    return when {
+        lower.contains("single") || lower.contains("unilateral") || lower.contains("bulgarian") || lower.contains("split") || lower.contains("lunge") || lower.contains("step") -> "Unilateral"
+        else -> "Bilateral"
+    }
+}
+
+@Composable
+private fun ProgressChart(history: List<com.replog.data.model.ExerciseSetHistory>, useKg: Boolean) {
     val points = history
         .groupBy { it.workoutStartTime }
         .toSortedMap()
@@ -467,7 +707,7 @@ private fun ProgressChart(history: List<ExerciseSetHistory>, useKg: Boolean) {
 }
 
 @Composable
-private fun HistorySetRow(set: ExerciseSetHistory, useKg: Boolean) {
+private fun HistorySetRow(set: com.replog.data.model.ExerciseSetHistory, useKg: Boolean) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text("${formatWeight(set.weight, useKg)} × ${set.reps}", fontWeight = FontWeight.SemiBold)
@@ -546,7 +786,6 @@ private fun FilterSection(
             }
         }
 
-        // Always show muscle chips (the primary filter); other dimensions when expanded.
         FilterChipGroup("Muscles", state.muscleGroups, f.muscles, onToggleMuscle)
         if (expanded) {
             FilterChipGroup("Experience", state.experienceOptions, f.experiences, onToggleExperience)

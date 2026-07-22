@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Professional Vector Anatomy Asset — Back Body
+  RC47: Independently addressable muscle regions for runtime activation rendering.
+  Each path uses a unique id mapped to MuscleRegion enum values.
+  The anatomy artwork exists as an external asset; the renderer loads,
+  maps, and applies activation colours only.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 1000" width="100%" height="100%">
+  <defs>
+    <style>
+      .region { fill-opacity: 0.35; stroke-width: 3; stroke-linejoin: round; }
+    </style>
+  </defs>
+
+  <!-- REAR SILHOUETTE -->
+  <path id="body_silhouette_back" d="M250 30 C285 30, 295 70, 285 110 C275 130, 275 150, 280 150 C320 155, 360 160, 390 165 C415 185, 420 240, 415 350 L435 510 L440 565 L410 565 L395 510 L375 355 C365 255, 345 215, 345 215 C335 300, 325 380, 325 440 C335 470, 345 510, 340 550 C345 620, 340 690, 330 715 C345 780, 345 870, 330 925 L350 965 L280 965 L270 925 L255 715 L245 480 L235 715 L230 925 L220 965 L150 965 L170 925 C155 870, 155 780, 170 715 C160 690, 155 620, 160 550 C155 510, 165 470, 175 440 C175 380, 165 300, 155 215 C155 215, 135 255, 125 355 L105 510 L90 565 L60 565 L65 510 L85 350 C80 240, 85 185, 110 165 C140 160, 180 155, 220 150 C225 150, 225 130, 215 110 C205 70, 215 30, 250 30 Z" fill="#F5F5F5" stroke="#333333" stroke-width="4"/>
+
+  <!-- PRIMARY BACK MUSCLE REGIONS -->
+  <path id="POSTERIOR_DELTOID" class="region" d="M355 175 C385 180, 395 210, 385 240 C375 240, 360 215, 355 195 Z M145 175 C115 180, 105 210, 115 240 C125 240, 140 215, 145 195 Z" fill="#E1F5FE" stroke="#0277BD"/>
+  <path id="TRICEPS" class="region" d="M385 245 C410 255, 415 310, 395 350 C385 340, 380 310, 380 275 Z M115 245 C90 255, 85 310, 105 350 C115 340, 120 310, 120 275 Z" fill="#B2DFDB" stroke="#00796B"/>
+  <path id="FOREARMS_POSTERIOR" class="region" d="M395 360 C425 380, 420 450, 410 500 C400 495, 390 430, 385 375 Z M105 360 C75 380, 80 450, 90 500 C100 495, 110 430, 115 375 Z" fill="#B2DFDB" stroke="#00796B"/>
+  <path id="UPPER_TRAPEZIUS" class="region" d="M215 115 C230 130, 270 130, 285 115 L340 160 C290 160, 210 160, 160 160 Z" fill="#F1F8E9" stroke="#558B2F"/>
+  <path id="MIDDLE_TRAPEZIUS" class="region" d="M195 160 L305 160 C295 190, 280 210, 250 225 C220 210, 205 190, 195 160 Z" fill="#E8F5E9" stroke="#33691E"/>
+  <path id="LOWER_TRAPEZIUS" class="region" d="M215 225 L285 225 C275 255, 260 285, 250 310 C240 285, 225 255, 215 225 Z" fill="#DCEDC8" stroke="#33691E"/>
+  <path id="LATISSIMUS_DORSI" class="region" d="M295 225 C335 230, 340 300, 305 345 C295 335, 285 290, 295 225 Z M205 225 C165 230, 160 300, 195 345 C205 335, 215 290, 205 225 Z" fill="#E1F5FE" stroke="#01579B"/>
+  <path id="RHOMBOIDS" class="region" d="M205 190 L295 190 C285 220, 275 240, 250 255 C225 240, 215 220, 205 190 Z" fill="#B3E5FC" stroke="#0288D1"/>
+  <path id="SPINAL_ERECTORS" class="region" d="M230 325 L270 325 C275 360, 270 400, 265 435 L235 435 C230 400, 225 360, 230 325 Z" fill="#C8E6C9" stroke="#558B2F"/>
+  <path id="GLUTE_MAXIMUS" class="region" d="M252 440 L325 440 C315 490, 280 545, 252 540 Z M248 440 L175 440 C185 490, 220 545, 248 540 Z" fill="#FFCCBC" stroke="#D84315"/>
+  <path id="GLUTE_MEDIUS" class="region" d="M252 420 L335 420 C330 440, 310 460, 252 455 Z M248 420 L175 420 C180 440, 190 460, 248 455 Z" fill="#FFAB91" stroke="#BF360C"/>
+  <path id="HAMSTRINGS" class="region" d="M260 550 C285 550, 325 570, 320 710 C305 710, 280 660, 260 550 Z M240 550 C215 550, 175 570, 180 710 C195 710, 220 660, 240 550 Z" fill="#FFEDE0" stroke="#F57C00"/>
+  <path id="CALVES" class="region" d="M272 715 C310 715, 315 800, 290 915 L272 915 Z M228 715 C190 715, 185 800, 210 915 L228 915 Z" fill="#FFF8E1" stroke="#F9A825"/>
+
+  <!-- RC45 NEW BACK REGIONS -->
+  <path id="GLUTE_MINIMUS" class="region" d="M245 440 L310 440 C300 460, 280 475, 245 470 Z" fill="#FFAB91" stroke="#D84315"/>
+  <path id="TERES_MAJOR" class="region" d="M310 190 C330 200, 340 230, 320 250 C300 240, 295 215, 310 190 Z" fill="#E3F2FD" stroke="#1565C0"/>
+  <path id="TERES_MINOR" class="region" d="M340 210 C360 220, 355 240, 335 230 Z" fill="#D6EAF8" stroke="#2196F3"/>
+
+  <!-- RC46 NEW BACK REGIONS (independent derived vector paths) -->
+  <path id="PERONEALS" class="region" d="M320 760 C345 780, 325 860, 300 880 C285 850, 305 790, 320 760 Z" fill="#FCE4EC" stroke="#C2185B"/>
+  <path id="GASTROCNEMIUS" class="region" d="M270 720 C300 720, 305 790, 275 820 C260 800, 265 740, 270 720 Z" fill="#FFE0B2" stroke="#FF5722"/>
+  <path id="SOLEUS" class="region" d="M270 820 C300 820, 305 890, 275 910 C255 890, 260 830, 270 820 Z" fill="#FFEDE0" stroke="#F57C00"/>
+  <path id="BICEPS_FEMORIS" class="region" d="M285 560 C325 560, 330 660, 290 710 C275 680, 285 590, 285 560 Z" fill="#FFEDE0" stroke="#F57C00"/>
+  <path id="SEMITENDINOSUS" class="region" d="M235 560 C195 560, 185 660, 230 710 C245 680, 235 590, 235 560 Z" fill="#FFEDE0" stroke="#F57C00"/>
+  <path id="SEMIMEMBRANOSUS" class="region" d="M245 580 C220 580, 210 640, 245 680 C255 650, 245 600, 245 580 Z" fill="#FFEDE0" stroke="#F57C00"/>
+</svg>

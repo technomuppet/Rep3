@@ -28,7 +28,7 @@ object MuscleActivationEngine {
     /**
      * Calculates activation per region based on anatomy spec and progress.
      * @param spec anatomy primary/secondary
-     * @param progress 0..1 where 0 = top/lockout, 1 = bottom/stretch (from ExerciseAnimationView t)
+     * @param progress 0..1 where 0 = top/lockout, 1 = bottom/stretch
      * @param familyId movement family for family-specific curves
      * @param marker pose marker for phase detection
      */
@@ -83,7 +83,7 @@ object MuscleActivationEngine {
             }
             "PULL_UP", "LAT_PULLDOWN", "CABLE_ROW", "HORIZONTAL_PULL" -> {
                 // Pull: lats high at contracted (bottom of our t? Actually pull-up contracted is top Y 0.40, which is our t? For pull-up, topBar is contracted? In our cached bar ends, topBar is hang? Need simpler: use 1-t for pull so contracted high
-                // t 0 top (hang) low, t 1 bottom (contracted) high for pull-up? Actually for pull-up topBar we defined as hang? In ExerciseAnimationView topBar is evaluated at 0 (hang) and bottomBar at duration*0.5 (contracted). So topBar = hang, bottomBar = contracted. So progress t 0->1 is hang->contracted, so activation should increase with t.
+                // t 0 top (hang) low, t 1 bottom (contracted) high for pull-up? Actually for pull-up topBar we defined as hang? In the animation timeline (now removed), topBar = hang, bottomBar = contracted. Progress t 0->1 is hang->contracted.
                 (0.35f + 0.65f * t).coerceIn(0.3f, 1f)
             }
             "SQUAT", "FRONT_SQUAT", "HACK_SQUAT", "LEG_PRESS", "LUNGE", "SPLIT_SQUAT" -> {

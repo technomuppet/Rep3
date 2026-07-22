@@ -13,6 +13,8 @@ object MuscleMap {
         "upper chest" to setOf(MuscleRegion.UPPER_CHEST),
         "clavicular" to setOf(MuscleRegion.UPPER_CHEST),
         "chest" to setOf(MuscleRegion.CHEST),
+        "middle chest" to setOf(MuscleRegion.MIDDLE_CHEST),
+        "lower chest" to setOf(MuscleRegion.LOWER_CHEST),
         "pectoral" to setOf(MuscleRegion.CHEST),
         "pec" to setOf(MuscleRegion.CHEST),
 
@@ -28,6 +30,7 @@ object MuscleMap {
 
         // Arms
         "bicep" to setOf(MuscleRegion.BICEPS),
+        "brachialis" to setOf(MuscleRegion.BRACHIALIS),
         "brachialis" to setOf(MuscleRegion.BICEPS),
         "tricep" to setOf(MuscleRegion.TRICEPS),
         "forearm" to setOf(MuscleRegion.FOREARMS_ANTERIOR, MuscleRegion.FOREARMS_POSTERIOR),
@@ -51,7 +54,8 @@ object MuscleMap {
         "oblique" to setOf(MuscleRegion.OBLIQUES),
         "abdom" to setOf(MuscleRegion.RECTUS_ABDOMINIS),
         "abs" to setOf(MuscleRegion.RECTUS_ABDOMINIS),
-        "core" to setOf(MuscleRegion.RECTUS_ABDOMINIS, MuscleRegion.OBLIQUES),
+        "core" to setOf(MuscleRegion.RECTUS_ABDOMINIS, MuscleRegion.OBLIQUES, MuscleRegion.TRANSVERSE_ABDOMINIS),
+        "transverse abdominis" to setOf(MuscleRegion.TRANSVERSE_ABDOMINIS),
 
         // Hips & Glutes
         "hip flexor" to setOf(MuscleRegion.HIP_FLEXORS),
@@ -93,11 +97,28 @@ object MuscleMap {
 
     fun resolveRegions(muscleName: String): Set<MuscleRegion> {
         val m = muscleName.trim().lowercase()
-        if (m.isEmpty()) return emptySet()
+        if (m.isEmpty()) {
+            AnatomyDiagnostics.auditEnumConversion(muscleName)
+            return emptySet()
+        }
         val matched = mutableSetOf<MuscleRegion>()
         for ((kw, regions) in keywordMappings) {
             if (m.contains(kw)) {
                 matched.addAll(regions)
+                // Audit each matched region independently
+                for (region in regions) {
+                    AnatomyDiagnostics.auditMatch(muscleName, region.name, region.name, true)
+                }
+            }
+        }
+        // Audit requested muscle: if no direct keyword match, try valueOf as fallback
+        if (matched.isEmpty()) {
+            val enumRegion = AnatomyDiagnostics.auditEnumConversion(muscleName)
+            if (enumRegion != null) {
+                matched.add(enumRegion)
+                AnatomyDiagnostics.auditMatch(muscleName, enumRegion.name, enumRegion.name, true)
+            } else {
+                AnatomyDiagnostics.auditMatch(muscleName, null, null, false)
             }
         }
         return matched

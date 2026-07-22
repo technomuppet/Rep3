@@ -1,9 +1,5 @@
 package com.replog.ui.exercise.presentation
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -26,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import com.replog.data.model.Exercise
 import com.replog.domain.visual.anatomy.*
 import com.replog.domain.visual.presentation.*
+import androidx.compose.ui.platform.LocalContext
 import com.replog.ui.components.RepLogCard
 
 @Composable
@@ -33,6 +30,14 @@ fun ExercisePresentationView(exercise: Exercise, modifier: Modifier = Modifier) 
     val asset = remember(exercise.id) { ExercisePresentationFactory.createAsset(exercise) }
     var selectedPoseIndex by remember(exercise.id) { mutableIntStateOf(0) }
     val selectedPose = asset.poses[selectedPoseIndex]
+
+    // Phase 3: Audit exercise data immediately upon opening
+    AnatomyDiagnostics.auditExerciseData(
+        exerciseName = exercise.name ?: "Unknown",
+        primaryMuscles = asset.anatomySpec.primaryMuscles,
+        secondaryMuscles = asset.anatomySpec.secondaryMuscles,
+        stabiliserMuscles = asset.anatomySpec.stabiliserMuscles
+    )
 
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         
@@ -63,13 +68,9 @@ fun ExercisePresentationView(exercise: Exercise, modifier: Modifier = Modifier) 
             }
         }
 
-        // 2. Pose Diagram with Coaching Overlays
-        AnimatedContent(
-            targetState = selectedPose,
-            transitionSpec = { fadeIn().togetherWith(fadeOut()) },
-            label = "PoseAnimation"
-        ) { currentPose ->
-            Row(
+        // 2. Pose Diagram with Coaching Overlays (Static — NO ANIMATION per RC44)
+        val currentPose = selectedPose
+        Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(240.dp)
@@ -84,17 +85,7 @@ fun ExercisePresentationView(exercise: Exercise, modifier: Modifier = Modifier) 
                         drawHumanPose(this, currentPose, size.width, size.height)
                         drawCues(this, currentPose, size.width, size.height)
                     }
-                    if (asset.useFrameAnimation) {
-                        Text(
-                            "🎞️ Frame Animation Active",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White,
-                            modifier = Modifier
-                                .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(4.dp))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                                .align(Alignment.BottomCenter)
-                        )
-                    }
+
                 }
                 
                 // Right: Stage Description Card
@@ -122,6 +113,7 @@ fun ExercisePresentationView(exercise: Exercise, modifier: Modifier = Modifier) 
         }
 
         // 3. Textbook Anatomy Muscle Diagram
+        val context = LocalContext.current
         RepLogCard {
             Text("Target Muscle Activation", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
@@ -131,36 +123,32 @@ fun ExercisePresentationView(exercise: Exercise, modifier: Modifier = Modifier) 
             ) {
                 Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                     Canvas(modifier = Modifier.fillMaxWidth().height(220.dp)) {
-                        val regions = V2AnatomyModel.loadRegionsForSide(isFront = true)
+                        val regions = V2AnatomyModel.loadRegionsForSide(isFront = true, context = context)
                         MuscleRenderer.drawRegions(
                             drawScope = this,
                             regions = regions,
                             silhouettePath = V2AnatomyModel.frontSilhouette,
-                            primaryRegions = if (selectedPoseIndex >= 2) asset.anatomySpec.primaryMuscles.map { MuscleRegion.valueOf(it.uppercase()) }.toSet() else emptySet(),
-                            secondaryRegions = if (selectedPoseIndex >= 1) asset.anatomySpec.secondaryMuscles.map { MuscleRegion.valueOf(it.uppercase()) }.toSet() else emptySet(),
+                            primaryRegions = asset.anatomySpec.primaryMuscles.mapNotNull { name -> AnatomyDiagnostics.auditEnumConversion(name) }.toSet(),
+                            secondaryRegions = asset.anatomySpec.secondaryMuscles.mapNotNull { name -> AnatomyDiagnostics.auditEnumConversion(name) }.toSet(),
                             palette = AnatomyPalette.default(),
                             activations = emptyList(),
-                            stabiliserRegions = if (selectedPoseIndex >= 1) asset.anatomySpec.stabiliserMuscles.mapNotNull {
-                                try { MuscleRegion.valueOf(it.uppercase()) } catch (e: Exception) { null }
-                            }.toSet() else emptySet()
+                            stabiliserRegions = asset.anatomySpec.stabiliserMuscles.mapNotNull { name -> AnatomyDiagnostics.auditEnumConversion(name) }.toSet()
                         )
                     }
                     Text("Anterior (Front)", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
                 }
                 Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                     Canvas(modifier = Modifier.fillMaxWidth().height(220.dp)) {
-                        val regions = V2AnatomyModel.loadRegionsForSide(isFront = false)
+                        val regions = V2AnatomyModel.loadRegionsForSide(isFront = false, context = context)
                         MuscleRenderer.drawRegions(
                             drawScope = this,
                             regions = regions,
                             silhouettePath = V2AnatomyModel.rearSilhouette,
-                            primaryRegions = if (selectedPoseIndex >= 2) asset.anatomySpec.primaryMuscles.map { MuscleRegion.valueOf(it.uppercase()) }.toSet() else emptySet(),
-                            secondaryRegions = if (selectedPoseIndex >= 1) asset.anatomySpec.secondaryMuscles.map { MuscleRegion.valueOf(it.uppercase()) }.toSet() else emptySet(),
+                            primaryRegions = asset.anatomySpec.primaryMuscles.mapNotNull { name -> AnatomyDiagnostics.auditEnumConversion(name) }.toSet(),
+                            secondaryRegions = asset.anatomySpec.secondaryMuscles.mapNotNull { name -> AnatomyDiagnostics.auditEnumConversion(name) }.toSet(),
                             palette = AnatomyPalette.default(),
                             activations = emptyList(),
-                            stabiliserRegions = if (selectedPoseIndex >= 1) asset.anatomySpec.stabiliserMuscles.mapNotNull {
-                                try { MuscleRegion.valueOf(it.uppercase()) } catch (e: Exception) { null }
-                            }.toSet() else emptySet()
+                            stabiliserRegions = asset.anatomySpec.stabiliserMuscles.mapNotNull { name -> AnatomyDiagnostics.auditEnumConversion(name) }.toSet()
                         )
                     }
                     Text("Posterior (Back)", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
@@ -201,6 +189,9 @@ fun ExercisePresentationView(exercise: Exercise, modifier: Modifier = Modifier) 
                 }
             }
         }
+
+        // Phase 9: Finalize diagnostic session and write report
+        AnatomyDiagnostics.finalizeSession("VERIFIED_SOURCE_ONLY_RUNTIME_BLOCKED")
     }
 }
 
@@ -280,4 +271,4 @@ private fun drawCues(drawScope: DrawScope, pose: PoseIllustration, w: Float, h: 
                 }
             }
     }
-}
+
