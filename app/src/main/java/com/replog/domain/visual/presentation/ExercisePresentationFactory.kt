@@ -1,5 +1,7 @@
 package com.replog.domain.visual.presentation
 
+import com.replog.domain.visual.anatomy.Muscles
+
 import androidx.compose.ui.geometry.Offset
 import com.replog.data.model.Exercise
 import com.replog.domain.visual.spec.AnatomySpec
@@ -49,7 +51,7 @@ object ExercisePresentationFactory {
                 },
                 description = "Bench Press pose stage $step.",
                 skeletonOffsets = mapOf("PELVIS" to Offset(0.5f, 0.52f), "MID_SPINE" to Offset(0.5f, 0.44f), "HEAD" to Offset(0.5f, 0.35f), "LEFT_SHOULDER" to Offset(0.42f, 0.44f), "LEFT_ELBOW" to Offset(0.35f + step * 0.015f, 0.44f + step * 0.02f), "LEFT_WRIST" to Offset(0.42f, 0.40f - step * 0.02f)),
-                activeMuscles = setOf("Chest", "Triceps"),
+                activeMuscles = setOf(Muscles.CHEST, Muscles.TRICEPS),
                 overlayCues = listOf(OverlayCue(CueType.MARKER, "LEFT_WRIST", "LEFT_WRIST", "Bar Path"))
             )
         }
@@ -57,7 +59,7 @@ object ExercisePresentationFactory {
             exerciseId = exercise.id, name = "Bench Press", equipment = "Barbell Bench", difficulty = "Beginner",
             musclesWorkedText = "Chest, Triceps, Shoulders", setupChecklist = setup, executionSteps = execution,
             commonMistakes = listOf("Flaring elbows at 90 deg", "Bouncing bar off chest"), coachingTips = listOf("Tuck elbows 45 deg"),
-            safetyNotes = listOf("Always use safety collars"), anatomySpec = AnatomySpec(setOf("Chest"), setOf("Triceps", "Shoulders")),
+            safetyNotes = listOf("Always use safety collars"), anatomySpec = AnatomySpec(setOf(Muscles.CHEST), setOf(Muscles.TRICEPS, Muscles.ANTERIOR_DELTOID)),
             poses = poses, overlayType = OverlayType.BAR_PATH
         )
     }
@@ -73,7 +75,7 @@ object ExercisePresentationFactory {
                 },
                 description = "Incline Bench Press pose stage $step.",
                 skeletonOffsets = mapOf("PELVIS" to Offset(0.5f, 0.55f), "MID_SPINE" to Offset(0.53f, 0.45f), "HEAD" to Offset(0.55f, 0.36f), "LEFT_SHOULDER" to Offset(0.45f, 0.45f), "LEFT_ELBOW" to Offset(0.36f + step * 0.015f, 0.48f + step * 0.01f), "LEFT_WRIST" to Offset(0.44f, 0.38f - step * 0.02f)),
-                activeMuscles = setOf("Upper_Chest", "Triceps"),
+                activeMuscles = setOf(Muscles.UPPER_CHEST, Muscles.TRICEPS),
                 overlayCues = listOf(OverlayCue(CueType.ANGLE, "LEFT_SHOULDER", "LEFT_ELBOW", "Incline Track"))
             )
         }
@@ -81,7 +83,7 @@ object ExercisePresentationFactory {
             exerciseId = exercise.id, name = "Incline Bench Press", equipment = "Barbell Incline", difficulty = "Intermediate",
             musclesWorkedText = "Upper Chest, Triceps, Anterior Deltoids", setupChecklist = setup, executionSteps = execution,
             commonMistakes = listOf("Arching lower back off bench"), coachingTips = listOf("Press over clavicles"),
-            safetyNotes = listOf("Spotter recommended"), anatomySpec = AnatomySpec(setOf("Upper_Chest"), setOf("Triceps", "Shoulders")),
+            safetyNotes = listOf("Spotter recommended"), anatomySpec = AnatomySpec(setOf(Muscles.UPPER_CHEST), setOf(Muscles.TRICEPS, Muscles.ANTERIOR_DELTOID)),
             poses = poses, overlayType = OverlayType.BAR_PATH
         )
     }
@@ -97,7 +99,7 @@ object ExercisePresentationFactory {
                 },
                 description = "Decline Bench Press pose stage $step.",
                 skeletonOffsets = mapOf("PELVIS" to Offset(0.5f, 0.48f), "MID_SPINE" to Offset(0.47f, 0.52f), "HEAD" to Offset(0.44f, 0.55f), "LEFT_SHOULDER" to Offset(0.40f, 0.52f), "LEFT_ELBOW" to Offset(0.32f + step * 0.015f, 0.45f - step * 0.01f), "LEFT_WRIST" to Offset(0.38f, 0.48f + step * 0.02f)),
-                activeMuscles = setOf("Chest"),
+                activeMuscles = setOf(Muscles.CHEST),
                 overlayCues = emptyList()
             )
         }
@@ -105,7 +107,7 @@ object ExercisePresentationFactory {
             exerciseId = exercise.id, name = "Decline Bench Press", equipment = "Barbell Decline", difficulty = "Intermediate",
             musclesWorkedText = "Lower Chest, Triceps, Anterior Deltoids", setupChecklist = setup, executionSteps = execution,
             commonMistakes = listOf("Slipping off bench"), coachingTips = listOf("Control bottom portion"),
-            safetyNotes = listOf("Always lock ankles securely"), anatomySpec = AnatomySpec(setOf("Chest"), setOf("Triceps", "Shoulders")),
+            safetyNotes = listOf("Always lock ankles securely"), anatomySpec = AnatomySpec(setOf(Muscles.CHEST), setOf(Muscles.TRICEPS, Muscles.ANTERIOR_DELTOID)),
             poses = poses, overlayType = OverlayType.BAR_PATH
         )
     }
@@ -121,7 +123,7 @@ object ExercisePresentationFactory {
                 },
                 description = "Push Up pose stage $step.",
                 skeletonOffsets = mapOf("PELVIS" to Offset(0.45f, 0.55f), "MID_SPINE" to Offset(0.55f, 0.50f), "HEAD" to Offset(0.65f, 0.45f), "LEFT_SHOULDER" to Offset(0.55f, 0.48f), "LEFT_ELBOW" to Offset(0.55f - step * 0.015f, 0.58f), "LEFT_WRIST" to Offset(0.55f, 0.68f)),
-                activeMuscles = setOf("Chest", "Obliques"),
+                activeMuscles = setOf(Muscles.CHEST, Muscles.OBLIQUES),
                 overlayCues = listOf(OverlayCue(CueType.LINE, "PELVIS", "HEAD", "Anti-Sag Line"))
             )
         }
@@ -129,7 +131,7 @@ object ExercisePresentationFactory {
             exerciseId = exercise.id, name = "Push Up", equipment = "Bodyweight", difficulty = "Beginner",
             musclesWorkedText = "Chest, Triceps, Anterior Deltoids, Core", setupChecklist = setup, executionSteps = execution,
             commonMistakes = listOf("Hips sagging", "Elbows flaring"), coachingTips = listOf("Keep body rigid"),
-            safetyNotes = emptyList(), anatomySpec = AnatomySpec(setOf("Chest"), setOf("Triceps", "Obliques")),
+            safetyNotes = emptyList(), anatomySpec = AnatomySpec(setOf(Muscles.CHEST), setOf(Muscles.TRICEPS, Muscles.OBLIQUES)),
             poses = poses, overlayType = OverlayType.CORE_HOLD
         )
     }
@@ -145,7 +147,7 @@ object ExercisePresentationFactory {
                 },
                 description = "Overhead Press pose stage $step.",
                 skeletonOffsets = mapOf("PELVIS" to Offset(0.5f, 0.45f), "MID_SPINE" to Offset(0.5f, 0.35f), "HEAD" to Offset(0.5f, 0.25f), "LEFT_SHOULDER" to Offset(0.42f, 0.35f), "LEFT_ELBOW" to Offset(0.38f + step * 0.01f, 0.45f - step * 0.04f), "LEFT_WRIST" to Offset(0.42f, 0.38f - step * 0.05f)),
-                activeMuscles = setOf("Shoulders", "Triceps"),
+                activeMuscles = setOf(Muscles.ANTERIOR_DELTOID, Muscles.LATERAL_DELTOID, Muscles.TRICEPS),
                 overlayCues = listOf(OverlayCue(CueType.LINE, "LEFT_WRIST", "LEFT_SHOULDER", "Vertical Trajectory"))
             )
         }
@@ -153,7 +155,7 @@ object ExercisePresentationFactory {
             exerciseId = exercise.id, name = "Overhead Press", equipment = "Barbell Rack", difficulty = "Intermediate",
             musclesWorkedText = "Anterior Deltoids, Triceps, Upper Trapezius", setupChecklist = setup, executionSteps = execution,
             commonMistakes = listOf("Leaning back excessively"), coachingTips = listOf("Keep glutes squeezed"),
-            safetyNotes = listOf("Do not use thumbs-around suicide grip"), anatomySpec = AnatomySpec(setOf("Shoulders"), setOf("Triceps", "Upper_Trapezius")),
+            safetyNotes = listOf("Do not use thumbs-around suicide grip"), anatomySpec = AnatomySpec(setOf(Muscles.ANTERIOR_DELTOID, Muscles.LATERAL_DELTOID), setOf(Muscles.TRICEPS, Muscles.UPPER_TRAPEZIUS)),
             poses = poses, overlayType = OverlayType.BAR_PATH
         )
     }
@@ -169,7 +171,7 @@ object ExercisePresentationFactory {
                 },
                 description = "Barbell Row pose stage $step.",
                 skeletonOffsets = mapOf("PELVIS" to Offset(0.45f, 0.50f), "MID_SPINE" to Offset(0.55f, 0.45f), "HEAD" to Offset(0.65f, 0.40f), "LEFT_SHOULDER" to Offset(0.55f, 0.42f), "LEFT_ELBOW" to Offset(0.55f - step * 0.015f, 0.52f - step * 0.01f), "LEFT_WRIST" to Offset(0.55f, 0.62f - step * 0.04f)),
-                activeMuscles = setOf("Latissimus_Dorsi", "Biceps"),
+                activeMuscles = setOf(Muscles.LATISSIMUS_DORSI, Muscles.BICEPS),
                 overlayCues = listOf(OverlayCue(CueType.ANGLE, "PELVIS", "MID_SPINE", "Torso Angle"))
             )
         }
@@ -177,7 +179,7 @@ object ExercisePresentationFactory {
             exerciseId = exercise.id, name = "Barbell Row", equipment = "Barbell", difficulty = "Intermediate",
             musclesWorkedText = "Lats, Upper Back, Biceps", setupChecklist = setup, executionSteps = execution,
             commonMistakes = listOf("Rounding the spine", "Yanking bar with torso"), coachingTips = listOf("Keep spine completely neutral"),
-            safetyNotes = emptyList(), anatomySpec = AnatomySpec(setOf("Latissimus_Dorsi"), setOf("Biceps", "Middle_Trapezius")),
+            safetyNotes = emptyList(), anatomySpec = AnatomySpec(setOf(Muscles.LATISSIMUS_DORSI), setOf(Muscles.BICEPS, Muscles.MIDDLE_TRAPEZIUS)),
             poses = poses, overlayType = OverlayType.HIP_HINGE
         )
     }
@@ -193,7 +195,7 @@ object ExercisePresentationFactory {
                 },
                 description = "Lat Pulldown pose stage $step.",
                 skeletonOffsets = mapOf("PELVIS" to Offset(0.5f, 0.52f), "MID_SPINE" to Offset(0.5f, 0.44f), "LEFT_SHOULDER" to Offset(0.42f, 0.44f), "LEFT_ELBOW" to Offset(0.42f, 0.28f + step * 0.04f), "LEFT_WRIST" to Offset(0.42f, 0.12f + step * 0.06f)),
-                activeMuscles = setOf("Latissimus_Dorsi", "Biceps"),
+                activeMuscles = setOf(Muscles.LATISSIMUS_DORSI, Muscles.BICEPS),
                 overlayCues = listOf(OverlayCue(CueType.ANGLE, "LEFT_SHOULDER", "LEFT_ELBOW", "Elbow Tuck"))
             )
         }
@@ -201,7 +203,7 @@ object ExercisePresentationFactory {
             exerciseId = exercise.id, name = "Lat Pulldown", equipment = "Cable Pulldown", difficulty = "Beginner",
             musclesWorkedText = "Latissimus Dorsi, Biceps, Traps", setupChecklist = setup, executionSteps = execution,
             commonMistakes = listOf("Pulling bar behind neck", "Rocking torso backward"), coachingTips = listOf("Lead with elbows"),
-            safetyNotes = emptyList(), anatomySpec = AnatomySpec(setOf("Latissimus_Dorsi"), setOf("Biceps", "Upper_Trapezius")),
+            safetyNotes = emptyList(), anatomySpec = AnatomySpec(setOf(Muscles.LATISSIMUS_DORSI), setOf(Muscles.BICEPS, Muscles.UPPER_TRAPEZIUS)),
             poses = poses, overlayType = OverlayType.CABLE_PATH
         )
     }
@@ -217,7 +219,7 @@ object ExercisePresentationFactory {
                 },
                 description = "Pull Up pose stage $step.",
                 skeletonOffsets = mapOf("PELVIS" to Offset(0.5f, 0.65f - step * 0.04f), "MID_SPINE" to Offset(0.5f, 0.50f - step * 0.04f), "HEAD" to Offset(0.5f, 0.40f - step * 0.04f), "LEFT_SHOULDER" to Offset(0.42f, 0.44f - step * 0.04f), "LEFT_ELBOW" to Offset(0.42f, 0.28f + step * 0.02f), "LEFT_WRIST" to Offset(0.42f, 0.12f)),
-                activeMuscles = setOf("Latissimus_Dorsi", "Biceps"),
+                activeMuscles = setOf(Muscles.LATISSIMUS_DORSI, Muscles.BICEPS),
                 overlayCues = listOf(OverlayCue(CueType.MARKER, "LEFT_WRIST", "LEFT_WRIST", "Bar Pivot"))
             )
         }
@@ -225,7 +227,7 @@ object ExercisePresentationFactory {
             exerciseId = exercise.id, name = "Pull Up", equipment = "Pull Up Bar", difficulty = "Advanced",
             musclesWorkedText = "Lats, Biceps, Upper Trapezius", setupChecklist = setup, executionSteps = execution,
             commonMistakes = listOf("Kipping with legs", "Not reaching chin over bar"), coachingTips = listOf("Lead chest to bar"),
-            safetyNotes = emptyList(), anatomySpec = AnatomySpec(setOf("Latissimus_Dorsi"), setOf("Biceps", "Upper_Trapezius")),
+            safetyNotes = emptyList(), anatomySpec = AnatomySpec(setOf(Muscles.LATISSIMUS_DORSI), setOf(Muscles.BICEPS, Muscles.UPPER_TRAPEZIUS)),
             poses = poses, overlayType = OverlayType.GENERIC
         )
     }
@@ -241,7 +243,7 @@ object ExercisePresentationFactory {
                 },
                 description = "Seated Cable Row pose stage $step.",
                 skeletonOffsets = mapOf("PELVIS" to Offset(0.5f, 0.52f), "MID_SPINE" to Offset(0.5f, 0.44f), "LEFT_SHOULDER" to Offset(0.42f, 0.44f), "LEFT_ELBOW" to Offset(0.42f - step * 0.015f, 0.44f), "LEFT_WRIST" to Offset(0.42f, 0.40f + step * 0.04f)),
-                activeMuscles = setOf("Latissimus_Dorsi", "Biceps"),
+                activeMuscles = setOf(Muscles.LATISSIMUS_DORSI, Muscles.BICEPS),
                 overlayCues = emptyList()
             )
         }
@@ -249,7 +251,7 @@ object ExercisePresentationFactory {
             exerciseId = exercise.id, name = "Seated Cable Row", equipment = "Low Pulley Cable", difficulty = "Beginner",
             musclesWorkedText = "Middle Trapezius, Latissimus Dorsi, Biceps", setupChecklist = setup, executionSteps = execution,
             commonMistakes = listOf("Yanking handle with torso swing"), coachingTips = listOf("Keep back perfectly straight"),
-            safetyNotes = emptyList(), anatomySpec = AnatomySpec(setOf("Latissimus_Dorsi"), setOf("Biceps", "Middle_Trapezius")),
+            safetyNotes = emptyList(), anatomySpec = AnatomySpec(setOf(Muscles.LATISSIMUS_DORSI), setOf(Muscles.BICEPS, Muscles.MIDDLE_TRAPEZIUS)),
             poses = poses, overlayType = OverlayType.CABLE_PATH
         )
     }
@@ -265,7 +267,7 @@ object ExercisePresentationFactory {
                 },
                 description = "Deadlift pose stage $step.",
                 skeletonOffsets = mapOf("PELVIS" to Offset(0.5f, 0.54f - step * 0.024f), "MID_SPINE" to Offset(0.5f, 0.42f - step * 0.024f), "HEAD" to Offset(0.5f, 0.35f - step * 0.024f), "LEFT_HIP" to Offset(0.44f, 0.55f - step * 0.024f), "LEFT_KNEE" to Offset(0.44f, 0.68f + step * 0.02f), "LEFT_ANKLE" to Offset(0.44f, 0.78f)),
-                activeMuscles = setOf("Hamstrings", "Glutes"),
+                activeMuscles = setOf(Muscles.HAMSTRINGS, Muscles.GLUTE_MAXIMUS),
                 overlayCues = listOf(OverlayCue(CueType.LINE, "LEFT_ANKLE", "LEFT_HIP", "Hinge Line"))
             )
         }
@@ -273,7 +275,7 @@ object ExercisePresentationFactory {
             exerciseId = exercise.id, name = "Deadlift", equipment = "Barbell", difficulty = "Advanced",
             musclesWorkedText = "Hamstrings, Glutes, Spinal Erectors, Core", setupChecklist = setup, executionSteps = execution,
             commonMistakes = listOf("Rounding lower back", "Bar floating away from legs"), coachingTips = listOf("Keep bar touching shins"),
-            safetyNotes = listOf("Perform with flat-sole shoes"), anatomySpec = AnatomySpec(setOf("Hamstrings", "Glutes"), setOf("Spinal_Erectors")),
+            safetyNotes = listOf("Perform with flat-sole shoes"), anatomySpec = AnatomySpec(setOf(Muscles.HAMSTRINGS, Muscles.GLUTE_MAXIMUS), setOf(Muscles.SPINAL_ERECTORS)),
             poses = poses, overlayType = OverlayType.HIP_HINGE
         )
     }
@@ -289,7 +291,7 @@ object ExercisePresentationFactory {
                 },
                 description = "RDL pose stage $step.",
                 skeletonOffsets = mapOf("PELVIS" to Offset(0.5f, 0.42f + step * 0.012f), "MID_SPINE" to Offset(0.5f, 0.30f + step * 0.03f), "LEFT_HIP" to Offset(0.44f, 0.42f + step * 0.012f), "LEFT_KNEE" to Offset(0.44f, 0.58f), "LEFT_ANKLE" to Offset(0.44f, 0.78f)),
-                activeMuscles = setOf("Hamstrings", "Glutes"),
+                activeMuscles = setOf(Muscles.HAMSTRINGS, Muscles.GLUTE_MAXIMUS),
                 overlayCues = listOf(OverlayCue(CueType.ANGLE, "PELVIS", "LEFT_HIP", "Hinge Stretch"))
             )
         }
@@ -297,7 +299,7 @@ object ExercisePresentationFactory {
             exerciseId = exercise.id, name = "Romanian Deadlift", equipment = "Barbell", difficulty = "Intermediate",
             musclesWorkedText = "Hamstrings, Glutes, Spinal Erectors", setupChecklist = setup, executionSteps = execution,
             commonMistakes = listOf("Bending knees too much", "Rounding thoracic spine"), coachingTips = listOf("Hips back, not knees down"),
-            safetyNotes = emptyList(), anatomySpec = AnatomySpec(setOf("Hamstrings", "Glutes"), setOf("Spinal_Erectors")),
+            safetyNotes = emptyList(), anatomySpec = AnatomySpec(setOf(Muscles.HAMSTRINGS, Muscles.GLUTE_MAXIMUS), setOf(Muscles.SPINAL_ERECTORS)),
             poses = poses, overlayType = OverlayType.HIP_HINGE
         )
     }
@@ -313,7 +315,7 @@ object ExercisePresentationFactory {
                 },
                 description = "Back Squat pose stage $step.",
                 skeletonOffsets = mapOf("PELVIS" to Offset(0.5f, 0.40f + step * 0.03f), "MID_SPINE" to Offset(0.5f, 0.30f + step * 0.028f), "HEAD" to Offset(0.5f, 0.22f + step * 0.028f), "LEFT_HIP" to Offset(0.44f, 0.41f + step * 0.03f), "LEFT_KNEE" to Offset(0.44f - step * 0.015f, 0.58f + step * 0.014f), "LEFT_ANKLE" to Offset(0.44f, 0.78f)),
-                activeMuscles = setOf("Quads", "Glutes"),
+                activeMuscles = setOf(Muscles.QUADRICEPS, Muscles.GLUTE_MAXIMUS),
                 overlayCues = listOf(OverlayCue(CueType.ANGLE, "LEFT_HIP", "LEFT_KNEE", "Knee angle"))
             )
         }
@@ -321,7 +323,7 @@ object ExercisePresentationFactory {
             exerciseId = exercise.id, name = "Back Squat", equipment = "Barbell", difficulty = "Intermediate",
             musclesWorkedText = "Quadriceps, Glutes, Hamstrings", setupChecklist = setup, executionSteps = execution,
             commonMistakes = listOf("Valgus knee collapse", "Heels lifting"), coachingTips = listOf("Push knees outward"),
-            safetyNotes = emptyList(), anatomySpec = AnatomySpec(setOf("Quads", "Glutes"), setOf("Hamstrings")),
+            safetyNotes = emptyList(), anatomySpec = AnatomySpec(setOf(Muscles.QUADRICEPS, Muscles.GLUTE_MAXIMUS), setOf(Muscles.HAMSTRINGS)),
             poses = poses, overlayType = OverlayType.SQUAT_DEPTH
         )
     }
@@ -337,7 +339,7 @@ object ExercisePresentationFactory {
                 },
                 description = "Front Squat pose stage $step.",
                 skeletonOffsets = mapOf("PELVIS" to Offset(0.5f, 0.40f + step * 0.03f), "MID_SPINE" to Offset(0.5f, 0.30f + step * 0.028f), "LEFT_HIP" to Offset(0.44f, 0.41f + step * 0.03f), "LEFT_KNEE" to Offset(0.44f - step * 0.015f, 0.58f + step * 0.014f), "LEFT_ANKLE" to Offset(0.44f, 0.78f)),
-                activeMuscles = setOf("Quads"),
+                activeMuscles = setOf(Muscles.QUADRICEPS),
                 overlayCues = listOf(OverlayCue(CueType.LINE, "MID_SPINE", "HEAD", "Upright Torso"))
             )
         }
@@ -345,7 +347,7 @@ object ExercisePresentationFactory {
             exerciseId = exercise.id, name = "Front Squat", equipment = "Barbell Rack", difficulty = "Advanced",
             musclesWorkedText = "Quadriceps, Upper Back, Core", setupChecklist = setup, executionSteps = execution,
             commonMistakes = listOf("Letting elbows drop"), coachingTips = listOf("Keep elbows high"),
-            safetyNotes = emptyList(), anatomySpec = AnatomySpec(setOf("Quads"), setOf("Middle_Trapezius")),
+            safetyNotes = emptyList(), anatomySpec = AnatomySpec(setOf(Muscles.QUADRICEPS), setOf(Muscles.MIDDLE_TRAPEZIUS)),
             poses = poses, overlayType = OverlayType.SQUAT_DEPTH
         )
     }
@@ -361,7 +363,7 @@ object ExercisePresentationFactory {
                 },
                 description = "Walking Lunge pose stage $step.",
                 skeletonOffsets = mapOf("PELVIS" to Offset(0.5f, 0.42f + step * 0.024f), "LEFT_HIP" to Offset(0.44f, 0.42f + step * 0.024f), "LEFT_KNEE" to Offset(0.44f - step * 0.02f, 0.58f + step * 0.02f), "LEFT_ANKLE" to Offset(0.44f, 0.78f)),
-                activeMuscles = setOf("Quads", "Glutes"),
+                activeMuscles = setOf(Muscles.QUADRICEPS, Muscles.GLUTE_MAXIMUS),
                 overlayCues = emptyList()
             )
         }
@@ -369,7 +371,7 @@ object ExercisePresentationFactory {
             exerciseId = exercise.id, name = "Walking Lunge", equipment = "Dumbbells / Bodyweight", difficulty = "Beginner",
             musclesWorkedText = "Quads, Glutes, Hamstrings", setupChecklist = setup, executionSteps = execution,
             commonMistakes = listOf("Step too narrow", "Front knee over toe"), coachingTips = listOf("Keep step wide like railroad tracks"),
-            safetyNotes = emptyList(), anatomySpec = AnatomySpec(setOf("Quads", "Glutes"), setOf("Hamstrings")),
+            safetyNotes = emptyList(), anatomySpec = AnatomySpec(setOf(Muscles.QUADRICEPS, Muscles.GLUTE_MAXIMUS), setOf(Muscles.HAMSTRINGS)),
             poses = poses, overlayType = OverlayType.SQUAT_DEPTH
         )
     }
@@ -385,7 +387,7 @@ object ExercisePresentationFactory {
                 },
                 description = "Hip Thrust pose stage $step.",
                 skeletonOffsets = mapOf("PELVIS" to Offset(0.5f, 0.55f - step * 0.014f), "LEFT_HIP" to Offset(0.42f, 0.55f - step * 0.014f), "LEFT_KNEE" to Offset(0.42f, 0.70f), "LEFT_ANKLE" to Offset(0.42f, 0.78f)),
-                activeMuscles = setOf("Glutes"),
+                activeMuscles = setOf(Muscles.GLUTE_MAXIMUS),
                 overlayCues = listOf(OverlayCue(CueType.LINE, "LEFT_KNEE", "PELVIS", "Hip Extension Line"))
             )
         }
@@ -393,7 +395,7 @@ object ExercisePresentationFactory {
             exerciseId = exercise.id, name = "Hip Thrust", equipment = "Barbell / Bench", difficulty = "Intermediate",
             musclesWorkedText = "Glutes, Hamstrings, Adductors", setupChecklist = setup, executionSteps = execution,
             commonMistakes = listOf("Hyperextending lower back"), coachingTips = listOf("Keep ribs down, look forward"),
-            safetyNotes = emptyList(), anatomySpec = AnatomySpec(setOf("Glutes"), setOf("Hamstrings", "Adductors")),
+            safetyNotes = emptyList(), anatomySpec = AnatomySpec(setOf(Muscles.GLUTE_MAXIMUS), setOf(Muscles.HAMSTRINGS, Muscles.ADDUCTORS)),
             poses = poses, overlayType = OverlayType.GENERIC
         )
     }
@@ -409,7 +411,7 @@ object ExercisePresentationFactory {
                 },
                 description = "Leg Press pose stage $step.",
                 skeletonOffsets = mapOf("PELVIS" to Offset(0.45f, 0.58f), "LEFT_HIP" to Offset(0.42f, 0.59f), "LEFT_KNEE" to Offset(0.40f + step * 0.03f, 0.44f), "LEFT_ANKLE" to Offset(0.55f + step * 0.02f, 0.38f)),
-                activeMuscles = setOf("Quads", "Glutes"),
+                activeMuscles = setOf(Muscles.QUADRICEPS, Muscles.GLUTE_MAXIMUS),
                 overlayCues = emptyList()
             )
         }
@@ -417,7 +419,7 @@ object ExercisePresentationFactory {
             exerciseId = exercise.id, name = "Leg Press", equipment = "Leg Press Sled", difficulty = "Beginner",
             musclesWorkedText = "Quads, Glutes, Hamstrings", setupChecklist = setup, executionSteps = execution,
             commonMistakes = listOf("Lower back rounding off pad"), coachingTips = listOf("Stop before lower back rounds"),
-            safetyNotes = emptyList(), anatomySpec = AnatomySpec(setOf("Quads", "Glutes"), setOf("Hamstrings")),
+            safetyNotes = emptyList(), anatomySpec = AnatomySpec(setOf(Muscles.QUADRICEPS, Muscles.GLUTE_MAXIMUS), setOf(Muscles.HAMSTRINGS)),
             poses = poses, overlayType = OverlayType.GENERIC
         )
     }
@@ -433,7 +435,7 @@ object ExercisePresentationFactory {
                 },
                 description = "Leg Extension pose stage $step.",
                 skeletonOffsets = mapOf("PELVIS" to Offset(0.45f, 0.52f), "LEFT_HIP" to Offset(0.42f, 0.53f), "LEFT_KNEE" to Offset(0.60f, 0.53f), "LEFT_ANKLE" to Offset(0.60f + step * 0.036f, 0.74f - step * 0.042f)),
-                activeMuscles = setOf("Quads"),
+                activeMuscles = setOf(Muscles.QUADRICEPS),
                 overlayCues = listOf(OverlayCue(CueType.MARKER, "LEFT_KNEE", "LEFT_KNEE", "Rotation Pivot"))
             )
         }
@@ -441,7 +443,7 @@ object ExercisePresentationFactory {
             exerciseId = exercise.id, name = "Leg Extension", equipment = "Leg Extension Machine", difficulty = "Beginner",
             musclesWorkedText = "Quadriceps", setupChecklist = setup, executionSteps = execution,
             commonMistakes = listOf("Lifting pelvis off seat"), coachingTips = listOf("Squeeze quads tightly at top"),
-            safetyNotes = emptyList(), anatomySpec = AnatomySpec(setOf("Quads"), emptySet()),
+            safetyNotes = emptyList(), anatomySpec = AnatomySpec(setOf(Muscles.QUADRICEPS), emptySet()),
             poses = poses, overlayType = OverlayType.GENERIC
         )
     }
@@ -457,7 +459,7 @@ object ExercisePresentationFactory {
                 },
                 description = "Leg Curl pose stage $step.",
                 skeletonOffsets = mapOf("PELVIS" to Offset(0.45f, 0.52f), "LEFT_HIP" to Offset(0.42f, 0.53f), "LEFT_KNEE" to Offset(0.60f, 0.53f), "LEFT_ANKLE" to Offset(0.78f - step * 0.05f, 0.53f - step * 0.024f)),
-                activeMuscles = setOf("Hamstrings"),
+                activeMuscles = setOf(Muscles.HAMSTRINGS),
                 overlayCues = emptyList()
             )
         }
@@ -465,7 +467,7 @@ object ExercisePresentationFactory {
             exerciseId = exercise.id, name = "Leg Curl", equipment = "Prone Leg Curl Machine", difficulty = "Beginner",
             musclesWorkedText = "Hamstrings, Calves", setupChecklist = setup, executionSteps = execution,
             commonMistakes = listOf("Arching lower back off pad"), coachingTips = listOf("Slow concentric squeeze"),
-            safetyNotes = emptyList(), anatomySpec = AnatomySpec(setOf("Hamstrings"), setOf("Calves")),
+            safetyNotes = emptyList(), anatomySpec = AnatomySpec(setOf(Muscles.HAMSTRINGS), setOf(Muscles.CALVES)),
             poses = poses, overlayType = OverlayType.GENERIC
         )
     }
@@ -481,7 +483,7 @@ object ExercisePresentationFactory {
                 },
                 description = "Calf Raise pose stage $step.",
                 skeletonOffsets = mapOf("PELVIS" to Offset(0.5f, 0.42f - step * 0.005f), "LEFT_HIP" to Offset(0.44f, 0.42f - step * 0.005f), "LEFT_KNEE" to Offset(0.44f, 0.58f - step * 0.005f), "LEFT_ANKLE" to Offset(0.44f, 0.78f - step * 0.012f)),
-                activeMuscles = setOf("Calves"),
+                activeMuscles = setOf(Muscles.CALVES),
                 overlayCues = listOf(OverlayCue(CueType.LINE, "LEFT_ANKLE", "LEFT_ANKLE", "Ankle Flexion"))
             )
         }
@@ -489,7 +491,7 @@ object ExercisePresentationFactory {
             exerciseId = exercise.id, name = "Calf Raise", equipment = "Standing Calf Block", difficulty = "Beginner",
             musclesWorkedText = "Calves / Gastrocnemius & Soleus", setupChecklist = setup, executionSteps = execution,
             commonMistakes = listOf("Bending knees to help push"), coachingTips = listOf("Full extension focus"),
-            safetyNotes = emptyList(), anatomySpec = AnatomySpec(setOf("Calves"), emptySet()),
+            safetyNotes = emptyList(), anatomySpec = AnatomySpec(setOf(Muscles.CALVES), emptySet()),
             poses = poses, overlayType = OverlayType.GENERIC
         )
     }

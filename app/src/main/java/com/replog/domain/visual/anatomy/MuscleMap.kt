@@ -1,5 +1,7 @@
 package com.replog.domain.visual.anatomy
 
+import com.replog.domain.visual.anatomy.Muscles
+
 import com.replog.domain.visual.spec.AnatomySpec
 
 /**
@@ -8,6 +10,44 @@ import com.replog.domain.visual.spec.AnatomySpec
  */
 object MuscleMap {
 
+private val canonicalMappings = mapOf(
+
+    Muscles.CHEST.lowercase() to setOf(MuscleRegion.CHEST),
+    Muscles.UPPER_CHEST.lowercase() to setOf(MuscleRegion.UPPER_CHEST),
+
+    Muscles.LATISSIMUS_DORSI.lowercase() to setOf(MuscleRegion.LATISSIMUS_DORSI),
+    Muscles.TERES_MAJOR.lowercase() to setOf(MuscleRegion.TERES_MAJOR),
+    Muscles.RHOMBOIDS.lowercase() to setOf(MuscleRegion.RHOMBOIDS),
+
+    Muscles.UPPER_TRAPEZIUS.lowercase() to setOf(MuscleRegion.UPPER_TRAPEZIUS),
+    Muscles.MIDDLE_TRAPEZIUS.lowercase() to setOf(MuscleRegion.MIDDLE_TRAPEZIUS),
+
+    Muscles.SPINAL_ERECTORS.lowercase() to setOf(MuscleRegion.SPINAL_ERECTORS),
+
+    Muscles.ANTERIOR_DELTOID.lowercase() to setOf(MuscleRegion.ANTERIOR_DELTOID),
+    Muscles.LATERAL_DELTOID.lowercase() to setOf(MuscleRegion.LATERAL_DELTOID),
+    Muscles.POSTERIOR_DELTOID.lowercase() to setOf(MuscleRegion.POSTERIOR_DELTOID),
+
+    Muscles.BICEPS.lowercase() to setOf(MuscleRegion.BICEPS),
+    Muscles.TRICEPS.lowercase() to setOf(MuscleRegion.TRICEPS),
+    Muscles.FOREARMS.lowercase() to setOf(
+        MuscleRegion.FOREARMS_ANTERIOR,
+        MuscleRegion.FOREARMS_POSTERIOR
+    ),
+
+    Muscles.RECTUS_ABDOMINIS.lowercase() to setOf(MuscleRegion.RECTUS_ABDOMINIS),
+    Muscles.OBLIQUES.lowercase() to setOf(MuscleRegion.OBLIQUES),
+    Muscles.SERRATUS_ANTERIOR.lowercase() to setOf(MuscleRegion.SERRATUS_ANTERIOR),
+    Muscles.HIP_FLEXORS.lowercase() to setOf(MuscleRegion.HIP_FLEXORS),
+
+    Muscles.GLUTE_MAXIMUS.lowercase() to setOf(MuscleRegion.GLUTE_MAXIMUS),
+    Muscles.QUADRICEPS.lowercase() to setOf(MuscleRegion.QUADRICEPS),
+    Muscles.HAMSTRINGS.lowercase() to setOf(MuscleRegion.HAMSTRINGS),
+    Muscles.ADDUCTORS.lowercase() to setOf(MuscleRegion.ADDUCTORS),
+
+    Muscles.CALVES.lowercase() to setOf(MuscleRegion.CALVES),
+    Muscles.TIBIALIS_ANTERIOR.lowercase() to setOf(MuscleRegion.TIBIALIS_ANTERIOR)
+)
     private val keywordMappings: List<Pair<String, Set<MuscleRegion>>> = listOf(
         // Upper Chest specific matches first
         "upper chest" to setOf(MuscleRegion.UPPER_CHEST),
@@ -97,6 +137,19 @@ object MuscleMap {
 
     fun resolveRegions(muscleName: String): Set<MuscleRegion> {
         val m = muscleName.trim().lowercase()
+        canonicalMappings[m]?.let { regions ->
+
+    for (region in regions) {
+        AnatomyDiagnostics.auditMatch(
+            muscleName,
+            region.name,
+            region.name,
+            true
+        )
+    }
+
+    return regions
+}
         if (m.isEmpty()) {
             AnatomyDiagnostics.auditEnumConversion(muscleName)
             return emptySet()
