@@ -37,7 +37,6 @@ private val canonicalMappings = mapOf(
 
     Muscles.RECTUS_ABDOMINIS.lowercase() to setOf(MuscleRegion.RECTUS_ABDOMINIS),
     Muscles.OBLIQUES.lowercase() to setOf(MuscleRegion.OBLIQUES),
-    Muscles.SERRATUS_ANTERIOR.lowercase() to setOf(MuscleRegion.SERRATUS_ANTERIOR),
     Muscles.HIP_FLEXORS.lowercase() to setOf(MuscleRegion.HIP_FLEXORS),
 
     Muscles.GLUTE_MAXIMUS.lowercase() to setOf(MuscleRegion.GLUTE_MAXIMUS),
