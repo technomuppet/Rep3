@@ -19,6 +19,7 @@ enum class MuscleRegion(val id: String, val displayName: String, val side: BodyS
     FOREARMS_ANTERIOR("FOREARMS_ANTERIOR", "Anterior Forearm Flexors", BodySide.FRONT),
     RECTUS_ABDOMINIS("RECTUS_ABDOMINIS", "Rectus Abdominis / Abs", BodySide.FRONT),
     OBLIQUES("OBLIQUES", "External & Internal Obliques", BodySide.FRONT),
+    SERRATUS_ANTERIOR("SERRATUS_ANTERIOR", "Serratus Anterior", BodySide.FRONT),
     HIP_FLEXORS("HIP_FLEXORS", "Iliopsoas / Hip Flexors", BodySide.FRONT),
     QUADRICEPS("QUADRICEPS", "Quadriceps Femoris", BodySide.FRONT),
     ADDUCTORS("ADDUCTORS", "Thigh Adductors / Inner Thighs", BodySide.FRONT),

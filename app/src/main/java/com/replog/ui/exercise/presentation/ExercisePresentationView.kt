@@ -22,7 +22,6 @@ import androidx.compose.ui.unit.dp
 import com.replog.data.model.Exercise
 import com.replog.domain.visual.anatomy.*
 import com.replog.domain.visual.presentation.*
-import androidx.compose.ui.platform.LocalContext
 import com.replog.ui.components.RepLogCard
 
 @Composable
@@ -111,48 +110,14 @@ fun ExercisePresentationView(exercise: Exercise, modifier: Modifier = Modifier) 
                 }
             }
 
-        // 3. Textbook Anatomy Muscle Diagram
-        val context = LocalContext.current
+        // 3. Textbook Anatomy Muscle Diagram — shared layered SVG rendering pipeline
         RepLogCard {
             Text("Target Muscle Activation", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Canvas(modifier = Modifier.fillMaxWidth().height(220.dp)) {
-                        val regions = V2AnatomyModel.loadRegionsForSide(isFront = true, context = context)
-                        MuscleRenderer.drawRegions(
-                            drawScope = this,
-                            regions = regions,
-                            silhouettePath = V2AnatomyModel.frontSilhouette,
-                            primaryRegions = asset.anatomySpec.primaryMuscles.mapNotNull { name -> AnatomyDiagnostics.auditEnumConversion(name) }.toSet(),
-                            secondaryRegions = asset.anatomySpec.secondaryMuscles.mapNotNull { name -> AnatomyDiagnostics.auditEnumConversion(name) }.toSet(),
-                            palette = AnatomyPalette.default(),
-                            activations = emptyList(),
-                            stabiliserRegions = asset.anatomySpec.stabiliserMuscles.mapNotNull { name -> AnatomyDiagnostics.auditEnumConversion(name) }.toSet()
-                        )
-                    }
-                    Text("Anterior (Front)", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
-                }
-                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Canvas(modifier = Modifier.fillMaxWidth().height(220.dp)) {
-                        val regions = V2AnatomyModel.loadRegionsForSide(isFront = false, context = context)
-                        MuscleRenderer.drawRegions(
-                            drawScope = this,
-                            regions = regions,
-                            silhouettePath = V2AnatomyModel.rearSilhouette,
-                            primaryRegions = asset.anatomySpec.primaryMuscles.mapNotNull { name -> AnatomyDiagnostics.auditEnumConversion(name) }.toSet(),
-                            secondaryRegions = asset.anatomySpec.secondaryMuscles.mapNotNull { name -> AnatomyDiagnostics.auditEnumConversion(name) }.toSet(),
-                            palette = AnatomyPalette.default(),
-                            activations = emptyList(),
-                            stabiliserRegions = asset.anatomySpec.stabiliserMuscles.mapNotNull { name -> AnatomyDiagnostics.auditEnumConversion(name) }.toSet()
-                        )
-                    }
-                    Text("Posterior (Back)", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
-                }
-            }
+            AnatomicalMuscleDiagram(
+                anatomySpec = asset.anatomySpec,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
 
         // 4. Detailed Coaching Cards

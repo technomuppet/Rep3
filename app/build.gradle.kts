@@ -70,6 +70,13 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("com.google.code.gson:gson:2.11.0")
 
+    // Complete SVG rendering for the layered anatomy pipeline. Compose can draw
+    // vector drawables, but it does not natively render arbitrary raw SVG assets
+    // with gradients/transforms as complete layered documents. AndroidSVG lets us
+    // render the checked-in SVG assets as whole documents without maintaining a
+    // custom path parser.
+    implementation("com.caverock:androidsvg-aar:1.4")
+
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")

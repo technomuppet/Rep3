@@ -37,6 +37,7 @@ private val canonicalMappings = mapOf(
 
     Muscles.RECTUS_ABDOMINIS.lowercase() to setOf(MuscleRegion.RECTUS_ABDOMINIS),
     Muscles.OBLIQUES.lowercase() to setOf(MuscleRegion.OBLIQUES),
+    Muscles.SERRATUS_ANTERIOR.lowercase() to setOf(MuscleRegion.SERRATUS_ANTERIOR),
     Muscles.HIP_FLEXORS.lowercase() to setOf(MuscleRegion.HIP_FLEXORS),
 
     Muscles.GLUTE_MAXIMUS.lowercase() to setOf(MuscleRegion.GLUTE_MAXIMUS),
@@ -70,7 +71,6 @@ private val canonicalMappings = mapOf(
         // Arms
         "bicep" to setOf(MuscleRegion.BICEPS),
         "brachialis" to setOf(MuscleRegion.BRACHIALIS),
-        "brachialis" to setOf(MuscleRegion.BICEPS),
         "tricep" to setOf(MuscleRegion.TRICEPS),
         "forearm" to setOf(MuscleRegion.FOREARMS_ANTERIOR, MuscleRegion.FOREARMS_POSTERIOR),
         "brachioradialis" to setOf(MuscleRegion.FOREARMS_ANTERIOR),
@@ -91,6 +91,7 @@ private val canonicalMappings = mapOf(
 
         // Core
         "oblique" to setOf(MuscleRegion.OBLIQUES),
+        "serratus" to setOf(MuscleRegion.SERRATUS_ANTERIOR),
         "abdom" to setOf(MuscleRegion.RECTUS_ABDOMINIS),
         "abs" to setOf(MuscleRegion.RECTUS_ABDOMINIS),
         "core" to setOf(MuscleRegion.RECTUS_ABDOMINIS, MuscleRegion.OBLIQUES, MuscleRegion.TRANSVERSE_ABDOMINIS),
