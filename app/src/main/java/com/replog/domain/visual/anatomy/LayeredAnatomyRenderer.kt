@@ -2,6 +2,7 @@ package com.replog.domain.visual.anatomy
 
 import android.content.Context
 import android.graphics.RectF
+import androidx.compose.foundation.border
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -17,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -92,7 +94,7 @@ object LayeredAnatomyRenderer {
                 // Explicit clipping prevents any oversized document content from
                 // bleeding outside the intended anatomy canvas while preserving
                 // transparency inside the layer.
-                nativeCanvas.clipRect(destination)
+                // nativeCanvas.clipRect(destination)
                 // AndroidSVG maps the SVG viewBox/document dimensions into this
                 // viewport, preserving fills, strokes, transforms, clipping and
                 // anti-aliasing handled by Android's Canvas/Paint pipeline.
@@ -159,7 +161,7 @@ fun LayeredAnatomyDiagram(
         horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-            Canvas(modifier = Modifier.fillMaxWidth().height(240.dp)) {
+            Canvas(modifier = Modifier.fillMaxWidth().height(240.dp).border(2.dp, Color.Red)) {
                 LayeredAnatomyRenderer.drawLayers(
                     drawScope = this,
                     context = appContext,
