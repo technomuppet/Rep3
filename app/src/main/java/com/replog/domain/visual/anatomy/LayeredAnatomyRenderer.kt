@@ -99,8 +99,11 @@ object LayeredAnatomyRenderer {
                 // viewport, preserving fills, strokes, transforms, clipping and
                 // anti-aliasing handled by Android's Canvas/Paint pipeline.
                 nativeCanvas.save()
-                nativeCanvas.translate(0f, 0f)
+                nativeCanvas.translate(dx, dy)
+                nativeCanvas.scale(scale, scale)
+
                 svg.renderToCanvas(nativeCanvas)
+
                 nativeCanvas.restore()
             } catch (e: Exception) {
                 RendererDiagnostics.renderFailure(assetPath, e.message)
