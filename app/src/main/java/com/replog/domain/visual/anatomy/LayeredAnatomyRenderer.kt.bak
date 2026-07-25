@@ -98,7 +98,13 @@ object LayeredAnatomyRenderer {
                 // AndroidSVG maps the SVG viewBox/document dimensions into this
                 // viewport, preserving fills, strokes, transforms, clipping and
                 // anti-aliasing handled by Android's Canvas/Paint pipeline.
-                svg.renderToCanvas(nativeCanvas, destination)
+                nativeCanvas.save()
+                nativeCanvas.translate(dx, dy)
+                nativeCanvas.scale(scale, scale)
+
+                svg.renderToCanvas(nativeCanvas)
+
+                nativeCanvas.restore()
             } catch (e: Exception) {
                 RendererDiagnostics.renderFailure(assetPath, e.message)
             } finally {
