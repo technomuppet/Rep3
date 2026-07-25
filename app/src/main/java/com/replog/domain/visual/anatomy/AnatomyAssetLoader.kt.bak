@@ -25,6 +25,15 @@ class AnatomyAssetLoader(private val context: Context) {
         return try {
             context.assets.open(normalizedPath).use { stream ->
                 val svg = SVG.getFromInputStream(stream)
+                svg.setDocumentViewBox(0f, 0f, 768f, 1536f)
+                svg.setDocumentWidth("768px")
+                svg.setDocumentHeight("1536px")
+
+                android.util.Log.d("SVG_DEBUG",
+                    "asset=" + normalizedPath +
+                    " width=" + svg.documentWidth +
+                    " height=" + svg.documentHeight +
+                    " viewBox=" + svg.documentViewBox)
                 SvgLoadResult.Success(assetPath = normalizedPath, svg = svg)
             }
         } catch (e: FileNotFoundException) {
