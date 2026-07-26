@@ -75,7 +75,6 @@ dependencies {
     // with gradients/transforms as complete layered documents. AndroidSVG lets us
     // render the checked-in SVG assets as whole documents without maintaining a
     // custom path parser.
-    implementation("io.coil-kt:coil-compose:2.7.0")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
