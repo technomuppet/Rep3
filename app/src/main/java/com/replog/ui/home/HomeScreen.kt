@@ -12,6 +12,9 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -48,6 +51,30 @@ fun HomeScreen(
     val displayName by viewModel.displayName.collectAsState()
     var showTrainAnywayDialog by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { viewModel.refresh(); viewModel.loadIntelligence(); coachViewModel.loadRecommendation(force = false) }
+
+    // Phase 2 Gap 2: refresh the briefing whenever Home returns to the foreground
+    // (e.g. user finishes a workout and tabs back to Home). The VM dedupes via
+    // its (sessionCount, epochDay) cache; a no-op ON_RESUME (same day, same count)
+    // is harmless.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) viewModel.onResumed()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    // Phase 2 Gap 2: a 60-second heartbeat so an epoch-day rollover (midnight
+    // crossing while Home stays mounted) invalidates the briefing cache without
+    // requiring the user to leave Home. Cancelled automatically when Home leaves
+    // the composition; ticks while Home is in the foreground only.
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(60_000L)
+            viewModel.onMinuteTick()
+        }
+    }
     LazyColumn(Modifier.fillMaxSize().padding(contentPadding), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
             val name = displayName?.takeIf { it.isNotBlank() }

@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 import javax.inject.Inject
 
 data class HomeInsight(
@@ -84,6 +85,17 @@ class HomeViewModel @Inject constructor(
     private val _briefing = MutableStateFlow<com.replog.domain.intelligence.TodaysBriefing?>(null)
     val briefing: StateFlow<com.replog.domain.intelligence.TodaysBriefing?> = _briefing
     private var briefingLoadedForSessionCount = -1
+    // Phase 2 Gap 2: day-of-year cache key — LocalDate.toEpochDay() is a SINGLE
+    // monotonically-increasing day counter since 1970-01-01 (unlike Calendar
+    // .DAY_OF_YEAR which wraps annually and would falsely hit its prior-year
+    // value on January 1st each year, suppressing the post-midnight refresh).
+    private var briefingLoadedForEpochDay: Int = -1
+    // Phase 2 Gap 2: cancel any in-flight recompute before launching a new one,
+    // so concurrent triggers (e.g. ON_RESUME firing while the minute tick also
+    // fires) cannot both run the expensive `buildBriefing()` / `buildRepLogScore()`
+    // chain. Cheap cancellation points (`ensureActive()`) are implicit at every
+    // suspend inside the load block because `Job.cancel()` is cooperative.
+    private var intelligenceJob: kotlinx.coroutines.Job? = null
 
     // Priority 2: an in-progress workout to resume, if any.
     private val _continueWorkout = MutableStateFlow<ContinueWorkout?>(null)
@@ -97,28 +109,52 @@ class HomeViewModel @Inject constructor(
     val displayName: StateFlow<String?> = prefs.displayName
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    /** Load (or refresh) the briefing + continue-workout card. Cheap to call repeatedly. */
-    fun loadIntelligence() = viewModelScope.launch {
-        val activeId = prefs.activeSessionId.first()
-        _continueWorkout.value = activeId?.let { id ->
-            repo.getSessionById(id)?.takeIf { it.session.endTime == null }?.let { s ->
-                ContinueWorkout(
-                    sessionId = id,
-                    templateName = s.session.templateName ?: "Workout",
-                    startTime = s.session.startTime,
-                    exerciseCount = s.exercises.size,
-                    setCount = s.exercises.sumOf { it.sets.size }
-                )
+    /**
+     * Load (or refresh) the briefing + continue-workout card. Cheap to call repeatedly.
+     *
+     * Phase 2 Gap 2 reactive refresh:
+     *   - Cached by (sessionCount, epochDay) so the briefing refreshes after a
+     *     workout (session count climbed) OR after the local date rolls past
+     *     midnight (epoch day), without leaving Home.
+     *   - Cancels any in-flight recompute before launching a new one so two
+     *     triggers firing back-to-back (e.g. ON_RESUME racing with the minute
+     *     tick) cannot both run the expensive engine chain.
+     */
+    fun loadIntelligence() {
+        intelligenceJob?.cancel()
+        intelligenceJob = viewModelScope.launch {
+            val activeId = prefs.activeSessionId.first()
+            _continueWorkout.value = activeId?.let { id ->
+                repo.getSessionById(id)?.takeIf { it.session.endTime == null }?.let { s ->
+                    ContinueWorkout(
+                        sessionId = id,
+                        templateName = s.session.templateName ?: "Workout",
+                        startTime = s.session.startTime,
+                        exerciseCount = s.exercises.size,
+                        setCount = s.exercises.sumOf { it.sets.size }
+                    )
+                }
+            }
+            val count = repo.getCompletedSessionCount()
+            val today = currentEpochDay()
+            if (count != briefingLoadedForSessionCount
+                || today != briefingLoadedForEpochDay
+                || _briefing.value == null
+            ) {
+                _briefing.value = runCatching { intelligenceRepository.buildBriefing() }.getOrNull()
+                _repLogScore.value = runCatching { intelligenceRepository.buildRepLogScore() }.getOrNull()
+                briefingLoadedForSessionCount = count
+                briefingLoadedForEpochDay = today
             }
         }
-        // Recompute the briefing only when the completed-session count changed.
-        val count = repo.getCompletedSessionCount()
-        if (count != briefingLoadedForSessionCount || _briefing.value == null) {
-            _briefing.value = runCatching { intelligenceRepository.buildBriefing() }.getOrNull()
-            _repLogScore.value = runCatching { intelligenceRepository.buildRepLogScore() }.getOrNull()
-            briefingLoadedForSessionCount = count
-        }
     }
+
+    /** Phase 2 Gap 2: thin refresh triggers wired from HomeScreen. */
+    fun onResumed() = loadIntelligence()
+    fun onMinuteTick() = loadIntelligence()
+
+    /** Days since 1970-01-01 — monotonically increasing, no annual wrap. */
+    private fun currentEpochDay(): Int = LocalDate.now().toEpochDay().toInt()
 
     /** P5: launch a favourite template (sets it active; Training tab resumes it). */
     fun startTemplate(template: com.replog.data.model.TemplateWithExercises) = viewModelScope.launch {
