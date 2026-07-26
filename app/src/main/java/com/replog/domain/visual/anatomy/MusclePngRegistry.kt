@@ -31,6 +31,7 @@ object MusclePngRegistry {
         const val FRONT_HIP_FLEXORS = "hip_flexors"
         const val FRONT_QUADS = "quads"
         const val FRONT_ADDUCTORS = "adductors"
+        const val FRONT_ABDUCTORS = "abductors"
         const val FRONT_TIBIALIS = "tibialis"
         const val FRONT_CALVES = "calves"
         const val BACK_TRAPS_UPPER = "traps_upper"
@@ -42,6 +43,7 @@ object MusclePngRegistry {
         const val BACK_TRICEPS = "triceps"
         const val BACK_ERECTOR_SPINAE = "erector_spinae"
         const val BACK_GLUTES = "glutes"
+        const val BACK_ABDUCTORS = "abductors_back"
         const val BACK_HAMSTRINGS = "hamstrings"
         const val BACK_FOREARMS = "forearms_back"
         const val BACK_CALVES = "calves_back"
@@ -62,6 +64,7 @@ object MusclePngRegistry {
         @DrawableRes val FRONT_HIP_FLEXORS: Int = R.drawable.hip_flexors
         @DrawableRes val FRONT_QUADS: Int = R.drawable.quads
         @DrawableRes val FRONT_ADDUCTORS: Int = R.drawable.adductors
+        @DrawableRes val FRONT_ABDUCTORS: Int = R.drawable.abductors
         @DrawableRes val FRONT_TIBIALIS: Int = R.drawable.tibialis
         @DrawableRes val FRONT_CALVES: Int = R.drawable.calves
         @DrawableRes val BACK_TRAPS_UPPER: Int = R.drawable.traps_upper
@@ -73,6 +76,7 @@ object MusclePngRegistry {
         @DrawableRes val BACK_TRICEPS: Int = R.drawable.triceps
         @DrawableRes val BACK_ERECTOR_SPINAE: Int = R.drawable.erector_spinae
         @DrawableRes val BACK_GLUTES: Int = R.drawable.glutes
+        @DrawableRes val BACK_ABDUCTORS: Int = R.drawable.abductors_back
         @DrawableRes val BACK_HAMSTRINGS: Int = R.drawable.hamstrings
         @DrawableRes val BACK_FOREARMS: Int = R.drawable.forearms_back
         @DrawableRes val BACK_CALVES: Int = R.drawable.calves_back
@@ -105,6 +109,7 @@ object MusclePngRegistry {
         DrawableName.BACK_TRICEPS,
         DrawableName.BACK_ERECTOR_SPINAE,
         DrawableName.BACK_GLUTES,
+        DrawableName.BACK_ABDUCTORS,
         DrawableName.BACK_HAMSTRINGS,
         DrawableName.BACK_FOREARMS,
         DrawableName.BACK_CALVES
@@ -168,10 +173,11 @@ object MusclePngRegistry {
         alias(MuscleRegion.VASTUS_MEDIALIS, BodySide.FRONT, DrawableId.FRONT_QUADS, DrawableName.FRONT_QUADS, 53, MuscleRegion.QUADRICEPS),
         alias(MuscleRegion.VASTUS_INTERMEDIUS, BodySide.FRONT, DrawableId.FRONT_QUADS, DrawableName.FRONT_QUADS, 54, MuscleRegion.QUADRICEPS),
         direct(MuscleRegion.ADDUCTORS, BodySide.FRONT, DrawableId.FRONT_ADDUCTORS, DrawableName.FRONT_ADDUCTORS, 55),
-        alias(MuscleRegion.ABDUCTORS, BodySide.BACK, DrawableId.BACK_GLUTES, DrawableName.BACK_GLUTES, 56, MuscleRegion.GLUTE_MEDIUS),
-        direct(MuscleRegion.TIBIALIS_ANTERIOR, BodySide.FRONT, DrawableId.FRONT_TIBIALIS, DrawableName.FRONT_TIBIALIS, 57),
+        direct(MuscleRegion.ABDUCTORS, BodySide.FRONT, DrawableId.FRONT_ABDUCTORS, DrawableName.FRONT_ABDUCTORS, 56),
+        direct(MuscleRegion.ABDUCTORS, BodySide.BACK, DrawableId.BACK_ABDUCTORS, DrawableName.BACK_ABDUCTORS, 57),
+        direct(MuscleRegion.TIBIALIS_ANTERIOR, BodySide.FRONT, DrawableId.FRONT_TIBIALIS, DrawableName.FRONT_TIBIALIS, 58),
         // Calves have both anterior and posterior overlay assets.
-        direct(MuscleRegion.CALVES, BodySide.FRONT, DrawableId.FRONT_CALVES, DrawableName.FRONT_CALVES, 58),
+        direct(MuscleRegion.CALVES, BodySide.FRONT, DrawableId.FRONT_CALVES, DrawableName.FRONT_CALVES, 59),
 
         // Back upper body
         direct(MuscleRegion.UPPER_TRAPEZIUS, BodySide.BACK, DrawableId.BACK_TRAPS_UPPER, DrawableName.BACK_TRAPS_UPPER, 100),
@@ -188,8 +194,11 @@ object MusclePngRegistry {
 
         // Back lower body
         direct(MuscleRegion.GLUTE_MAXIMUS, BodySide.BACK, DrawableId.BACK_GLUTES, DrawableName.BACK_GLUTES, 130),
+        DrawableName.BACK_ABDUCTORS,
         alias(MuscleRegion.GLUTE_MEDIUS, BodySide.BACK, DrawableId.BACK_GLUTES, DrawableName.BACK_GLUTES, 131, MuscleRegion.GLUTE_MAXIMUS),
+        DrawableName.BACK_ABDUCTORS,
         alias(MuscleRegion.GLUTE_MINIMUS, BodySide.BACK, DrawableId.BACK_GLUTES, DrawableName.BACK_GLUTES, 132, MuscleRegion.GLUTE_MAXIMUS),
+        DrawableName.BACK_ABDUCTORS,
         direct(MuscleRegion.HAMSTRINGS, BodySide.BACK, DrawableId.BACK_HAMSTRINGS, DrawableName.BACK_HAMSTRINGS, 133),
         alias(MuscleRegion.BICEPS_FEMORIS, BodySide.BACK, DrawableId.BACK_HAMSTRINGS, DrawableName.BACK_HAMSTRINGS, 134, MuscleRegion.HAMSTRINGS),
         alias(MuscleRegion.SEMITENDINOSUS, BodySide.BACK, DrawableId.BACK_HAMSTRINGS, DrawableName.BACK_HAMSTRINGS, 135, MuscleRegion.HAMSTRINGS),
