@@ -77,16 +77,6 @@ object RendererDiagnostics {
         log("MISSING_REGION_MAPPING", region.name)
     }
 
-    @Synchronized fun duplicateMappings(duplicates: Map<MuscleRegion, List<AnatomyLayerAsset>>) {
-        duplicateMappingEvents++
-        log(
-            "DUPLICATE_MAPPINGS",
-            duplicates.entries.joinToString { (region, layers) ->
-                "${region.name}=${layers.joinToString(prefix = "[", postfix = "]") { it.assetPath }}"
-            }
-        )
-    }
-
     @Synchronized fun cacheHit(assetPath: String) {
         cacheHits++
         log("CACHE_HIT", assetPath)
@@ -105,10 +95,6 @@ object RendererDiagnostics {
     @Synchronized fun emptyActivationList(side: BodySide) {
         emptyActivationLists++
         log("EMPTY_ACTIVATION_LIST", side.name)
-    }
-
-    @Synchronized fun layerStack(side: BodySide, layers: List<AnatomyLayerAsset>) {
-        log("LAYER_STACK", "${side.name}: ${layers.joinToString { it.assetPath }}")
     }
 
     @Synchronized private fun increment(map: MutableMap<String, Int>, key: String) {
