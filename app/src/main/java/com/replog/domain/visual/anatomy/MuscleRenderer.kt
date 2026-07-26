@@ -7,8 +7,8 @@ import com.replog.domain.visual.spec.AnatomySpec
 /**
  * Public anatomy diagram API preserved for existing UI callers.
  *
- * The active backend is [LayeredAnatomyRenderer], which composites complete SVG
- * assets from [MuscleAssetRegistry]. Inactive muscles are not rendered.
+ * The active backend is [PNGAnatomyRenderer], which composites complete SVG
+ * assets from [MusclePngRegistry]. Inactive muscles are not rendered.
  */
 @Composable
 fun AnatomicalMuscleDiagram(
@@ -19,7 +19,7 @@ fun AnatomicalMuscleDiagram(
     familyId: String? = null
 ) {
     @Suppress("UNUSED_PARAMETER") val retainedForApiCompatibility = palette
-    LayeredAnatomyDiagram(
+    PNGAnatomyDiagram(
         anatomySpec = anatomySpec,
         modifier = modifier,
         progress = progress,
