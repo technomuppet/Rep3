@@ -346,4 +346,181 @@ class IntelligenceEngineTest {
             b.explainSections.map { it.title }
         )
     }
+
+    // -------------------------------------------------------------------------
+    // confidenceFor — signal-threshold transitions 0/1/2/3/4 →
+    // LOW / LOW / MEDIUM / MEDIUM / HIGH. The signal counter increments per
+    // independent signal in IntelligenceEngine.confidenceFor (HIGH = >= 4,
+    // MEDIUM = >= 2, else LOW). The signals=0 case passes
+    // `recoveryScore = null` explicitly to defeat the helper default of 78.
+    // -------------------------------------------------------------------------
+
+    @Test(timeout = 1_000L)
+    fun whenConfidenceFor_ranksSignalsCorrectlyAcrossThresholds() {
+        // signals = 0 → LOW. All participating fields reset to null/empty.
+        val b0 = IntelligenceEngine.build(
+            inputs(
+                recoveryScore = null,
+                readyMuscleGroups = emptyList(),
+                fatiguedMuscleGroups = emptyList(),
+                underVolumeGroups = emptyList(),
+                topForecastLabel = null,
+                topForecastConfidenceHigh = false,
+                genomeBestRepRange = null
+            )
+        )
+        assertEquals(BriefingConfidence.LOW, b0.confidence)
+
+        // signals = 1 → LOW (only recoveryScore present).
+        val b1 = IntelligenceEngine.build(
+            inputs(recoveryScore = 80)
+        )
+        assertEquals(BriefingConfidence.LOW, b1.confidence)
+
+        // signals = 2 → MEDIUM (recoveryScore + ready groups).
+        val b2 = IntelligenceEngine.build(
+            inputs(
+                recoveryScore = 80,
+                readyMuscleGroups = listOf("Chest")
+            )
+        )
+        assertEquals(BriefingConfidence.MEDIUM, b2.confidence)
+
+        // signals = 3 → MEDIUM (above + underVolume).
+        val b3 = IntelligenceEngine.build(
+            inputs(
+                recoveryScore = 80,
+                readyMuscleGroups = listOf("Chest"),
+                underVolumeGroups = listOf("Hamstrings")
+            )
+        )
+        assertEquals(BriefingConfidence.MEDIUM, b3.confidence)
+
+        // signals = 4 → HIGH (above + genome rep range; HIGH threshold is ">= 4").
+        val b4 = IntelligenceEngine.build(
+            inputs(
+                recoveryScore = 80,
+                readyMuscleGroups = listOf("Chest"),
+                underVolumeGroups = listOf("Hamstrings"),
+                genomeBestRepRange = "6-8 reps"
+            )
+        )
+        assertEquals(BriefingConfidence.HIGH, b4.confidence)
+    }
+
+    // -------------------------------------------------------------------------
+    // joinHuman grammar — exercised through the narrative ready-group line.
+    // The narrative lowercases items before joining, so we input capitalised
+    // muscle names and assert on the lowercased joined output. Three counts
+    // exercise the three branches in IntelligenceEngine.joinHuman:
+    //   size == 1 → "${items[0]}" (singular verb "has")
+    //   size == 2 → "${items[0]} and ${items[1]}" (plural verb "have")
+    //   size >= 3 → items.dropLast(1).joinToString(", ") + " and " + items.last()
+    //               (Oxford-less comma branch, plural verb "have")
+    // -------------------------------------------------------------------------
+
+    @Test(timeout = 1_000L)
+    fun whenNarrativeJoinsMuscleGroups_correctGrammarForOneTwoAndMany() {
+        // 1 item — singular verb "has".
+        val b1i = IntelligenceEngine.build(
+            inputs(readyMuscleGroups = listOf("Chest"))
+        )
+        assertTrue(
+            "1-item join: '${b1i.narrative.joinToString(" | ")}'",
+            b1i.narrative.any { it == "Your chest has fully recovered." }
+        )
+
+        // 2 items — "and" joiner, plural "have".
+        val b2i = IntelligenceEngine.build(
+            inputs(readyMuscleGroups = listOf("Chest", "Triceps"))
+        )
+        assertTrue(
+            "2-item join: '${b2i.narrative.joinToString(" | ")}'",
+            b2i.narrative.any { it == "Your chest and triceps have fully recovered." }
+        )
+
+        // 3 items — Oxford-less comma branch ("a, b and c"), plural "have".
+        val b3i = IntelligenceEngine.build(
+            inputs(readyMuscleGroups = listOf("Chest", "Triceps", "Quads"))
+        )
+        assertTrue(
+            "3-item join: '${b3i.narrative.joinToString(" | ")}'",
+            b3i.narrative.any { it == "Your chest, triceps and quads have fully recovered." }
+        )
+    }
+
+    // -------------------------------------------------------------------------
+    // Recommendation fallback — when no rest, no targeted focus, and no ready
+    // groups, the recommendation must default to "Balanced full-body session"
+    // and the narrative workout line must reflect that exact text. This is the
+    // last branch of the `when` in IntelligenceEngine.build().
+    // -------------------------------------------------------------------------
+
+    @Test(timeout = 1_000L)
+    fun whenNoFocusNoReadyAndNoRest_returnsBalancedFullBodyFallback() {
+        val b = IntelligenceEngine.build(
+            inputs(
+                recoveryScore = 80,
+                recommendedFocus = null,
+                readyMuscleGroups = emptyList(),
+                isRestRecommended = false
+            )
+        )
+
+        // The fallback recommendation wins when every earlier branch is dead.
+        assertEquals("Balanced full-body session", b.recommendation)
+        // The narrative workout line interpolates the chosen recommendation.
+        assertTrue(
+            "narrative must surface the fallback text: '${b.narrative.joinToString(" | ")}'",
+            b.narrative.any {
+                it == "Today is an excellent day for a Balanced full-body session workout."
+            }
+        )
+    }
+
+    // -------------------------------------------------------------------------
+    // timeGreeting — boundary sweep across the three ranges defined in
+    // IntelligenceEngine.timeGreeting(): 0..11 morning, 12..16 afternoon,
+    // 17..23 evening. We pass `recoveryScore = null` so the narrative stays
+    // minimal and the greeting is unambiguously the first line; this also
+    // exercises the narrative-non-empty guarantee (confidence footer always
+    // appended, so .first() is safe even with no other inputs).
+    // -------------------------------------------------------------------------
+
+    @Test(timeout = 1_000L)
+    fun whenTimeGreeting_returnsCorrectGreetingAtEveryBoundary() {
+        // 0..11 → "Good morning." (lower boundary, mid-range, upper boundary).
+        listOf(0, 8, 11).forEach { hour ->
+            val b = IntelligenceEngine.build(
+                inputs(recoveryScore = null, hourOfDay = hour)
+            )
+            assertEquals(
+                "hour=$hour must produce 'Good morning.'",
+                "Good morning.",
+                b.narrative.first()
+            )
+        }
+        // 12..16 → "Good afternoon." (lower boundary, mid-range, upper boundary).
+        listOf(12, 14, 16).forEach { hour ->
+            val b = IntelligenceEngine.build(
+                inputs(recoveryScore = null, hourOfDay = hour)
+            )
+            assertEquals(
+                "hour=$hour must produce 'Good afternoon.'",
+                "Good afternoon.",
+                b.narrative.first()
+            )
+        }
+        // 17..23 → "Good evening." (lower boundary, mid-range, upper boundary).
+        listOf(17, 20, 23).forEach { hour ->
+            val b = IntelligenceEngine.build(
+                inputs(recoveryScore = null, hourOfDay = hour)
+            )
+            assertEquals(
+                "hour=$hour must produce 'Good evening.'",
+                "Good evening.",
+                b.narrative.first()
+            )
+        }
+    }
 }
