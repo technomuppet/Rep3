@@ -8,7 +8,6 @@ package com.replog.domain.visual.anatomy
  * This object is the single source of truth for:
  * - ExercisePresentationFactory
  * - AnatomySpec
- * - AnatomicalPreviews
  * - MuscleMap
  * - AnatomyDiagnostics
  * - MuscleActivationEngine
