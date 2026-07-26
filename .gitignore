@@ -7,3 +7,11 @@ captures/
 .externalNativeBuild/
 .cxx/
 app/build/
+
+
+# Backup file artifacts from previous Android SVG normaliser iterations
+*.bak
+*.debug.bak
+
+# Stray git-status dump accidentally committed during a previous merge
+tatus
