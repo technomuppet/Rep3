@@ -118,7 +118,7 @@ object RendererDiagnostics {
     private fun log(event: String, message: String) {
         if (ENABLED) println("$TAG [$event] $message")
     }
-    fun duplicatePngMappings(duplicates: List<*>) {}
+    fun duplicatePngMappings(duplicates: Map<*, *>) {}
 
     fun missingPngDrawable(drawable: Any) {}
 
