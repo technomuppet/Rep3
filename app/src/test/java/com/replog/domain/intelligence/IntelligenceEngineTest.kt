@@ -76,7 +76,7 @@ class IntelligenceEngineTest {
     // fabricated insights.
     // -------------------------------------------------------------------------
 
-    @Test
+    @Test(timeout = 1_000L)
     fun whenNotEnoughData_returnsFallbackBriefing_withLowConfidenceAndNoFabricatedInsights() {
         // Construct inputs as if the engine MIGHT have produced a rich briefing
         // — none of that should leak through when hasEnoughData is false.
@@ -122,7 +122,7 @@ class IntelligenceEngineTest {
     // recoveryScore is present.
     // -------------------------------------------------------------------------
 
-    @Test
+    @Test(timeout = 1_000L)
     fun whenRestRecommended_overridesTargetedFocusAndNarrativeReferencesRest() {
         val b = IntelligenceEngine.build(
             inputs(
@@ -176,7 +176,7 @@ class IntelligenceEngineTest {
     // explainSections appear when every source engine contributes.
     // -------------------------------------------------------------------------
 
-    @Test
+    @Test(timeout = 1_000L)
     fun whenMultipleIndependentSignalsAgree_returnsHighConfidenceBriefingAndDetailedExplainSections() {
         // 6 independent signals → confidence HIGH (signals counter
         // recoveryScore(1) + ready(1) + underVolume(1) + topForecastHigh(2) +
@@ -250,7 +250,7 @@ class IntelligenceEngineTest {
     // `narrative`. Coach insights only fire for fields that are populated.
     // -------------------------------------------------------------------------
 
-    @Test
+    @Test(timeout = 1_000L)
     fun whenFatigueAndUnderVolumeOverlap_narrativeAndReasonsNeverFabricate() {
         // Only three signals given: recoveryScore, fatigue, underVolume. Genome,
         // topForecast, goalSummary, recommendedFocus are all null/empty.
@@ -339,9 +339,10 @@ class IntelligenceEngineTest {
             sources
         )
 
-        // ----- Explain sections — only Recovery appears. -----
+        // ----- Explain sections — Recovery + Weekly Volume appear
+        // (underVolumeGroups = ["Hamstrings"] is non-empty). -----
         assertEquals(
-            listOf("Recovery"),
+            listOf("Recovery", "Weekly Volume"),
             b.explainSections.map { it.title }
         )
     }
