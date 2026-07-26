@@ -15,3 +15,8 @@ app/build/
 
 # Stray git-status dump accidentally committed during a previous merge
 tatus
+
+# Layered anatomy SVG library (removed in the dead-code PR; do not re-introduce)
+app/src/main/assets/anatomy/
+# Anatomy tooling (Python script used to centre per-muscle SVGs; superseded by managed registry)
+tools/
