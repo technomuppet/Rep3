@@ -98,6 +98,7 @@ object MusclePngRegistry {
         DrawableName.FRONT_HIP_FLEXORS,
         DrawableName.FRONT_QUADS,
         DrawableName.FRONT_ADDUCTORS,
+        DrawableName.FRONT_ABDUCTORS,
         DrawableName.FRONT_TIBIALIS,
         DrawableName.FRONT_CALVES,
         DrawableName.BACK_TRAPS_UPPER,
@@ -194,11 +195,8 @@ object MusclePngRegistry {
 
         // Back lower body
         direct(MuscleRegion.GLUTE_MAXIMUS, BodySide.BACK, DrawableId.BACK_GLUTES, DrawableName.BACK_GLUTES, 130),
-        DrawableName.BACK_ABDUCTORS,
         alias(MuscleRegion.GLUTE_MEDIUS, BodySide.BACK, DrawableId.BACK_GLUTES, DrawableName.BACK_GLUTES, 131, MuscleRegion.GLUTE_MAXIMUS),
-        DrawableName.BACK_ABDUCTORS,
         alias(MuscleRegion.GLUTE_MINIMUS, BodySide.BACK, DrawableId.BACK_GLUTES, DrawableName.BACK_GLUTES, 132, MuscleRegion.GLUTE_MAXIMUS),
-        DrawableName.BACK_ABDUCTORS,
         direct(MuscleRegion.HAMSTRINGS, BodySide.BACK, DrawableId.BACK_HAMSTRINGS, DrawableName.BACK_HAMSTRINGS, 133),
         alias(MuscleRegion.BICEPS_FEMORIS, BodySide.BACK, DrawableId.BACK_HAMSTRINGS, DrawableName.BACK_HAMSTRINGS, 134, MuscleRegion.HAMSTRINGS),
         alias(MuscleRegion.SEMITENDINOSUS, BodySide.BACK, DrawableId.BACK_HAMSTRINGS, DrawableName.BACK_HAMSTRINGS, 135, MuscleRegion.HAMSTRINGS),
