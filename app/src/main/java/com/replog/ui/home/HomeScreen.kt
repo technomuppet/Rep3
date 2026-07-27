@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.lifecycle.Lifecycle
@@ -93,6 +94,12 @@ fun HomeScreen(
         // Priority 1: Today's Briefing - the unified intelligence card.
         briefing?.let { b ->
             item { TodaysBriefingCard(b, onOpenRecovery = onOpenRecoveryCentre) }
+            // Phase 2 Gap 3: dedicated recommendation card so the headline
+            // recommendation gets its own visual hierarchy + a CTA distinct
+            // from the briefing's narrative. The CoachDashboardCard below
+            // remains untouched — it pulls from coachState (CoachViewModel)
+            // and owns the dismiss / refresh / train-anyway UX.
+            item { RecommendationCard(b, onStart = onStartRecommendedWorkout) }
         }
 
         // Sprint 8 P5: RepLog Score with explainable component breakdown.
@@ -429,5 +436,56 @@ private fun RepLogScoreCard(s: com.replog.domain.intelligence.RepLogScoreResult)
             Text(c.explanation, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(6.dp))
         }
+    }
+}
+
+// Phase 2 Gap 3: dedicated recommendation card with its own visual hierarchy.
+// Surfaces the IntelligenceEngine's `recommendation` string at weighty title
+// size, gives the matching personalised coach-insight as a "Because: …" reason
+// line, and provides a single primary CTA. The "Log a few more workouts" low-
+// data fallback branch disables the CTA (it would have nothing concrete to
+// start) and shows a soft caption instead, matching the briefing fallback.
+@Composable
+private fun RecommendationCard(
+    b: com.replog.domain.intelligence.TodaysBriefing,
+    onStart: () -> Unit
+) = RepLogCard {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Default.PlayArrow, null, tint = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.width(8.dp))
+        Text(
+            "RECOMMENDED TODAY",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+    }
+    Spacer(Modifier.height(4.dp))
+    Text(
+        b.recommendation,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.ExtraBold
+    )
+    Spacer(Modifier.height(12.dp))
+    Text("Because:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+    val insightText = b.coachInsights.firstOrNull()?.text
+        ?: "No additional insight today — based on recent training."
+    Text(
+        insightText,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+    if (b.recommendation != "Log a few more workouts") {
+        Spacer(Modifier.height(12.dp))
+        TextButton(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
+            Text("Start recommended workout", fontWeight = FontWeight.Bold)
+        }
+    } else {
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Need a couple more sessions before recommendations lock in.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
