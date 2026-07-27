@@ -524,6 +524,28 @@ class IntelligenceRepository @Inject constructor(
     }
 
     /**
+     * Phase 2 Gap 4 — dedicated muscle-gap card on Home.
+     *
+     * Reuses the weak-muscle list from the latest DNA snapshot (the same
+     * `weakestMuscles` field `buildBriefing()` already splits + passes to
+     * `MuscleGapAnalyzer`) and the full exercise library used by
+     * `buildMuscleBalance()` and `startMuscleGapWorkout()`. Returns an
+     * empty list when there is no DNA snapshot yet — mirrors the
+     * briefing's `hasEnoughData` guard so the card stays hidden until
+     * training history has produced actionable guidance.
+     */
+    suspend fun buildMuscleGapSuggestions(
+        perMuscle: Int = 3
+    ): List<com.replog.domain.musclegap.MuscleGapSuggestion> {
+        val dna = trainingDNARepository.getLatestDNA().first()
+        val weak = dna?.weakestMuscles?.split(",")?.map { it.trim() }
+            ?.filter { it.isNotBlank() }.orEmpty()
+        if (weak.isEmpty()) return emptyList()
+        val library = exerciseRepository.getAllExercises().first()
+        return MuscleGapAnalyzer.analyze(weak, library, perMuscle)
+    }
+
+    /**
      * Phase 2 Gap 5 — dedicated weekly-volume card on Home.
      *
      * Reuses the same `VolumeLandmarks.analyze(weeks = 1)` pass that

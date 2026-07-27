@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.Healing
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Insights
@@ -55,6 +56,9 @@ fun HomeScreen(
     // Phase 2 Gap 5: dedicated weekly-volume card data. Empty list is a
     // legitimate UI state (card stays hidden); null means "not yet loaded".
     val weeklyLandmarks by viewModel.weeklyLandmarks.collectAsState()
+    // Phase 2 Gap 4: dedicated muscle-gap card data. Same null-vs-empty-list
+    // semantics as weekly landmarks; null = not loaded, empty = no DNA yet.
+    val muscleGapSuggestions by viewModel.muscleGapSuggestions.collectAsState()
     val displayName by viewModel.displayName.collectAsState()
     var showTrainAnywayDialog by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { viewModel.refresh(); viewModel.loadIntelligence(); coachViewModel.loadRecommendation(force = false) }
@@ -128,6 +132,23 @@ fun HomeScreen(
         // the card never advertises zeros.
         weeklyLandmarks?.takeIf { it.isNotEmpty() }?.let { landmarks ->
             item { WeeklyLandmarksCard(landmarks, onOpen = onOpenMuscleBalance) }
+        }
+
+        // Phase 2 Gap 4: muscle-gap card. Each row carries its own per-muscle
+        // "Start focus workout" CTA that delegates to the existing
+        // `IntelligenceRepository.startMuscleGapWorkout()`, which creates a
+        // session + sets active id; Home then navigates to the workout tab.
+        muscleGapSuggestions?.takeIf { it.isNotEmpty() }?.let { suggestions ->
+            item {
+                MuscleGapCard(
+                    suggestions = suggestions,
+                    onStartMuscle = { muscle ->
+                        viewModel.startMuscleGapFocus(muscle)
+                        onStartWorkout()
+                    },
+                    onOpen = onOpenMuscleBalance
+                )
+            }
         }
 
         // Coach Dashboard — the unified "Good morning" advisor (recommendation +
@@ -651,4 +672,99 @@ private fun WeeklyStatusBadge(status: com.replog.domain.volume.VolumeStatus) {
             .background(bg, RoundedCornerShape(4.dp))
             .padding(horizontal = 6.dp, vertical = 2.dp)
     )
+}
+
+// Phase 2 Gap 4: dedicated muscle-gap card on Home with its own visual
+// hierarchy. Each row carries a per-muscle "Start focus workout" CTA wired
+// to the existing IntelligenceRepository.startMuscleGapWorkout() helper,
+// which creates a session with the top-ranked exercises and sets the active
+// session id in DataStore — Home then navigates to the workout tab.
+@Composable
+private fun MuscleGapCard(
+    suggestions: List<com.replog.domain.musclegap.MuscleGapSuggestion>,
+    onStartMuscle: (String) -> Unit,
+    onOpen: () -> Unit
+) = RepLogCard {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            Icons.Default.Healing,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            "MUSCLES YOU'VE BEEN SKIPPING",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+    }
+    Spacer(Modifier.height(4.dp))
+    val total = suggestions.sumOf { it.exercises.size }
+    val headline = if (suggestions.size == 1) {
+        "1 under-trained group with $total exercise suggestion. Tap to start a focus workout."
+    } else {
+        "$total exercise suggestions across ${suggestions.size} under-trained groups. Tap to start a focus workout."
+    }
+    Text(
+        headline,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurface
+    )
+    Spacer(Modifier.height(10.dp))
+    suggestions.forEach { s ->
+        MuscleGapRow(s, onStartMuscle)
+        Spacer(Modifier.height(6.dp))
+    }
+    Spacer(Modifier.height(8.dp))
+    TextButton(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
+        Text("Open Muscle Balance →", fontWeight = FontWeight.Bold)
+    }
+}
+
+/** One weak-muscle row in the MuscleGapCard: name, suggestion count, top exercises, focus-workout CTA. */
+@Composable
+private fun MuscleGapRow(
+    s: com.replog.domain.musclegap.MuscleGapSuggestion,
+    onStart: (String) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Default.FitnessCenter,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.tertiary,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                s.muscle,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                "${s.exercises.size} suggested",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            s.exercises.take(3).joinToString(" \u00b7 ") { it.name },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(6.dp))
+        TextButton(
+            onClick = { onStart(s.muscle) },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                "Start ${s.muscle} focus workout \u2192",
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
 }

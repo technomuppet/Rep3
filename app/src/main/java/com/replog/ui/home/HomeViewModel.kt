@@ -114,6 +114,15 @@ class HomeViewModel @Inject constructor(
     private var weeklyLandmarksLoadedForSessionCount = -1
     private var weeklyLandmarksLoadedForEpochDay: Int = -1
 
+    // Phase 2 Gap 4: muscle-gap card on Home. Same freshness predicate as the
+    // briefing + weekly volumes so all three intelligence cards refresh in
+    // one frame rather than re-fetching the DNA snapshot + exercise library
+    // three times within a single ON_RESUME tick.
+    private val _muscleGapSuggestions = MutableStateFlow<List<com.replog.domain.musclegap.MuscleGapSuggestion>?>(null)
+    val muscleGapSuggestions: StateFlow<List<com.replog.domain.musclegap.MuscleGapSuggestion>?> = _muscleGapSuggestions
+    private var muscleGapLoadedForSessionCount = -1
+    private var muscleGapLoadedForEpochDay: Int = -1
+
     /** The user's chosen display name for personalised greetings (null before onboarding). */
     val displayName: StateFlow<String?> = prefs.displayName
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
@@ -167,6 +176,18 @@ class HomeViewModel @Inject constructor(
                 weeklyLandmarksLoadedForSessionCount = count
                 weeklyLandmarksLoadedForEpochDay = today
             }
+            // Phase 2 Gap 4: muscle-gap card refreshes with the same predicate so
+            // the briefing, weekly volumes, and muscle-gap trio are all consistent
+            // after a workout or across a midnight boundary.
+            if (count != muscleGapLoadedForSessionCount
+                || today != muscleGapLoadedForEpochDay
+                || _muscleGapSuggestions.value == null
+            ) {
+                _muscleGapSuggestions.value =
+                    runCatching { intelligenceRepository.buildMuscleGapSuggestions() }.getOrNull()
+                muscleGapLoadedForSessionCount = count
+                muscleGapLoadedForEpochDay = today
+            }
         }
     }
 
@@ -180,6 +201,20 @@ class HomeViewModel @Inject constructor(
     /** P5: launch a favourite template (sets it active; Training tab resumes it). */
     fun startTemplate(template: com.replog.data.model.TemplateWithExercises) = viewModelScope.launch {
         workoutStarter.startTemplate(template)
+    }
+
+    /**
+     * Phase 2 Gap 4 — start a focus workout for an under-trained muscle.
+     *
+     * Delegates to `IntelligenceRepository.startMuscleGapWorkout(muscle)` which
+     * already creates a session with 4 ranked exercises and sets the active
+     * session id in DataStore. The Home screen's `onStartWorkout` callback is
+     * fired by the caller immediately after this returns (typically inside the
+     * same chained click handler) so the user lands on the workout screen.
+     */
+    fun startMuscleGapFocus(muscle: String) = viewModelScope.launch {
+        runCatching { intelligenceRepository.startMuscleGapWorkout(muscle) }
+            .getOrNull() // success/failure is observed by Navigation moving to the active session
     }
 
     /** P6: one-tap repeat of a recent session. */
