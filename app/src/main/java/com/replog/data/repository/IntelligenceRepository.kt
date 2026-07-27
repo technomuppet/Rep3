@@ -2,6 +2,7 @@ package com.replog.data.repository
 
 import com.replog.domain.forecast.ForecastConfidence
 import com.replog.domain.forecast.ProgressionForecaster
+import com.replog.domain.forecast.ProgressionForecaster
 import com.replog.domain.genome.TrainingGenomeEngine
 import com.replog.domain.intelligence.IntelligenceEngine
 import com.replog.domain.intelligence.IntelligenceInputs
@@ -68,6 +69,17 @@ data class MuscleBalanceRow(
     val status: String,                 // UNDER / IN_RANGE / ABOVE / NONE
     val severity: Int,                  // 0-100, how far below optimal (gap severity)
     val recommendedExercises: List<String>
+)
+
+/** One projected-lift entry for the Phase 2 Gap 6 progression-forecast card on Home. */
+data class ForecastCardEntry(
+    val exerciseId: Int,
+    val exerciseName: String,
+    val projectionLabel: String,    // e.g. "85 kg x 5 in 4 weeks"
+    val trend: com.replog.domain.forecast.ForecastTrend,
+    val confidence: com.replog.domain.forecast.ForecastConfidence,
+    val weeklyGainKg: Double,
+    val explanation: String
 )
 
 /** Muscle Balance Centre data (Priority 2) - from VolumeLandmarks + MuscleGapAnalyzer + DNA snapshot. */
@@ -521,6 +533,51 @@ class IntelligenceRepository @Inject constructor(
         val othersAvg = others.map { it.recoveryScore }.average().takeIf { !it.isNaN() } ?: 100.0
         // Legs noticeably more fatigued than the rest, with meaningful recent volume.
         return legWorst < 50 && legWorst < othersAvg - 15 && leg.any { it.volumeLast7Days > 3000 }
+    }
+
+    /**
+     * Phase 2 Gap 6 — dedicated progression-forecast card on Home.
+     *
+     * Pulls EVERY stored `TrainingDnaProgressionScore`, runs the pure
+     * `ProgressionForecaster.forecast(score)` against each, and ranks the
+     * results by (confidence desc, weeklyGainKg desc). Returns the top N
+     * entries with their resolved exercise names so the UI does not need
+     * to look up by id again. Empty list when there is no progression
+     * data yet — matching the briefing's hasEnoughData guard so the card
+     * stays hidden until training history has produced a stable trend.
+     */
+    suspend fun buildProgressionForecasts(
+        maxResults: Int = 5
+    ): List<ForecastCardEntry> {
+        val scores = trainingDNARepository.getProgressionScores().first()
+        if (scores.isEmpty()) return emptyList()
+        return scores
+            .mapNotNull { score ->
+                runCatching {
+                    val f = ProgressionForecaster.forecast(score)
+                    val name = exerciseRepository.getExerciseById(score.exerciseId)?.name
+                        ?: return@runCatching null
+                    ForecastCardEntry(
+                        exerciseId = score.exerciseId,
+                        exerciseName = name,
+                        projectionLabel = f.projectionLabel,
+                        trend = f.trend,
+                        confidence = f.confidence,
+                        weeklyGainKg = f.weeklyGainKg,
+                        explanation = f.explanation
+                    )
+                }.getOrNull()
+            }
+            .sortedWith(
+                compareByDescending<ForecastCardEntry> {
+                    when (it.confidence) {
+                        com.replog.domain.forecast.ForecastConfidence.HIGH -> 3
+                        com.replog.domain.forecast.ForecastConfidence.MEDIUM -> 2
+                        com.replog.domain.forecast.ForecastConfidence.LOW -> 1
+                    }
+                }.thenByDescending { it.weeklyGainKg }
+            )
+            .take(maxResults)
     }
 
     /**

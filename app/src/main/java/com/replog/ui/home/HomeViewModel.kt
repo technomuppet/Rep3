@@ -123,6 +123,16 @@ class HomeViewModel @Inject constructor(
     private var muscleGapLoadedForSessionCount = -1
     private var muscleGapLoadedForEpochDay: Int = -1
 
+    // Phase 2 Gap 6: progression-forecast card on Home. Same freshness
+    // predicate as briefing + volume landmarks + muscle gap so all four
+    // intelligence cards refresh together in one frame. The forecasts
+    // are derived from stored TrainingDnaProgressionScore rows + an
+    // exercise-name lookup, both already cached low-cost reads.
+    private val _progressionForecasts = MutableStateFlow<List<com.replog.data.repository.ForecastCardEntry>?>(null)
+    val progressionForecasts: StateFlow<List<com.replog.data.repository.ForecastCardEntry>?> = _progressionForecasts
+    private var progressionForecastsLoadedForSessionCount = -1
+    private var progressionForecastsLoadedForEpochDay: Int = -1
+
     /** The user's chosen display name for personalised greetings (null before onboarding). */
     val displayName: StateFlow<String?> = prefs.displayName
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
@@ -187,6 +197,19 @@ class HomeViewModel @Inject constructor(
                     runCatching { intelligenceRepository.buildMuscleGapSuggestions() }.getOrNull()
                 muscleGapLoadedForSessionCount = count
                 muscleGapLoadedForEpochDay = today
+            }
+            // Phase 2 Gap 6: progression-forecast card refreshes with the same
+            // predicate. All four intelligence cards now share a single
+            // ON_RESUME-driven refresh + midnight heartbeat — one DB read, no
+            // per-card throttling.
+            if (count != progressionForecastsLoadedForSessionCount
+                || today != progressionForecastsLoadedForEpochDay
+                || _progressionForecasts.value == null
+            ) {
+                _progressionForecasts.value =
+                    runCatching { intelligenceRepository.buildProgressionForecasts() }.getOrNull()
+                progressionForecastsLoadedForSessionCount = count
+                progressionForecastsLoadedForEpochDay = today
             }
         }
     }
