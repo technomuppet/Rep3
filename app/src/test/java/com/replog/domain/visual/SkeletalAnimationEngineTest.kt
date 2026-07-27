@@ -27,7 +27,7 @@ class SkeletalAnimationEngineTest {
             JointId.LEFT_ELBOW to 45f
         )
         val solved = ForwardKinematicsSolver.solve(rotations)
-        assertEquals(19, solved.joints.size)
+        assertEquals(28, solved.joints.size) // matches the expanded JointId rig (28 entries including bilateral limbs + legacy chest fallback)
         for (jointId in JointId.entries) {
             assertNotNull("Every joint ID must be evaluated by FK solver", solved.getJoint(jointId))
         }
