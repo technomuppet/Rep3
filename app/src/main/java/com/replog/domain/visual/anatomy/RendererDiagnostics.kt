@@ -104,10 +104,36 @@ object RendererDiagnostics {
     private fun log(event: String, message: String) {
         if (ENABLED) println("$TAG [$event] $message")
     }
-    fun duplicatePngMappings(duplicates: Map<*, *>) {}
+    @Synchronized
+    fun duplicatePngMappings(
+        duplicates: Map<MuscleRegion, List<PngAnatomyLayerAsset>>
+    ) {
+        if (duplicates.isEmpty()) return
+        duplicateMappingEvents += duplicates.size
+        val summary = duplicates.entries.joinToString(separator = ", ") { (region, layers) ->
+            "${region.name}[${layers.size}]"
+        }
+        log("DUPLICATE_PNG_MAPPING", summary)
+    }
 
-    fun missingPngDrawable(drawable: Any) {}
+    @Synchronized
+    fun missingPngDrawable(drawableName: String) {
+        increment(missingAssets, drawableName)
+        log("MISSING_PNG_DRAWABLE", drawableName)
+    }
 
-    fun pngLayerStack(side: Any, layers: Any) {}
+    @Synchronized
+    fun pngLayerStack(side: BodySide, layers: List<PngAnatomyLayerAsset>) {
+        if (layers.isEmpty()) return
+        val byDrawableId = layers.groupingBy { it.drawableId }.eachCount()
+        val dupeDrawables = byDrawableId.filter { it.value > 1 }
+        if (dupeDrawables.isEmpty()) return
+        dupeDrawables.forEach { (id, _) ->
+            val drawableName = layers.first { it.drawableId == id }.drawableName
+            val key = "${side.name}:stack-duplicate:$drawableName"
+            increment(renderFailures, key)
+        }
+        log("PNG_LAYER_STACK_DUPLICATE", "${side.name}:${dupeDrawables.keys.size}")
+    }
 
 }
