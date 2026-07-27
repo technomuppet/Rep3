@@ -105,6 +105,15 @@ class HomeViewModel @Inject constructor(
     private val _repLogScore = MutableStateFlow<com.replog.domain.intelligence.RepLogScoreResult?>(null)
     val repLogScore: StateFlow<com.replog.domain.intelligence.RepLogScoreResult?> = _repLogScore
 
+    // Phase 2 Gap 5: weekly volume landmarks card on Home. Same freshness
+    // predicate as the briefing so the two cards refresh together (a single
+    // recompute + a single DB read covers both rather than re-entering the
+    // bounded `getRecentCompletedSessions(60)` flow twice within a frame).
+    private val _weeklyLandmarks = MutableStateFlow<List<com.replog.domain.volume.VolumeLandmark>?>(null)
+    val weeklyLandmarks: StateFlow<List<com.replog.domain.volume.VolumeLandmark>?> = _weeklyLandmarks
+    private var weeklyLandmarksLoadedForSessionCount = -1
+    private var weeklyLandmarksLoadedForEpochDay: Int = -1
+
     /** The user's chosen display name for personalised greetings (null before onboarding). */
     val displayName: StateFlow<String?> = prefs.displayName
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
@@ -145,6 +154,18 @@ class HomeViewModel @Inject constructor(
                 _repLogScore.value = runCatching { intelligenceRepository.buildRepLogScore() }.getOrNull()
                 briefingLoadedForSessionCount = count
                 briefingLoadedForEpochDay = today
+            }
+            // Phase 2 Gap 5: reuse the same (sessionCount, epochDay) guard so the
+            // weekly volume card refreshes in lockstep with the briefing. Empty
+            // list is a legitimate state (low-data fallback in the repository).
+            if (count != weeklyLandmarksLoadedForSessionCount
+                || today != weeklyLandmarksLoadedForEpochDay
+                || _weeklyLandmarks.value == null
+            ) {
+                _weeklyLandmarks.value =
+                    runCatching { intelligenceRepository.buildWeeklyLandmarks() }.getOrNull()
+                weeklyLandmarksLoadedForSessionCount = count
+                weeklyLandmarksLoadedForEpochDay = today
             }
         }
     }

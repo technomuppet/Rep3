@@ -522,4 +522,24 @@ class IntelligenceRepository @Inject constructor(
         // Legs noticeably more fatigued than the rest, with meaningful recent volume.
         return legWorst < 50 && legWorst < othersAvg - 15 && leg.any { it.volumeLast7Days > 3000 }
     }
+
+    /**
+     * Phase 2 Gap 5 — dedicated weekly-volume card on Home.
+     *
+     * Reuses the same `VolumeLandmarks.analyze(weeks = 1)` pass that
+     * `buildBriefing()` already runs to populate the "Weekly Volume"
+     * explainSection. Surfacing it as its own StateFlow lets Home draw
+     * ten muscle-group rows with status colours rather than burying the
+     * signal in the briefing's narrative — same engine, fresh UI wiring.
+     *
+     * Returns an empty list when there are too few completed sessions;
+     * the Home card stays hidden until the user has real training
+     * history, exactly matching the briefing's `hasEnoughData` guard.
+     */
+    suspend fun buildWeeklyLandmarks(): List<com.replog.domain.volume.VolumeLandmark> {
+        val now = System.currentTimeMillis()
+        val sessions = workoutRepository.getRecentCompletedSessions(60).first()
+        if (sessions.size < 3) return emptyList()
+        return VolumeLandmarks.analyze(sessions, now, weeks = 1)
+    }
 }

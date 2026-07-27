@@ -1,13 +1,16 @@
 package com.replog.ui.home
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Insights
+import androidx.compose.material.icons.filled.StackedBarChart
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.PlayArrow
@@ -49,6 +52,9 @@ fun HomeScreen(
     val briefing by viewModel.briefing.collectAsState()
     val continueWorkout by viewModel.continueWorkout.collectAsState()
     val repLogScore by viewModel.repLogScore.collectAsState()
+    // Phase 2 Gap 5: dedicated weekly-volume card data. Empty list is a
+    // legitimate UI state (card stays hidden); null means "not yet loaded".
+    val weeklyLandmarks by viewModel.weeklyLandmarks.collectAsState()
     val displayName by viewModel.displayName.collectAsState()
     var showTrainAnywayDialog by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { viewModel.refresh(); viewModel.loadIntelligence(); coachViewModel.loadRecommendation(force = false) }
@@ -114,6 +120,14 @@ fun HomeScreen(
                 IntelligenceNavCard("Muscle Balance", Modifier.weight(1f), onOpenMuscleBalance)
                 IntelligenceNavCard("DNA", Modifier.weight(1f), onOpenDnaEvolution)
             }
+        }
+
+        // Phase 2 Gap 5: full weekly volume card with its own visual hierarchy.
+        // Empty list is the low-data state (the briefing itself still shows the
+        // "Log a few more workouts" fallback); we hide silently in that case so
+        // the card never advertises zeros.
+        weeklyLandmarks?.takeIf { it.isNotEmpty() }?.let { landmarks ->
+            item { WeeklyLandmarksCard(landmarks, onOpen = onOpenMuscleBalance) }
         }
 
         // Coach Dashboard — the unified "Good morning" advisor (recommendation +
@@ -488,4 +502,153 @@ private fun RecommendationCard(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
+}
+
+// Phase 2 Gap 5: dedicated weekly-volume card with its own visual hierarchy.
+// Renders the ten hypertrophy groups from `VolumeLandmarks.analyze(weeks = 1)`
+// as compact horizontal bars with a colour-coded status badge (UNDER /
+// IN_RANGE / ABOVE / NONE). UNDER groups are surfaced first so the user sees
+// the gap signal before the in-range noise; the CTA opens the existing
+// Muscle Balance drill-down screen (the same route the IntelligenceNavCard
+// "Muscle Balance" tile uses).
+@Composable
+private fun WeeklyLandmarksCard(
+    landmarks: List<com.replog.domain.volume.VolumeLandmark>,
+    onOpen: () -> Unit
+) = RepLogCard {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            Icons.Default.StackedBarChart,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            "WEEKLY VOLUME",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+    }
+    Spacer(Modifier.height(4.dp))
+    val underCount = landmarks.count {
+        it.status == com.replog.domain.volume.VolumeStatus.UNDER ||
+            it.status == com.replog.domain.volume.VolumeStatus.NONE
+    }
+    val inRangeCount = landmarks.count {
+        it.status == com.replog.domain.volume.VolumeStatus.IN_RANGE
+    }
+    val summary = when {
+        underCount == 0 && inRangeCount > 0 ->
+            "All $inRangeCount trained muscle groups are in their optimal range."
+        underCount > 0 && inRangeCount > 0 ->
+            "$inRangeCount in range • $underCount below optimal — tap for suggestions."
+        underCount > 0 && inRangeCount == 0 ->
+            "$underCount groups need attention — tap for suggestions."
+        else -> "Tap for full weekly volume analysis."
+    }
+    Text(
+        summary,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurface
+    )
+    Spacer(Modifier.height(10.dp))
+    // Priority order: UNDER first (action signal), then ABOVE, then IN_RANGE,
+    // then NONE, so the user sees the actionable rows at the top of the card.
+    val ordered = landmarks.sortedWith(
+        compareBy<com.replog.domain.volume.VolumeLandmark> {
+            when (it.status) {
+                com.replog.domain.volume.VolumeStatus.UNDER -> 0
+                com.replog.domain.volume.VolumeStatus.NONE -> 0
+                com.replog.domain.volume.VolumeStatus.ABOVE -> 1
+                com.replog.domain.volume.VolumeStatus.IN_RANGE -> 2
+            }
+        }.thenBy { it.muscleGroup }
+    )
+    ordered.forEach { lm ->
+        WeeklyLandmarkRow(lm)
+        Spacer(Modifier.height(4.dp))
+    }
+    Spacer(Modifier.height(8.dp))
+    TextButton(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
+        Text("Open Muscle Balance →", fontWeight = FontWeight.Bold)
+    }
+}
+
+/** One horizontal-bar muscle-group row in the WeeklyLandmarksCard. */
+@Composable
+private fun WeeklyLandmarkRow(lm: com.replog.domain.volume.VolumeLandmark) {
+    val barColor = when (lm.status) {
+        com.replog.domain.volume.VolumeStatus.IN_RANGE -> MaterialTheme.colorScheme.primary
+        com.replog.domain.volume.VolumeStatus.UNDER -> MaterialTheme.colorScheme.tertiary
+        com.replog.domain.volume.VolumeStatus.ABOVE -> MaterialTheme.colorScheme.secondary
+        com.replog.domain.volume.VolumeStatus.NONE -> MaterialTheme.colorScheme.outlineVariant
+    }
+    val trackColor = MaterialTheme.colorScheme.surfaceVariant
+    val fraction = if (lm.optimalHigh > 0) {
+        (lm.weeklySets / lm.optimalHigh).coerceIn(0.0, 1.0).toFloat()
+    } else 0f
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(
+            lm.muscleGroup,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.width(88.dp)
+        )
+        Spacer(Modifier.width(8.dp))
+        Box(modifier = Modifier.height(10.dp).weight(1f)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(trackColor, RoundedCornerShape(5.dp))
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(fraction)
+                    .background(barColor, RoundedCornerShape(5.dp))
+            )
+        }
+        Spacer(Modifier.width(8.dp))
+        Text(
+            when (lm.status) {
+                com.replog.domain.volume.VolumeStatus.NONE -> "—"
+                else -> "${lm.weeklySets.toInt()} / ${lm.optimalLow}-${lm.optimalHigh}"
+            },
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(72.dp)
+        )
+        Spacer(Modifier.width(8.dp))
+        WeeklyStatusBadge(lm.status)
+    }
+}
+
+/** Compact coloured pill showing the VolumeStatus label for one landmark. */
+@Composable
+private fun WeeklyStatusBadge(status: com.replog.domain.volume.VolumeStatus) {
+    val fg = when (status) {
+        com.replog.domain.volume.VolumeStatus.IN_RANGE -> MaterialTheme.colorScheme.primary
+        com.replog.domain.volume.VolumeStatus.UNDER -> MaterialTheme.colorScheme.tertiary
+        com.replog.domain.volume.VolumeStatus.ABOVE -> MaterialTheme.colorScheme.secondary
+        com.replog.domain.volume.VolumeStatus.NONE -> MaterialTheme.colorScheme.outline
+    }
+    val bg = when (status) {
+        com.replog.domain.volume.VolumeStatus.IN_RANGE -> MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+        com.replog.domain.volume.VolumeStatus.UNDER -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.18f)
+        com.replog.domain.volume.VolumeStatus.ABOVE -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.18f)
+        com.replog.domain.volume.VolumeStatus.NONE -> MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+    }
+    Text(
+        status.label,
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.Bold,
+        color = fg,
+        modifier = Modifier
+            .background(bg, RoundedCornerShape(4.dp))
+            .padding(horizontal = 6.dp, vertical = 2.dp)
+    )
 }
