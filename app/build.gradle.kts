@@ -39,6 +39,10 @@ android {
     buildFeatures { compose = true; buildConfig = true }
     composeOptions { kotlinCompilerExtensionVersion = "1.5.9" }
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
+    // Bundle Room-exported schema JSON files into the test APK so Room's
+    // MigrationTestHelper can locate them under assets/databases/<n>.json during
+    // :app:connectedDebugAndroidTest. Required for AppDatabaseMigrationTest.
+    sourceSets["androidTest"].assets.srcDir("$projectDir/schemas")
 }
 
 dependencies {
@@ -66,6 +70,7 @@ dependencies {
     implementation("androidx.room:room-ktx:$roomVersion")
     ksp("androidx.room:room-compiler:$roomVersion")
     androidTestImplementation("androidx.room:room-testing:$roomVersion")
+    androidTestImplementation("com.google.dagger:hilt-android-testing:2.51.1")
 
     implementation("com.google.dagger:hilt-android:2.51.1")
     ksp("com.google.dagger:hilt-compiler:2.51.1")

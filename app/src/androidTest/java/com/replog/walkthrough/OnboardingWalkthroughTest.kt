@@ -10,6 +10,8 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.replog.MainActivity
+import com.replog.RepLogTestApp
+import dagger.hilt.android.testing.HiltAndroidTest
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -24,8 +26,14 @@ import org.junit.runner.RunWith
  * step is missing, or if the flow cannot reach Home.
  */
 @OptIn(ExperimentalTestApi::class)
+@HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
 class OnboardingWalkthroughTest {
+    @get:Rule
+    val hiltTestRule = dagger.hilt.android.testing.HiltTestRule(this)
+
+    init {
+        hiltTestRule.inject()
 
     @get:Rule
     val rule = createAndroidComposeRule<MainActivity>()
