@@ -650,6 +650,90 @@ class IntelligenceRepository @Inject constructor(
      * concrete workout plan for that case — we return null so the card hides
      * until real recommendations are available).
      */
+    /**
+     * Phase 3 Gap 2 — in-workout coaching tips keyed by exerciseId.
+     *
+     * Computes per-exercise personalised tips using the same engines
+     * already powering the Home dashboard (RecoveryAnalyzer,
+     * TrainingGenomeEngine, VolumeLandmarks, MuscleGapAnalyzer). Each
+     * exercise in the library gets 0-3 short tips based on the signal
+     * that exists for its primary muscle group.
+     *
+     * Returns an empty map when there are too few completed sessions
+     * (the tips stay hidden until training history is meaningful).
+     */
+    suspend fun buildWorkoutIntelligence(
+        exercises: List<com.replog.data.model.Exercise>
+    ): Map<Int, List<String>> {
+        val now = System.currentTimeMillis()
+        val sessions = workoutRepository.getRecentCompletedSessions(60).first()
+        if (sessions.size < 3) return emptyMap()
+
+        // Recovery: per-muscle status (same pass the briefing runs).
+        val muscleRecovery = runCatching {
+            RecoveryAnalyzer.muscleRecovery(sessions, now)
+        }.getOrNull().orEmpty()
+        val recoveryByMuscle = muscleRecovery.associateBy { it.muscle.lowercase() }
+
+        // Genome: best rep range (only when data is sufficient).
+        val genome = runCatching {
+            TrainingGenomeEngine.analyze(sessions, now)
+        }.getOrNull()
+        val bestRepRange = genome?.takeIf { it.hasEnoughData }
+            ?.traits?.firstOrNull { it.dimension.equals("Rep range", true) }?.bestValue
+
+        // Weekly volume: under-trained groups.
+        val underVolume = runCatching {
+            VolumeLandmarks.analyze(sessions, now, weeks = 1)
+                .filter { it.status == VolumeStatus.UNDER }
+                .map { it.muscleGroup.lowercase() }.toSet()
+        }.getOrNull().orEmpty()
+
+        // Muscle gap: neglected muscles from latest DNA snapshot.
+        val weakMuscles = runCatching {
+            trainingDNARepository.getLatestDNA().first()
+                ?.weakestMuscles?.split(",")?.map { it.trim().lowercase() }
+                ?.filter { it.isNotBlank() }.orEmpty()
+        }.getOrNull().orEmpty()
+
+        return exercises.associate { ex ->
+            val primary = ex.primaryMuscles.split(",").firstOrNull()
+                ?.trim()?.lowercase() ?: ""
+            val tips = mutableListOf<String>()
+
+            // Recovery tip: per-muscle readiness (most actionable coaching signal).
+            recoveryByMuscle[primary]?.let { mr ->
+                when (mr.status) {
+                    MuscleRecoveryStatus.FRESH ->
+                        tips += "$primary is fully recovered \u2014 go heavy."
+                    MuscleRecoveryStatus.RECOVERED ->
+                        tips += "$primary is recovered and ready."
+                    MuscleRecoveryStatus.FATIGUED ->
+                        tips += "$primary is still recovering \u2014 go lighter today."
+                    MuscleRecoveryStatus.VERY_FATIGUED ->
+                        tips += "$primary is very fatigued \u2014 consider skipping or deloading."
+                }
+            }
+
+            // Genome tip: personal best rep range (only meaningful for working sets).
+            bestRepRange?.takeIf { it.isNotBlank() }?.let {
+                tips += "You respond best to $it."
+            }
+
+            // Volume tip: under-trained group this week.
+            if (primary in underVolume) {
+                tips += "$primary is under-trained this week \u2014 add volume if recovery allows."
+            }
+
+            // Muscle gap tip: this exercise targets a neglected muscle.
+            if (primary in weakMuscles) {
+                tips += "$primary is one of your neglected muscles \u2014 good choice!"
+            }
+
+            ex.id to tips
+        }
+    }
+
     suspend fun buildRecommendedWorkout(): RecommendedWorkoutCardEntry? {
         val rec = recommendationRepository.generateRecommendation()
         // Only surface TRAIN/PROGRESS/REPEAT recommendations that carry a

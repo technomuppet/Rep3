@@ -243,6 +243,7 @@ fun ActiveWorkoutScreen(
                         adaptiveTarget = state.targetsByExerciseId[entry.exercise.id],
                         previousSets = state.lastSetsByExerciseId[entry.exercise.id].orEmpty(),
                         progression = state.progressionByExerciseId[entry.exercise.id],
+                        tips = state.workoutTips[entry.exercise.id].orEmpty(),
                         useKg = state.useKg,
                         autoFocusField = state.autoFocusField,
                         onAddSet = { w, r, type, rpe, tempo -> viewModel.addSet(entry, w, r, type, rpe, tempo) },
@@ -576,6 +577,7 @@ private fun WorkoutExerciseCard(
     adaptiveTarget: WorkoutTargetUi?,
     previousSets: List<SetLog>,
     progression: ProgressionSuggestionUi?,
+    tips: List<String> = emptyList(),
     useKg: Boolean,
     autoFocusField: String = "weight",
     onAddSet: (Double, Int, String, Double?, String?) -> Unit,
@@ -627,6 +629,27 @@ private fun WorkoutExerciseCard(
         if (entry.sessionExercise.notes.isNotBlank()) {
             Spacer(Modifier.height(6.dp))
             Text("📝 ${entry.sessionExercise.notes}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+
+        // Phase 3 Gap 2: in-workout coaching tips
+        if (tips.isNotEmpty()) {
+            Spacer(Modifier.height(6.dp))
+            tips.forEach { tip ->
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 1.dp)) {
+                    Text(
+                        "•",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        tip,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
 
         // Progression suggestion – FEATURE 4

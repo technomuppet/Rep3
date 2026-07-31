@@ -96,7 +96,9 @@ data class ActiveWorkoutUiState(
     val restoredWorkout: Boolean = false,
     val summary: WorkoutSummary? = null,
     val adaptivePlan: AdaptiveWorkoutPlan? = null,
-    val targetsByExerciseId: Map<Int, WorkoutTargetUi> = emptyMap()
+    val targetsByExerciseId: Map<Int, WorkoutTargetUi> = emptyMap(),
+    /** Phase 3 Gap 2: in-workout coaching tips keyed by exerciseId. */
+    val workoutTips: Map<Int, List<String>> = emptyMap()
 )
 
 /** Typed holders so the ActiveWorkout combine() has no positional casts (Sprint 19). */
@@ -128,8 +130,13 @@ class ActiveWorkoutViewModel @Inject constructor(
     private val coachHandoff: com.replog.ui.coach.CoachHandoff,
     private val recommendationRepository: com.replog.data.repository.RecommendationRepository,
     private val dataSeeder: com.replog.util.DataSeeder,
-    private val workoutStarter: com.replog.util.WorkoutStarter
+    private val workoutStarter: com.replog.util.WorkoutStarter,
+    private val intelligenceRepository: com.replog.data.repository.IntelligenceRepository
 ) : ViewModel() {
+
+    /** Phase 3 Gap 2: in-workout coaching tips keyed by exerciseId. */
+    private val _workoutTips = MutableStateFlow<Map<Int, List<String>>>(emptyMap())
+    val workoutTips: StateFlow<Map<Int, List<String>>> = _workoutTips
 
     /** Install the full built-in template catalog (idempotent — no duplicates). */
     fun installAllBuiltInTemplates() = viewModelScope.launch {
@@ -222,6 +229,8 @@ class ActiveWorkoutViewModel @Inject constructor(
         if (cachedForSessionId != id) {
             previousWorkoutCache.clear()
             cachedForSessionId = id
+            // Phase 3 Gap 2: reload workout tips when session changes.
+            if (id != null) loadWorkoutIntelligence()
         }
         val exerciseIds = session?.exercises?.map { it.exercise.id }.orEmpty()
         previousWorkoutCache.keys.retainAll(exerciseIds.toSet())
@@ -271,7 +280,8 @@ class ActiveWorkoutViewModel @Inject constructor(
                     session?.exercises?.firstOrNull { it.exercise.id == p.exerciseId }?.exercise?.name.orEmpty(),
                     p.targetSets, p.targetReps, p.targetWeight, p.adjustment, p.reason, p.source
                 )
-            }
+            },
+            workoutTips = _workoutTips.value
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ActiveWorkoutUiState())
 
@@ -287,6 +297,14 @@ class ActiveWorkoutViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    /** Phase 3 Gap 2: load in-workout coaching tips for the exercise library. */
+    private fun loadWorkoutIntelligence() = viewModelScope.launch {
+        val library = exercises.getAllExercises().first()
+        _workoutTips.value = runCatching {
+            intelligenceRepository.buildWorkoutIntelligence(library)
+        }.getOrNull().orEmpty()
     }
 
     fun refresh() { tick.value++ }
