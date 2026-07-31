@@ -27,7 +27,25 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.replog.data.model.SessionWithExercises
+import com.replog.data.repository.ForecastCardEntry
+import com.replog.data.repository.RecommendedWorkoutCardEntry
+import com.replog.domain.forecast.ForecastConfidence
+import com.replog.domain.forecast.ForecastTrend
+import com.replog.domain.intelligence.BriefingConfidence
+import com.replog.domain.intelligence.RepLogScoreResult
+import com.replog.domain.intelligence.TodaysBriefing
+import com.replog.domain.musclegap.MuscleGapSuggestion
+import com.replog.domain.recommendation.WorkoutPlan
+import com.replog.domain.recovery.RecoveryCalendarDay
+import com.replog.domain.recovery.RecoveryDay
+import com.replog.domain.volume.VolumeLandmark
+import com.replog.domain.volume.VolumeStatus
+import com.replog.ui.coach.CoachDashboardCard
+import com.replog.ui.coach.CoachViewModel
 import com.replog.ui.components.*
+import com.replog.util.ShareCardRenderer
+import com.replog.util.ShareStat
+import com.replog.util.profile.Greetings
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.roundToInt
@@ -47,7 +65,7 @@ fun HomeScreen(
     onOpenMuscleBalance: () -> Unit = {},
     onOpenDnaEvolution: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
-    coachViewModel: com.replog.ui.coach.CoachViewModel = hiltViewModel()
+    coachViewModel: CoachViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
     val coachState by coachViewModel.state.collectAsState()
@@ -98,8 +116,8 @@ fun HomeScreen(
         item {
             val name = displayName?.takeIf { it.isNotBlank() }
             val hour = remember { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
-            val header = if (name != null) com.replog.util.profile.Greetings.timeOfDay(name, hour) else "Today"
-            val subtitle = if (name != null) com.replog.util.profile.Greetings.possessive(name, "training dashboard") else "Your training dashboard."
+            val header = if (name != null) Greetings.timeOfDay(name, hour) else "Today"
+            val subtitle = if (name != null) Greetings.possessive(name, "training dashboard") else "Your training dashboard."
             Text(header, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.ExtraBold)
             Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -170,7 +188,7 @@ fun HomeScreen(
         // Coach Dashboard — the unified "Good morning" advisor (recommendation +
         // recovery + focus + progression + goal + estimated time).
         item {
-            com.replog.ui.coach.CoachDashboardCard(
+            CoachDashboardCard(
                 state = coachState,
                 onStart = {
                     coachViewModel.acceptRecommendation(
@@ -302,15 +320,15 @@ fun HomeScreen(
         item {
             val shareContext = androidx.compose.ui.platform.LocalContext.current
             SecondaryButton("Share my progress") {
-                com.replog.util.ShareCardRenderer.renderAndShare(
+                ShareCardRenderer.renderAndShare(
                     context = shareContext,
                     headline = "${state.sessionCount} workouts logged",
                     subtitle = "My RepLog training so far",
                     stats = listOf(
-                        com.replog.util.ShareStat("Workouts", state.sessionCount.toString()),
-                        com.replog.util.ShareStat("Total volume", formatWeight(state.totalVolume)),
-                        com.replog.util.ShareStat("This week", "${state.sessionsThisWeek} sessions"),
-                        com.replog.util.ShareStat("Day streak", if (state.dayStreak > 0) "${state.dayStreak} days" else "—")
+                        ShareStat("Workouts", state.sessionCount.toString()),
+                        ShareStat("Total volume", formatWeight(state.totalVolume)),
+                        ShareStat("This week", "${state.sessionsThisWeek} sessions"),
+                        ShareStat("Day streak", if (state.dayStreak > 0) "${state.dayStreak} days" else "—")
                     ),
                     footnote = state.recentPRs.firstOrNull()?.let { "Latest PB: ${formatWeight(it.weight)} × ${it.reps}" }
                 )
@@ -410,10 +428,10 @@ private fun ContinueWorkoutCard(cw: ContinueWorkout, onContinue: () -> Unit) = R
     )
 }
 
-private fun confidenceText(c: com.replog.domain.intelligence.BriefingConfidence): String = when (c) {
-    com.replog.domain.intelligence.BriefingConfidence.HIGH -> "High"
-    com.replog.domain.intelligence.BriefingConfidence.MEDIUM -> "Medium"
-    com.replog.domain.intelligence.BriefingConfidence.LOW -> "Low"
+private fun confidenceText(c: BriefingConfidence): String = when (c) {
+    BriefingConfidence.HIGH -> "High"
+    BriefingConfidence.MEDIUM -> "Medium"
+    BriefingConfidence.LOW -> "Low"
 }
 
 @Composable
@@ -425,7 +443,7 @@ private fun IntelligenceNavCard(label: String, modifier: Modifier, onClick: () -
 
 @Composable
 private fun TodaysBriefingCard(
-    b: com.replog.domain.intelligence.TodaysBriefing,
+    b: TodaysBriefing,
     onOpenRecovery: () -> Unit
 ) = RepLogCard(onClick = onOpenRecovery) {
     var showWhy by remember { mutableStateOf(false) }
@@ -475,7 +493,7 @@ private fun TodaysBriefingCard(
 }
 
 @Composable
-private fun RepLogScoreCard(s: com.replog.domain.intelligence.RepLogScoreResult) = RepLogCard {
+private fun RepLogScoreCard(s: RepLogScoreResult) = RepLogCard {
     var showBreakdown by remember { mutableStateOf(false) }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Default.Insights, null, tint = MaterialTheme.colorScheme.primary)
@@ -518,10 +536,10 @@ private fun RepLogScoreCard(s: com.replog.domain.intelligence.RepLogScoreResult)
 // start) and shows a soft caption instead, matching the briefing fallback.
 @Composable
 private fun RecommendationCard(
-    b: com.replog.domain.intelligence.TodaysBriefing,
+    b: TodaysBriefing,
     onStart: () -> Unit,
-    recommendedWorkout: com.replog.data.repository.RecommendedWorkoutCardEntry?,
-    onStartPlan: (com.replog.domain.recommendation.WorkoutPlan) -> Unit,
+    recommendedWorkout: RecommendedWorkoutCardEntry?,
+    onStartPlan: (WorkoutPlan) -> Unit,
     onSaveTemplate: () -> Unit = {}
 ) = RepLogCard {
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -598,7 +616,7 @@ private fun RecommendationCard(
 // "Muscle Balance" tile uses).
 @Composable
 private fun WeeklyLandmarksCard(
-    landmarks: List<com.replog.domain.volume.VolumeLandmark>,
+    landmarks: List<VolumeLandmark>,
     onOpen: () -> Unit
 ) = RepLogCard {
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -617,11 +635,11 @@ private fun WeeklyLandmarksCard(
     }
     Spacer(Modifier.height(4.dp))
     val underCount = landmarks.count {
-        it.status == com.replog.domain.volume.VolumeStatus.UNDER ||
-            it.status == com.replog.domain.volume.VolumeStatus.NONE
+        it.status == VolumeStatus.UNDER ||
+            it.status == VolumeStatus.NONE
     }
     val inRangeCount = landmarks.count {
-        it.status == com.replog.domain.volume.VolumeStatus.IN_RANGE
+        it.status == VolumeStatus.IN_RANGE
     }
     val summary = when {
         underCount == 0 && inRangeCount > 0 ->
@@ -641,12 +659,12 @@ private fun WeeklyLandmarksCard(
     // Priority order: UNDER first (action signal), then ABOVE, then IN_RANGE,
     // then NONE, so the user sees the actionable rows at the top of the card.
     val ordered = landmarks.sortedWith(
-        compareBy<com.replog.domain.volume.VolumeLandmark> {
+        compareBy<VolumeLandmark> {
             when (it.status) {
-                com.replog.domain.volume.VolumeStatus.UNDER -> 0
-                com.replog.domain.volume.VolumeStatus.NONE -> 0
-                com.replog.domain.volume.VolumeStatus.ABOVE -> 1
-                com.replog.domain.volume.VolumeStatus.IN_RANGE -> 2
+                VolumeStatus.UNDER -> 0
+                VolumeStatus.NONE -> 0
+                VolumeStatus.ABOVE -> 1
+                VolumeStatus.IN_RANGE -> 2
             }
         }.thenBy { it.muscleGroup }
     )
@@ -662,12 +680,12 @@ private fun WeeklyLandmarksCard(
 
 /** One horizontal-bar muscle-group row in the WeeklyLandmarksCard. */
 @Composable
-private fun WeeklyLandmarkRow(lm: com.replog.domain.volume.VolumeLandmark) {
+private fun WeeklyLandmarkRow(lm: VolumeLandmark) {
     val barColor = when (lm.status) {
-        com.replog.domain.volume.VolumeStatus.IN_RANGE -> MaterialTheme.colorScheme.primary
-        com.replog.domain.volume.VolumeStatus.UNDER -> MaterialTheme.colorScheme.tertiary
-        com.replog.domain.volume.VolumeStatus.ABOVE -> MaterialTheme.colorScheme.secondary
-        com.replog.domain.volume.VolumeStatus.NONE -> MaterialTheme.colorScheme.outlineVariant
+        VolumeStatus.IN_RANGE -> MaterialTheme.colorScheme.primary
+        VolumeStatus.UNDER -> MaterialTheme.colorScheme.tertiary
+        VolumeStatus.ABOVE -> MaterialTheme.colorScheme.secondary
+        VolumeStatus.NONE -> MaterialTheme.colorScheme.outlineVariant
     }
     val trackColor = MaterialTheme.colorScheme.surfaceVariant
     val fraction = if (lm.optimalHigh > 0) {
@@ -700,7 +718,7 @@ private fun WeeklyLandmarkRow(lm: com.replog.domain.volume.VolumeLandmark) {
         Spacer(Modifier.width(8.dp))
         Text(
             when (lm.status) {
-                com.replog.domain.volume.VolumeStatus.NONE -> "—"
+                VolumeStatus.NONE -> "—"
                 else -> "${lm.weeklySets.toInt()} / ${lm.optimalLow}-${lm.optimalHigh}"
             },
             style = MaterialTheme.typography.labelMedium,
@@ -714,18 +732,18 @@ private fun WeeklyLandmarkRow(lm: com.replog.domain.volume.VolumeLandmark) {
 
 /** Compact coloured pill showing the VolumeStatus label for one landmark. */
 @Composable
-private fun WeeklyStatusBadge(status: com.replog.domain.volume.VolumeStatus) {
+private fun WeeklyStatusBadge(status: VolumeStatus) {
     val fg = when (status) {
-        com.replog.domain.volume.VolumeStatus.IN_RANGE -> MaterialTheme.colorScheme.primary
-        com.replog.domain.volume.VolumeStatus.UNDER -> MaterialTheme.colorScheme.tertiary
-        com.replog.domain.volume.VolumeStatus.ABOVE -> MaterialTheme.colorScheme.secondary
-        com.replog.domain.volume.VolumeStatus.NONE -> MaterialTheme.colorScheme.outline
+        VolumeStatus.IN_RANGE -> MaterialTheme.colorScheme.primary
+        VolumeStatus.UNDER -> MaterialTheme.colorScheme.tertiary
+        VolumeStatus.ABOVE -> MaterialTheme.colorScheme.secondary
+        VolumeStatus.NONE -> MaterialTheme.colorScheme.outline
     }
     val bg = when (status) {
-        com.replog.domain.volume.VolumeStatus.IN_RANGE -> MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-        com.replog.domain.volume.VolumeStatus.UNDER -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.18f)
-        com.replog.domain.volume.VolumeStatus.ABOVE -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.18f)
-        com.replog.domain.volume.VolumeStatus.NONE -> MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+        VolumeStatus.IN_RANGE -> MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+        VolumeStatus.UNDER -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.18f)
+        VolumeStatus.ABOVE -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.18f)
+        VolumeStatus.NONE -> MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
     }
     Text(
         status.label,
@@ -745,7 +763,7 @@ private fun WeeklyStatusBadge(status: com.replog.domain.volume.VolumeStatus) {
 // session id in DataStore — Home then navigates to the workout tab.
 @Composable
 private fun MuscleGapCard(
-    suggestions: List<com.replog.domain.musclegap.MuscleGapSuggestion>,
+    suggestions: List<MuscleGapSuggestion>,
     onStartMuscle: (String) -> Unit,
     onOpen: () -> Unit
 ) = RepLogCard {
@@ -789,7 +807,7 @@ private fun MuscleGapCard(
 /** One weak-muscle row in the MuscleGapCard: name, suggestion count, top exercises, focus-workout CTA. */
 @Composable
 private fun MuscleGapRow(
-    s: com.replog.domain.musclegap.MuscleGapSuggestion,
+    s: MuscleGapSuggestion,
     onStart: (String) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -845,7 +863,7 @@ private fun MuscleGapRow(
 // always sees the strongest single lift at the top of the card.
 @Composable
 private fun ProgressionForecastCard(
-    forecasts: List<com.replog.data.repository.ForecastCardEntry>,
+    forecasts: List<ForecastCardEntry>,
     onOpen: () -> Unit
 ) = RepLogCard {
     val headline = forecasts.first()
@@ -896,28 +914,28 @@ private fun ProgressionForecastCard(
 /** One row in the progression-forecast card. Headline gets a star + bolder style. */
 @Composable
 private fun ProgressionForecastRow(
-    f: com.replog.data.repository.ForecastCardEntry,
+    f: ForecastCardEntry,
     isHeadline: Boolean
 ) {
     val trendGlyph = when (f.trend) {
-        com.replog.domain.forecast.ForecastTrend.RISING -> "\u2191"
-        com.replog.domain.forecast.ForecastTrend.FLAT -> "\u2192"
-        com.replog.domain.forecast.ForecastTrend.DECLINING -> "\u2193"
+        ForecastTrend.RISING -> "\u2191"
+        ForecastTrend.FLAT -> "\u2192"
+        ForecastTrend.DECLINING -> "\u2193"
     }
     val trendLabel = when (f.trend) {
-        com.replog.domain.forecast.ForecastTrend.RISING -> "Rising"
-        com.replog.domain.forecast.ForecastTrend.FLAT -> "Flat"
-        com.replog.domain.forecast.ForecastTrend.DECLINING -> "Declining"
+        ForecastTrend.RISING -> "Rising"
+        ForecastTrend.FLAT -> "Flat"
+        ForecastTrend.DECLINING -> "Declining"
     }
     val confidenceLabel = when (f.confidence) {
-        com.replog.domain.forecast.ForecastConfidence.HIGH -> "High"
-        com.replog.domain.forecast.ForecastConfidence.MEDIUM -> "Medium"
-        com.replog.domain.forecast.ForecastConfidence.LOW -> "Low"
+        ForecastConfidence.HIGH -> "High"
+        ForecastConfidence.MEDIUM -> "Medium"
+        ForecastConfidence.LOW -> "Low"
     }
     val confidenceColor = when (f.confidence) {
-        com.replog.domain.forecast.ForecastConfidence.HIGH -> MaterialTheme.colorScheme.primary
-        com.replog.domain.forecast.ForecastConfidence.MEDIUM -> MaterialTheme.colorScheme.tertiary
-        com.replog.domain.forecast.ForecastConfidence.LOW -> MaterialTheme.colorScheme.outline
+        ForecastConfidence.HIGH -> MaterialTheme.colorScheme.primary
+        ForecastConfidence.MEDIUM -> MaterialTheme.colorScheme.tertiary
+        ForecastConfidence.LOW -> MaterialTheme.colorScheme.outline
     }
     val weeklyGainText = if (f.weeklyGainKg >= 0.0)
         "+${"%.1f".format(f.weeklyGainKg)} kg/wk"
@@ -988,7 +1006,7 @@ private fun ProgressionForecastRow(
 
 // Phase 3 Gap 4: compact 7-day recovery forecast strip.
 @Composable
-private fun RecoveryCalendarStrip(days: List<com.replog.domain.recovery.RecoveryCalendarDay>) = RepLogCard {
+private fun RecoveryCalendarStrip(days: List<RecoveryCalendarDay>) = RepLogCard {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Default.Healing, null, tint = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.width(8.dp))
@@ -1001,10 +1019,10 @@ private fun RecoveryCalendarStrip(days: List<com.replog.domain.recovery.Recovery
     ) {
         days.forEach { day ->
             val (bg, fg) = when (day.state) {
-                com.replog.domain.recovery.RecoveryDay.READY -> MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) to MaterialTheme.colorScheme.primary
-                com.replog.domain.recovery.RecoveryDay.CAUTION -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.18f) to MaterialTheme.colorScheme.tertiary
-                com.replog.domain.recovery.RecoveryDay.RECOVERING -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.18f) to MaterialTheme.colorScheme.secondary
-                com.replog.domain.recovery.RecoveryDay.REST_NO_DATA -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.12f) to MaterialTheme.colorScheme.outline
+                RecoveryDay.READY -> MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) to MaterialTheme.colorScheme.primary
+                RecoveryDay.CAUTION -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.18f) to MaterialTheme.colorScheme.tertiary
+                RecoveryDay.RECOVERING -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.18f) to MaterialTheme.colorScheme.secondary
+                RecoveryDay.REST_NO_DATA -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.12f) to MaterialTheme.colorScheme.outline
             }
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -1049,19 +1067,19 @@ private fun ProgressionProjectionStrip(entries: List<ForecastCardEntry>) = RepLo
         ) {
             entries.forEach { entry ->
                 val trendColor = when (entry.trend) {
-                    com.replog.domain.forecast.ForecastTrend.RISING -> Color(0xFF4CAF50)
-                    com.replog.domain.forecast.ForecastTrend.FLAT -> Color(0xFFFF9800)
-                    com.replog.domain.forecast.ForecastTrend.DECLINING -> Color(0xFFE53935)
+                    ForecastTrend.RISING -> Color(0xFF4CAF50)
+                    ForecastTrend.FLAT -> Color(0xFFFF9800)
+                    ForecastTrend.DECLINING -> Color(0xFFE53935)
                 }
                 val trendArrow = when (entry.trend) {
-                    com.replog.domain.forecast.ForecastTrend.RISING -> "▲"
-                    com.replog.domain.forecast.ForecastTrend.FLAT -> "—"
-                    com.replog.domain.forecast.ForecastTrend.DECLINING -> "▼"
+                    ForecastTrend.RISING -> "▲"
+                    ForecastTrend.FLAT -> "—"
+                    ForecastTrend.DECLINING -> "▼"
                 }
                 val confidenceAlpha = when (entry.confidence) {
-                    com.replog.domain.forecast.ForecastConfidence.HIGH -> 1.0f
-                    com.replog.domain.forecast.ForecastConfidence.MEDIUM -> 0.7f
-                    com.replog.domain.forecast.ForecastConfidence.LOW -> 0.45f
+                    ForecastConfidence.HIGH -> 1.0f
+                    ForecastConfidence.MEDIUM -> 0.7f
+                    ForecastConfidence.LOW -> 0.45f
                 }
                 Surface(
                     shape = RoundedCornerShape(10.dp),
