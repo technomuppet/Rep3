@@ -9,6 +9,8 @@ import com.replog.data.model.WorkoutSession
 import com.replog.data.repository.ExerciseRepository
 import com.replog.data.repository.WorkoutRepository
 import com.replog.domain.library.QuickWorkout
+import com.replog.domain.recommendation.PlannedExercise
+import com.replog.domain.recommendation.WorkoutPlan
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -106,6 +108,42 @@ class WorkoutStarter @Inject constructor(
                     adjustment = "Repeat", reason = "Same as last time"
                 )
             }
+        }
+        if (prescriptions.isNotEmpty()) workouts.insertPrescriptions(prescriptions)
+        prefs.setActiveSessionId(id)
+        return id
+    }
+
+    /**
+     * Phase 3 Gap 1 — create a live session from a recommendation engine
+     * [WorkoutPlan] and mark it active. Same pattern as [startQuickWorkout]
+     * and [startTemplate]: insert session -> insert exercises -> insert
+     * prescriptions -> set active id.
+     */
+    suspend fun startFromRecommendation(plan: WorkoutPlan, templateName: String): Int {
+        val id = workouts.insertSession(
+            WorkoutSession(templateName = templateName, startTime = System.currentTimeMillis())
+        ).toInt()
+        val prescriptions = mutableListOf<WorkoutPrescription>()
+        plan.exercises.forEachIndexed { index, planned ->
+            workouts.insertSessionExercise(
+                SessionExercise(
+                    sessionId = id,
+                    exerciseId = planned.exerciseId,
+                    orderIndex = index,
+                    notes = planned.reason
+                )
+            )
+            prescriptions += WorkoutPrescription(
+                sessionId = id,
+                exerciseId = planned.exerciseId,
+                source = "Recommendation",
+                targetSets = planned.targetSets.coerceAtLeast(1),
+                targetReps = planned.targetReps,
+                targetWeight = planned.targetWeight,
+                adjustment = planned.progression.name,
+                reason = planned.reason
+            )
         }
         if (prescriptions.isNotEmpty()) workouts.insertPrescriptions(prescriptions)
         prefs.setActiveSessionId(id)

@@ -9,6 +9,7 @@ import com.replog.domain.intelligence.IntelligenceInputs
 import com.replog.domain.intelligence.TodaysBriefing
 import com.replog.domain.musclegap.MuscleGapAnalyzer
 import com.replog.domain.recommendation.MuscleRecoveryStatus
+import com.replog.domain.recommendation.Recommendation
 import com.replog.domain.recommendation.RecoveryAnalyzer
 import com.replog.domain.recovery.RecoveryCalendar
 import com.replog.domain.recovery.RecoveryCalendarDay
@@ -69,6 +70,19 @@ data class MuscleBalanceRow(
     val status: String,                 // UNDER / IN_RANGE / ABOVE / NONE
     val severity: Int,                  // 0-100, how far below optimal (gap severity)
     val recommendedExercises: List<String>
+)
+
+/** Phase 3 Gap 1 — today's recommended workout surfaced as a Home card. */
+data class RecommendedWorkoutCardEntry(
+    val title: String,                    // e.g. "Train Upper Push"
+    val type: String,                     // TRAIN / REST / DELOAD / REPEAT / PROGRESS
+    val explanation: String,
+    val exerciseCount: Int,
+    val estimatedDurationMinutes: Int,
+    val confidenceScore: Double,
+    val split: String,                    // e.g. "Upper"
+    val topExercises: List<String>,       // first 4 exercise names
+    val workoutPlan: com.replog.domain.recommendation.WorkoutPlan?  // null for REST
 )
 
 /** One projected-lift entry for the Phase 2 Gap 6 progression-forecast card on Home. */
@@ -620,5 +634,38 @@ class IntelligenceRepository @Inject constructor(
         val sessions = workoutRepository.getRecentCompletedSessions(60).first()
         if (sessions.size < 3) return emptyList()
         return VolumeLandmarks.analyze(sessions, now, weeks = 1)
+    }
+
+    /**
+     * Phase 3 Gap 1 — today's recommended workout card on Home.
+     *
+     * Calls the full [RecommendationEngine] (via [RecommendationRepository])
+     * and surfaces the resulting [Recommendation] as a [RecommendedWorkoutCardEntry]
+     * with the workout plan intact. The [RecommendationCard] on Home already shows
+     * the title from the briefing; this function provides the full workout so the
+     * "Start recommended workout" CTA creates a real session.
+     *
+     * Returns null when there is not enough training history (the
+     * RecommendationEngine falls back to "Start with Full Body" but has no
+     * concrete workout plan for that case — we return null so the card hides
+     * until real recommendations are available).
+     */
+    suspend fun buildRecommendedWorkout(): RecommendedWorkoutCardEntry? {
+        val rec = recommendationRepository.generateRecommendation()
+        // Only surface TRAIN/PROGRESS/REPEAT recommendations that carry a
+        // concrete workout plan. REST/DELOAD recommendations with no plan
+        // are shown via the existing RecommendationCard narrative instead.
+        if (rec.workoutPlan == null || rec.workoutPlan.exercises.isEmpty()) return null
+        return RecommendedWorkoutCardEntry(
+            title = rec.title,
+            type = rec.type.name,
+            explanation = rec.explanation,
+            exerciseCount = rec.workoutPlan.exercises.size,
+            estimatedDurationMinutes = rec.estimatedDurationMinutes,
+            confidenceScore = rec.confidenceScore,
+            split = rec.workoutPlan.split.name,
+            topExercises = rec.workoutPlan.exercises.take(4).map { it.exerciseName },
+            workoutPlan = rec.workoutPlan
+        )
     }
 }

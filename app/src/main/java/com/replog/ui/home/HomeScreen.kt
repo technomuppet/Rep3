@@ -63,6 +63,7 @@ fun HomeScreen(
     // Phase 2 Gap 6: dedicated progression-forecast card data. Empty list
     // = no history yet; null = not loaded.
     val progressionForecasts by viewModel.progressionForecasts.collectAsState()
+    val recommendedWorkout by viewModel.recommendedWorkout.collectAsState()
     val displayName by viewModel.displayName.collectAsState()
     var showTrainAnywayDialog by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { viewModel.refresh(); viewModel.loadIntelligence(); coachViewModel.loadRecommendation(force = false) }
@@ -113,7 +114,7 @@ fun HomeScreen(
             // from the briefing's narrative. The CoachDashboardCard below
             // remains untouched — it pulls from coachState (CoachViewModel)
             // and owns the dismiss / refresh / train-anyway UX.
-            item { RecommendationCard(b, onStart = onStartRecommendedWorkout) }
+            item { RecommendationCard(b, onStart = onStartRecommendedWorkout, recommendedWorkout = recommendedWorkout, onStartPlan = { plan -> viewModel.startRecommendedWorkout(plan, b.recommendation); onStartWorkout() }) }
         }
 
         // Sprint 8 P5: RepLog Score with explainable component breakdown.
@@ -170,7 +171,12 @@ fun HomeScreen(
                 state = coachState,
                 onStart = {
                     coachViewModel.acceptRecommendation(
-                        onLaunchWorkout = onStartRecommendedWorkout,
+                        onLaunchWorkout = {
+                            recommendedWorkout?.workoutPlan?.let { plan ->
+                                viewModel.startRecommendedWorkout(plan, recommendedWorkout!!.title)
+                            }
+                            onStartWorkout()
+                        },
                         onRestDay = onViewRecoveryGuidance
                     )
                 },
@@ -495,7 +501,9 @@ private fun RepLogScoreCard(s: com.replog.domain.intelligence.RepLogScoreResult)
 @Composable
 private fun RecommendationCard(
     b: com.replog.domain.intelligence.TodaysBriefing,
-    onStart: () -> Unit
+    onStart: () -> Unit,
+    recommendedWorkout: com.replog.data.repository.RecommendedWorkoutCardEntry?,
+    onStartPlan: (com.replog.domain.recommendation.WorkoutPlan) -> Unit
 ) = RepLogCard {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Default.PlayArrow, null, tint = MaterialTheme.colorScheme.primary)
@@ -524,7 +532,27 @@ private fun RecommendationCard(
     )
     if (b.recommendation != "Log a few more workouts") {
         Spacer(Modifier.height(12.dp))
-        TextButton(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
+        // Phase 3 Gap 1: if a concrete workout plan exists, use it.
+        // Otherwise fall back to the existing onStart callback.
+        val hasPlan = recommendedWorkout?.workoutPlan != null &&
+            recommendedWorkout.workoutPlan.exercises.isNotEmpty()
+        if (hasPlan) {
+            Text(
+                "${recommendedWorkout!!.exerciseCount} exercises • ~${recommendedWorkout.estimatedDurationMinutes} min • ${recommendedWorkout.split}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                recommendedWorkout.topExercises.joinToString(" \u00b7 "),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(8.dp))
+        }
+        TextButton(onClick = {
+            if (hasPlan) onStartPlan(recommendedWorkout!!.workoutPlan!!) else onStart()
+        }, modifier = Modifier.fillMaxWidth()) {
             Text("Start recommended workout", fontWeight = FontWeight.Bold)
         }
     } else {

@@ -133,6 +133,15 @@ class HomeViewModel @Inject constructor(
     private var progressionForecastsLoadedForSessionCount = -1
     private var progressionForecastsLoadedForEpochDay: Int = -1
 
+    // Phase 3 Gap 1: today's recommended workout card on Home. Same freshness
+    // predicate as the briefing so the recommendation refreshes in lockstep
+    // with all other intelligence cards. Null = not yet loaded or no plan
+    // available (REST/DELOAD recommendations hide the start-CTA card).
+    private val _recommendedWorkout = MutableStateFlow<com.replog.data.repository.RecommendedWorkoutCardEntry?>(null)
+    val recommendedWorkout: StateFlow<com.replog.data.repository.RecommendedWorkoutCardEntry?> = _recommendedWorkout
+    private var recommendedWorkoutLoadedForSessionCount = -1
+    private var recommendedWorkoutLoadedForEpochDay: Int = -1
+
     /** The user's chosen display name for personalised greetings (null before onboarding). */
     val displayName: StateFlow<String?> = prefs.displayName
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
@@ -211,6 +220,18 @@ class HomeViewModel @Inject constructor(
                 progressionForecastsLoadedForSessionCount = count
                 progressionForecastsLoadedForEpochDay = today
             }
+            // Phase 3 Gap 1: recommended-workout card refreshes with the same
+            // predicate. All five intelligence cards now share a single
+            // ON_RESUME-driven refresh + midnight heartbeat.
+            if (count != recommendedWorkoutLoadedForSessionCount
+                || today != recommendedWorkoutLoadedForEpochDay
+                || _recommendedWorkout.value == null
+            ) {
+                _recommendedWorkout.value =
+                    runCatching { intelligenceRepository.buildRecommendedWorkout() }.getOrNull()
+                recommendedWorkoutLoadedForSessionCount = count
+                recommendedWorkoutLoadedForEpochDay = today
+            }
         }
     }
 
@@ -240,9 +261,16 @@ class HomeViewModel @Inject constructor(
             .getOrNull() // success/failure is observed by Navigation moving to the active session
     }
 
-    /** P6: one-tap repeat of a recent session. */
-    fun repeatSession(session: SessionWithExercises) = viewModelScope.launch {
-        workoutStarter.repeatSession(session)
+    /**
+     * Phase 3 Gap 1 — start a live session from the recommendation engine's
+     * [WorkoutPlan]. Creates the session via [WorkoutStarter.startFromRecommendation]
+     * which inserts exercises + prescriptions + sets the active session id.
+     * The Home screen's [onStartWorkout] callback navigates to the workout tab
+     * immediately after this returns.
+     */
+    fun startRecommendedWorkout(plan: com.replog.domain.recommendation.WorkoutPlan, title: String) = viewModelScope.launch {
+        runCatching { workoutStarter.startFromRecommendation(plan, title) }
+            .getOrNull()
     }
 
     /** P5: star/unstar a template from the Home quick-launch row. */
