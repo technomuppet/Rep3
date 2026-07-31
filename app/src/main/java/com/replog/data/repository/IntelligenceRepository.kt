@@ -782,4 +782,23 @@ class IntelligenceRepository @Inject constructor(
         }
         return entry.title
     }
+
+    /**
+     * Phase 3 Gap 4 — compact 7-day recovery forecast strip for Home.
+     *
+     * Reuses [RecoveryCalendar.build] (the same engine powering the full
+     * Recovery Centre screen) and trims to the most recent 7 days. Each
+     * day carries a [RecoveryDay] state, a short label, and whether the
+     * user trained that day — all the calendar strip needs to draw
+     * coloured day bubbles.
+     */
+    suspend fun buildRecoveryCalendarStrip(): List<RecoveryCalendarDay> {
+        val now = System.currentTimeMillis()
+        val sessions = workoutRepository.getRecentCompletedSessions(60).first()
+        if (sessions.size < 3) return emptyList()
+        return RecoveryCalendar.build(
+            sessions.map { it.session.startTime to it.exercises.sumOf { e -> e.sets.sumOf { it.weight * it.reps } } },
+            now, days = 7
+        )
+    }
 }

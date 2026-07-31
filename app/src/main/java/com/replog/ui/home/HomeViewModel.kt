@@ -142,6 +142,12 @@ class HomeViewModel @Inject constructor(
     private var recommendedWorkoutLoadedForSessionCount = -1
     private var recommendedWorkoutLoadedForEpochDay: Int = -1
 
+    // Phase 3 Gap 4: compact 7-day recovery calendar strip on Home.
+    private val _recoveryCalendarStrip = MutableStateFlow<List<com.replog.domain.recovery.RecoveryCalendarDay>>(emptyList())
+    val recoveryCalendarStrip: StateFlow<List<com.replog.domain.recovery.RecoveryCalendarDay>> = _recoveryCalendarStrip
+    private var recoveryCalendarStripLoadedForSessionCount = -1
+    private var recoveryCalendarStripLoadedForEpochDay: Int = -1
+
     /** The user's chosen display name for personalised greetings (null before onboarding). */
     val displayName: StateFlow<String?> = prefs.displayName
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
@@ -231,6 +237,17 @@ class HomeViewModel @Inject constructor(
                     runCatching { intelligenceRepository.buildRecommendedWorkout() }.getOrNull()
                 recommendedWorkoutLoadedForSessionCount = count
                 recommendedWorkoutLoadedForEpochDay = today
+            }
+            // Phase 3 Gap 4: recovery calendar strip refreshes with the same
+            // predicate as all other intelligence cards.
+            if (count != recoveryCalendarStripLoadedForSessionCount
+                || today != recoveryCalendarStripLoadedForEpochDay
+                || _recoveryCalendarStrip.value.isEmpty()
+            ) {
+                _recoveryCalendarStrip.value =
+                    runCatching { intelligenceRepository.buildRecoveryCalendarStrip() }.getOrNull().orEmpty()
+                recoveryCalendarStripLoadedForSessionCount = count
+                recoveryCalendarStripLoadedForEpochDay = today
             }
         }
     }
