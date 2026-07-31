@@ -752,4 +752,34 @@ class IntelligenceRepository @Inject constructor(
             workoutPlan = rec.workoutPlan
         )
     }
+
+    /**
+     * Phase 3 Gap 3 — save today's recommendation as a reusable template.
+     *
+     * Calls [buildRecommendedWorkout] to get the current plan, then
+     * inserts a [WorkoutTemplate] + [TemplateExercise] entries (same
+     * pattern as [DataSeeder.installTemplates]). Returns the template
+     * name for a transient confirmation, or null when there is no plan
+     * (REST/DELOAD/low-data).
+     */
+    suspend fun saveRecommendedWorkoutAsTemplate(): String? {
+        val entry = buildRecommendedWorkout() ?: return null
+        val plan = entry.workoutPlan ?: return null
+        val templateId = workoutRepository.insertTemplate(
+            com.replog.data.model.WorkoutTemplate(name = entry.title, isBuiltIn = false)
+        ).toInt()
+        plan.exercises.forEachIndexed { index, planned ->
+            workoutRepository.insertTemplateExercise(
+                com.replog.data.model.TemplateExercise(
+                    templateId = templateId,
+                    exerciseId = planned.exerciseId,
+                    defaultSets = planned.targetSets.coerceAtLeast(1),
+                    orderIndex = index,
+                    targetReps = planned.targetReps,
+                    targetWeight = planned.targetWeight
+                )
+            )
+        }
+        return entry.title
+    }
 }

@@ -278,6 +278,12 @@ class HomeViewModel @Inject constructor(
             .getOrNull()
     }
 
+    /** Phase 3 Gap 3: save today's recommendation as a reusable template. */
+    fun saveRecommendedWorkoutAsTemplate() = viewModelScope.launch {
+        runCatching { intelligenceRepository.saveRecommendedWorkoutAsTemplate() }
+            .getOrNull()
+    }
+
     /** P5: star/unstar a template from the Home quick-launch row. */
     fun toggleFavorite(template: com.replog.data.model.TemplateWithExercises) = viewModelScope.launch {
         repo.setTemplateFavorite(template.template.id, !template.template.isFavorite)

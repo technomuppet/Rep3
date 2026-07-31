@@ -114,7 +114,7 @@ fun HomeScreen(
             // from the briefing's narrative. The CoachDashboardCard below
             // remains untouched — it pulls from coachState (CoachViewModel)
             // and owns the dismiss / refresh / train-anyway UX.
-            item { RecommendationCard(b, onStart = onStartRecommendedWorkout, recommendedWorkout = recommendedWorkout, onStartPlan = { plan -> viewModel.startRecommendedWorkout(plan, b.recommendation); onStartWorkout() }) }
+            item { RecommendationCard(b, onStart = onStartRecommendedWorkout, recommendedWorkout = recommendedWorkout, onStartPlan = { plan -> viewModel.startRecommendedWorkout(plan, b.recommendation); onStartWorkout() }, onSaveTemplate = { viewModel.saveRecommendedWorkoutAsTemplate() }) }
         }
 
         // Sprint 8 P5: RepLog Score with explainable component breakdown.
@@ -503,7 +503,8 @@ private fun RecommendationCard(
     b: com.replog.domain.intelligence.TodaysBriefing,
     onStart: () -> Unit,
     recommendedWorkout: com.replog.data.repository.RecommendedWorkoutCardEntry?,
-    onStartPlan: (com.replog.domain.recommendation.WorkoutPlan) -> Unit
+    onStartPlan: (com.replog.domain.recommendation.WorkoutPlan) -> Unit,
+    onSaveTemplate: () -> Unit = {}
 ) = RepLogCard {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Default.PlayArrow, null, tint = MaterialTheme.colorScheme.primary)
@@ -554,6 +555,11 @@ private fun RecommendationCard(
             if (hasPlan) onStartPlan(recommendedWorkout!!.workoutPlan!!) else onStart()
         }, modifier = Modifier.fillMaxWidth()) {
             Text("Start recommended workout", fontWeight = FontWeight.Bold)
+        }
+        if (hasPlan) {
+            TextButton(onClick = onSaveTemplate, modifier = Modifier.fillMaxWidth()) {
+                Text("Save as template", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.tertiary)
+            }
         }
     } else {
         Spacer(Modifier.height(8.dp))
