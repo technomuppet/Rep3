@@ -801,4 +801,15 @@ class IntelligenceRepository @Inject constructor(
             now, days = 7
         )
     }
+
+    /**
+     * Phase 3 Gap 5 — progression projection strip on Home.
+     *
+     * Reuses [buildProgressionForecasts] to produce the top 4 lifts by
+     * confidence, projected 4 weeks ahead. The strip shows each lift's
+     * projected working weight, trend arrow, and confidence badge in a
+     * compact horizontal scrollable row below the recovery calendar strip.
+     */
+    suspend fun buildProgressionProjection(): List<ForecastCardEntry> =
+        buildProgressionForecasts(maxResults = 4)
 }

@@ -147,6 +147,10 @@ class HomeViewModel @Inject constructor(
     val recoveryCalendarStrip: StateFlow<List<com.replog.domain.recovery.RecoveryCalendarDay>> = _recoveryCalendarStrip
     private var recoveryCalendarStripLoadedForSessionCount = -1
     private var recoveryCalendarStripLoadedForEpochDay: Int = -1
+    private val _progressionProjection = MutableStateFlow<List<ForecastCardEntry>>(emptyList())
+    val progressionProjection: StateFlow<List<ForecastCardEntry>> = _progressionProjection
+    private var progressionProjectionLoadedForSessionCount = -1
+    private var progressionProjectionLoadedForEpochDay: Int = -1
 
     /** The user's chosen display name for personalised greetings (null before onboarding). */
     val displayName: StateFlow<String?> = prefs.displayName
@@ -248,6 +252,17 @@ class HomeViewModel @Inject constructor(
                     runCatching { intelligenceRepository.buildRecoveryCalendarStrip() }.getOrNull().orEmpty()
                 recoveryCalendarStripLoadedForSessionCount = count
                 recoveryCalendarStripLoadedForEpochDay = today
+            }
+
+            // Phase 3 Gap 5 — Next 4 weeks progression projection strip.
+            if (count != progressionProjectionLoadedForSessionCount
+                || today != progressionProjectionLoadedForEpochDay
+                || _progressionProjection.value.isEmpty()
+            ) {
+                _progressionProjection.value =
+                    runCatching { intelligenceRepository.buildProgressionProjection() }.getOrNull().orEmpty()
+                progressionProjectionLoadedForSessionCount = count
+                progressionProjectionLoadedForEpochDay = today
             }
         }
     }

@@ -65,6 +65,7 @@ fun HomeScreen(
     val progressionForecasts by viewModel.progressionForecasts.collectAsState()
     val recommendedWorkout by viewModel.recommendedWorkout.collectAsState()
     val recoveryCalendarStrip by viewModel.recoveryCalendarStrip.collectAsState()
+    val progressionProjection by viewModel.progressionProjection.collectAsState()
     val displayName by viewModel.displayName.collectAsState()
     var showTrainAnywayDialog by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { viewModel.refresh(); viewModel.loadIntelligence(); coachViewModel.loadRecommendation(force = false) }
@@ -205,6 +206,11 @@ fun HomeScreen(
         // Phase 3 Gap 4: compact 7-day recovery forecast strip.
         if (recoveryCalendarStrip.isNotEmpty()) {
             item { RecoveryCalendarStrip(recoveryCalendarStrip.take(7)) }
+        }
+
+        // Phase 3 Gap 5: top-4 lifts projected 4 weeks ahead.
+        if (progressionProjection.isNotEmpty()) {
+            item { ProgressionProjectionStrip(progressionProjection) }
         }
 
         // Browse the curated Quick Workout library (P2/P3).
@@ -1012,6 +1018,73 @@ private fun RecoveryCalendarStrip(days: List<com.replog.domain.recovery.Recovery
                         fontWeight = if (day.trainedToday) FontWeight.ExtraBold else FontWeight.Bold,
                         color = fg
                     )
+                }
+            }
+        }
+    }
+}
+
+// ───────────────────────────────────────────────
+// Phase 3 Gap 5 — Progression Projection Strip
+// ───────────────────────────────────────────────
+
+@Composable
+private fun ProgressionProjectionStrip(entries: List<ForecastCardEntry>) = RepLogCard {
+    Column {
+        Text(
+            "Next 4 Weeks",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            entries.forEach { entry ->
+                val trendColor = when (entry.trend) {
+                    com.replog.domain.forecast.ForecastTrend.RISING -> Color(0xFF4CAF50)
+                    com.replog.domain.forecast.ForecastTrend.FLAT -> Color(0xFFFF9800)
+                    com.replog.domain.forecast.ForecastTrend.DECLINING -> Color(0xFFE53935)
+                }
+                val trendArrow = when (entry.trend) {
+                    com.replog.domain.forecast.ForecastTrend.RISING -> "▲"
+                    com.replog.domain.forecast.ForecastTrend.FLAT -> "—"
+                    com.replog.domain.forecast.ForecastTrend.DECLINING -> "▼"
+                }
+                val confidenceAlpha = when (entry.confidence) {
+                    com.replog.domain.forecast.ForecastConfidence.HIGH -> 1.0f
+                    com.replog.domain.forecast.ForecastConfidence.MEDIUM -> 0.7f
+                    com.replog.domain.forecast.ForecastConfidence.LOW -> 0.45f
+                }
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.alpha(confidenceAlpha)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            entry.exerciseName,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1
+                        )
+                        Text(
+                            entry.projectionLabel,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
+                        )
+                        Text(
+                            trendArrow,
+                            color = trendColor,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                    }
                 }
             }
         }
