@@ -66,6 +66,7 @@ fun HomeScreen(
     val recommendedWorkout by viewModel.recommendedWorkout.collectAsState()
     val recoveryCalendarStrip by viewModel.recoveryCalendarStrip.collectAsState()
     val progressionProjection by viewModel.progressionProjection.collectAsState()
+    val dnaEvolution by viewModel.dnaEvolution.collectAsState()
     val displayName by viewModel.displayName.collectAsState()
     var showTrainAnywayDialog by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { viewModel.refresh(); viewModel.loadIntelligence(); coachViewModel.loadRecommendation(force = false) }
@@ -211,6 +212,11 @@ fun HomeScreen(
         // Phase 3 Gap 5: top-4 lifts projected 4 weeks ahead.
         if (progressionProjection.isNotEmpty()) {
             item { ProgressionProjectionStrip(progressionProjection) }
+        }
+
+        // Phase 3 Gap 6: Training DNA evolution snapshot.
+        if (dnaEvolution.hasData) {
+            item { DnaEvolutionCard(dnaEvolution) }
         }
 
         // Browse the curated Quick Workout library (P2/P3).
@@ -1088,5 +1094,116 @@ private fun ProgressionProjectionStrip(entries: List<ForecastCardEntry>) = RepLo
                 }
             }
         }
+    }
+}
+
+// ───────────────────────────────────────────────
+// Phase 3 Gap 6 — Training DNA Evolution Card
+// ───────────────────────────────────────────────
+
+@Composable
+private fun DnaEvolutionCard(data: DnaEvolutionData) = RepLogCard {
+    val latest = data.points.lastOrNull()
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "Training DNA",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold
+            )
+            Surface(
+                shape = RoundedCornerShape(6.dp),
+                color = when (data.genomeMaturity) {
+                    "Mature" -> Color(0xFF4CAF50).copy(alpha = 0.15f)
+                    "Developing" -> Color(0xFFFF9800).copy(alpha = 0.15f)
+                    else -> Color(0xFF2196F3).copy(alpha = 0.15f)
+                }
+            ) {
+                Text(
+                    data.genomeMaturity,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = when (data.genomeMaturity) {
+                        "Mature" -> Color(0xFF4CAF50)
+                        "Developing" -> Color(0xFFFF9800)
+                        else -> Color(0xFF2196F3)
+                    }
+                )
+            }
+        }
+
+        if (latest != null) {
+            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                DnaStat(
+                    label = "Rep Range",
+                    value = latest.preferredRepRange,
+                    modifier = Modifier.weight(1f)
+                )
+                DnaStat(
+                    label = "Recovery",
+                    value = "${latest.recoveryHours}h",
+                    modifier = Modifier.weight(1f)
+                )
+                DnaStat(
+                    label = "Avg Duration",
+                    value = "${latest.workoutDurationMinutes}min",
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            if (data.points.size >= 2) {
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    DnaStat(
+                        label = "Trend",
+                        value = data.consistencyTrend,
+                        modifier = Modifier.weight(1f)
+                    )
+                    DnaStat(
+                        label = "Vol. Tolerance",
+                        value = "${latest.volumeTolerance}/100",
+                        modifier = Modifier.weight(1f)
+                    )
+                    DnaStat(
+                        label = "PRs (30d)",
+                        value = "${latest.monthlyPrCount}",
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DnaStat(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            value,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1
+        )
     }
 }

@@ -151,6 +151,10 @@ class HomeViewModel @Inject constructor(
     val progressionProjection: StateFlow<List<ForecastCardEntry>> = _progressionProjection
     private var progressionProjectionLoadedForSessionCount = -1
     private var progressionProjectionLoadedForEpochDay: Int = -1
+    private val _dnaEvolution = MutableStateFlow(DnaEvolutionData(hasData = false))
+    val dnaEvolution: StateFlow<DnaEvolutionData> = _dnaEvolution
+    private var dnaEvolutionLoadedForSessionCount = -1
+    private var dnaEvolutionLoadedForEpochDay: Int = -1
 
     /** The user's chosen display name for personalised greetings (null before onboarding). */
     val displayName: StateFlow<String?> = prefs.displayName
@@ -263,6 +267,17 @@ class HomeViewModel @Inject constructor(
                     runCatching { intelligenceRepository.buildProgressionProjection() }.getOrNull().orEmpty()
                 progressionProjectionLoadedForSessionCount = count
                 progressionProjectionLoadedForEpochDay = today
+            }
+
+            // Phase 3 Gap 6 — Training DNA evolution card.
+            if (count != dnaEvolutionLoadedForSessionCount
+                || today != dnaEvolutionLoadedForEpochDay
+                || !_dnaEvolution.value.hasData
+            ) {
+                _dnaEvolution.value =
+                    runCatching { intelligenceRepository.buildDnaEvolution() }.getOrDefault(DnaEvolutionData(hasData = false))
+                dnaEvolutionLoadedForSessionCount = count
+                dnaEvolutionLoadedForEpochDay = today
             }
         }
     }
