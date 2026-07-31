@@ -261,6 +261,11 @@ class HomeViewModel @Inject constructor(
             .getOrNull() // success/failure is observed by Navigation moving to the active session
     }
 
+    /** P6: one-tap repeat of a recent session. */
+    fun repeatSession(session: SessionWithExercises) = viewModelScope.launch {
+        workoutStarter.repeatSession(session)
+    }
+
     /**
      * Phase 3 Gap 1 — start a live session from the recommendation engine's
      * [WorkoutPlan]. Creates the session via [WorkoutStarter.startFromRecommendation]
