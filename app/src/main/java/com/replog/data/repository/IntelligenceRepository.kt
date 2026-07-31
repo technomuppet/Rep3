@@ -9,7 +9,6 @@ import com.replog.domain.intelligence.IntelligenceInputs
 import com.replog.domain.intelligence.TodaysBriefing
 import com.replog.domain.musclegap.MuscleGapAnalyzer
 import com.replog.domain.recommendation.MuscleRecoveryStatus
-import com.replog.domain.recommendation.Recommendation
 import com.replog.domain.recommendation.RecoveryAnalyzer
 import com.replog.domain.recovery.RecoveryCalendar
 import com.replog.domain.recovery.RecoveryCalendarDay

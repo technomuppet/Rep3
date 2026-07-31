@@ -9,7 +9,6 @@ import com.replog.data.model.WorkoutSession
 import com.replog.data.repository.ExerciseRepository
 import com.replog.data.repository.WorkoutRepository
 import com.replog.domain.library.QuickWorkout
-import com.replog.domain.recommendation.PlannedExercise
 import com.replog.domain.recommendation.WorkoutPlan
 import javax.inject.Inject
 import javax.inject.Singleton
