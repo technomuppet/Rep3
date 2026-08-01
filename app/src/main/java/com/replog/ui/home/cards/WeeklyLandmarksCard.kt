@@ -68,14 +68,7 @@ fun WeeklyLandmarksCard(
     // Priority order: UNDER first (action signal), then ABOVE, then IN_RANGE,
     // then NONE, so the user sees the actionable rows at the top of the card.
     val ordered = landmarks.sortedWith(
-        compareBy<VolumeLandmark> {
-            when (it.status) {
-                VolumeStatus.UNDER -> 0
-                VolumeStatus.NONE -> 0
-                VolumeStatus.ABOVE -> 1
-                VolumeStatus.IN_RANGE -> 2
-            }
-        }.thenBy { it.muscleGroup }
+        compareBy<VolumeLandmark> { it.status.sortOrder }.thenBy { it.muscleGroup }
     )
     ordered.forEach { lm ->
         WeeklyLandmarkRow(lm)
@@ -90,12 +83,7 @@ fun WeeklyLandmarksCard(
 /** One horizontal-bar muscle-group row in the WeeklyLandmarksCard. */
 @Composable
 fun WeeklyLandmarkRow(lm: VolumeLandmark) {
-    val barColor = when (lm.status) {
-        VolumeStatus.IN_RANGE -> MaterialTheme.colorScheme.primary
-        VolumeStatus.UNDER -> MaterialTheme.colorScheme.tertiary
-        VolumeStatus.ABOVE -> MaterialTheme.colorScheme.secondary
-        VolumeStatus.NONE -> MaterialTheme.colorScheme.outlineVariant
-    }
+    val barColor = lm.status.accent
     val trackColor = MaterialTheme.colorScheme.surfaceVariant
     val fraction = if (lm.optimalHigh > 0) {
         (lm.weeklySets / lm.optimalHigh).coerceIn(0.0, 1.0).toFloat()
@@ -142,18 +130,8 @@ fun WeeklyLandmarkRow(lm: VolumeLandmark) {
 /** Compact coloured pill showing the VolumeStatus label for one landmark. */
 @Composable
 fun WeeklyStatusBadge(status: VolumeStatus) {
-    val fg = when (status) {
-        VolumeStatus.IN_RANGE -> MaterialTheme.colorScheme.primary
-        VolumeStatus.UNDER -> MaterialTheme.colorScheme.tertiary
-        VolumeStatus.ABOVE -> MaterialTheme.colorScheme.secondary
-        VolumeStatus.NONE -> MaterialTheme.colorScheme.outline
-    }
-    val bg = when (status) {
-        VolumeStatus.IN_RANGE -> MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-        VolumeStatus.UNDER -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.18f)
-        VolumeStatus.ABOVE -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.18f)
-        VolumeStatus.NONE -> MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
-    }
+    val fg = status.accent
+    val bg = status.background
     Text(
         status.label,
         style = MaterialTheme.typography.labelSmall,

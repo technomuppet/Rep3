@@ -6,7 +6,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.replog.data.repository.DnaEvolutionData
@@ -30,22 +29,14 @@ fun DnaEvolutionCard(data: DnaEvolutionData) = RepLogCard {
             )
             Surface(
                 shape = RoundedCornerShape(6.dp),
-                color = when (data.genomeMaturity) {
-                    "Mature" -> Color(0xFF4CAF50).copy(alpha = 0.15f)
-                    "Developing" -> Color(0xFFFF9800).copy(alpha = 0.15f)
-                    else -> Color(0xFF2196F3).copy(alpha = 0.15f)
-                }
+                color = dnaMaturityAccent(data.genomeMaturity).copy(alpha = 0.15f)
             ) {
                 Text(
                     data.genomeMaturity,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.SemiBold,
-                    color = when (data.genomeMaturity) {
-                        "Mature" -> Color(0xFF4CAF50)
-                        "Developing" -> Color(0xFFFF9800)
-                        else -> Color(0xFF2196F3)
-                    }
+                    color = dnaMaturityAccent(data.genomeMaturity)
                 )
             }
         }

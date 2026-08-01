@@ -9,12 +9,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.replog.data.repository.ForecastCardEntry
-import com.replog.domain.forecast.ForecastConfidence
-import com.replog.domain.forecast.ForecastTrend
 import com.replog.ui.components.RepLogCard
 
 // Phase 3 Gap 5 — Progression Projection Strip
@@ -33,21 +30,9 @@ fun ProgressionProjectionStrip(entries: List<ForecastCardEntry>) = RepLogCard {
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             entries.forEach { entry ->
-                val trendColor = when (entry.trend) {
-                    ForecastTrend.RISING -> Color(0xFF4CAF50)
-                    ForecastTrend.FLAT -> Color(0xFFFF9800)
-                    ForecastTrend.DECLINING -> Color(0xFFE53935)
-                }
-                val trendArrow = when (entry.trend) {
-                    ForecastTrend.RISING -> "▲"
-                    ForecastTrend.FLAT -> "—"
-                    ForecastTrend.DECLINING -> "▼"
-                }
-                val confidenceAlpha = when (entry.confidence) {
-                    ForecastConfidence.HIGH -> 1.0f
-                    ForecastConfidence.MEDIUM -> 0.7f
-                    ForecastConfidence.LOW -> 0.45f
-                }
+                val trendColor = entry.trend.color
+                val trendArrow = entry.trend.glyph
+                val confidenceAlpha = entry.confidence.alpha
                 Surface(
                     shape = RoundedCornerShape(10.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant,

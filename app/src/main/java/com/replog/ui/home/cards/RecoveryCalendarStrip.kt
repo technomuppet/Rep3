@@ -12,7 +12,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.replog.domain.recovery.RecoveryCalendarDay
-import com.replog.domain.recovery.RecoveryDay
 import com.replog.ui.components.RepLogCard
 
 // Phase 3 Gap 4: compact 7-day recovery forecast strip.
@@ -29,12 +28,8 @@ fun RecoveryCalendarStrip(days: List<RecoveryCalendarDay>) = RepLogCard {
         modifier = Modifier.fillMaxWidth()
     ) {
         days.forEach { day ->
-            val (bg, fg) = when (day.state) {
-                RecoveryDay.READY -> MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) to MaterialTheme.colorScheme.primary
-                RecoveryDay.CAUTION -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.18f) to MaterialTheme.colorScheme.tertiary
-                RecoveryDay.RECOVERING -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.18f) to MaterialTheme.colorScheme.secondary
-                RecoveryDay.REST_NO_DATA -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.12f) to MaterialTheme.colorScheme.outline
-            }
+            val bg = day.state.background
+            val fg = day.state.accent
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.weight(1f)

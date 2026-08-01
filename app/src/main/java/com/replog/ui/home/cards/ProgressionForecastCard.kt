@@ -11,8 +11,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.replog.data.repository.ForecastCardEntry
-import com.replog.domain.forecast.ForecastConfidence
-import com.replog.domain.forecast.ForecastTrend
 import com.replog.ui.components.RepLogCard
 
 // Phase 2 Gap 6: dedicated progression-forecast card with its own visual hierarchy.
@@ -81,26 +79,10 @@ fun ProgressionForecastRow(
     f: ForecastCardEntry,
     isHeadline: Boolean
 ) {
-    val trendGlyph = when (f.trend) {
-        ForecastTrend.RISING -> "\u2191"
-        ForecastTrend.FLAT -> "\u2192"
-        ForecastTrend.DECLINING -> "\u2193"
-    }
-    val trendLabel = when (f.trend) {
-        ForecastTrend.RISING -> "Rising"
-        ForecastTrend.FLAT -> "Flat"
-        ForecastTrend.DECLINING -> "Declining"
-    }
-    val confidenceLabel = when (f.confidence) {
-        ForecastConfidence.HIGH -> "High"
-        ForecastConfidence.MEDIUM -> "Medium"
-        ForecastConfidence.LOW -> "Low"
-    }
-    val confidenceColor = when (f.confidence) {
-        ForecastConfidence.HIGH -> MaterialTheme.colorScheme.primary
-        ForecastConfidence.MEDIUM -> MaterialTheme.colorScheme.tertiary
-        ForecastConfidence.LOW -> MaterialTheme.colorScheme.outline
-    }
+    val trendGlyph = f.trend.glyph
+    val trendLabel = f.trend.label
+    val confidenceLabel = f.confidence.label
+    val confidenceColor = f.confidence.accent
     val weeklyGainText = if (f.weeklyGainKg >= 0.0)
         "+${\"%.1f\".format(f.weeklyGainKg)} kg/wk"
     else
