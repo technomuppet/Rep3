@@ -12,6 +12,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.replog.data.repository.ForecastCardEntry
 import com.replog.ui.components.RepLogCard
+import com.replog.ui.components.SectionHeader
 
 // Phase 2 Gap 6: dedicated progression-forecast card with its own visual hierarchy.
 // Surfaces the top progression projections (ranked by confidence desc, weekly gain
@@ -29,20 +30,7 @@ fun ProgressionForecastCard(
     onOpen: () -> Unit
 ) = RepLogCard {
     val headline = forecasts.first()
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            Icons.Default.TrendingUp,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            "PROGRESS FORECAST",
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
-        )
-    }
+    SectionHeader("PROGRESS FORECAST", Icons.Default.TrendingUp)
     Spacer(Modifier.height(4.dp))
     val more = forecasts.size - 1
     val subtitle = if (more > 0)

@@ -13,15 +13,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.replog.domain.recovery.RecoveryCalendarDay
 import com.replog.ui.components.RepLogCard
+import com.replog.ui.components.SectionHeader
 
 // Phase 3 Gap 4: compact 7-day recovery forecast strip.
 @Composable
 fun RecoveryCalendarStrip(days: List<RecoveryCalendarDay>) = RepLogCard {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(Icons.Default.Healing, null, tint = MaterialTheme.colorScheme.primary)
-        Spacer(Modifier.width(8.dp))
-        Text("7-DAY RECOVERY", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-    }
+    SectionHeader("7-DAY RECOVERY", Icons.Default.Healing)
     Spacer(Modifier.height(10.dp))
     Row(
         horizontalArrangement = Arrangement.SpaceBetween,

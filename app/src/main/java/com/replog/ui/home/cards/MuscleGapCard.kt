@@ -12,6 +12,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.replog.domain.musclegap.MuscleGapSuggestion
 import com.replog.ui.components.RepLogCard
+import com.replog.ui.components.SectionHeader
 
 // Phase 2 Gap 4: dedicated muscle-gap card on Home with its own visual
 // hierarchy. Each row carries a per-muscle "Start focus workout" CTA wired
@@ -24,20 +25,7 @@ fun MuscleGapCard(
     onStartMuscle: (String) -> Unit,
     onOpen: () -> Unit
 ) = RepLogCard {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            Icons.Default.Healing,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            "MUSCLES YOU'VE BEEN SKIPPING",
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
-        )
-    }
+    SectionHeader("MUSCLES YOU'VE BEEN SKIPPING", Icons.Default.Healing)
     Spacer(Modifier.height(4.dp))
     val total = suggestions.sumOf { it.exercises.size }
     val headline = if (suggestions.size == 1) {

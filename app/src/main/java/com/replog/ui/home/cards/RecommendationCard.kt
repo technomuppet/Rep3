@@ -5,7 +5,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -13,6 +12,7 @@ import com.replog.data.repository.RecommendedWorkoutCardEntry
 import com.replog.domain.intelligence.TodaysBriefing
 import com.replog.domain.recommendation.WorkoutPlan
 import com.replog.ui.components.RepLogCard
+import com.replog.ui.components.SectionHeader
 
 // Phase 2 Gap 3: dedicated recommendation card with its own visual hierarchy.
 // Surfaces the IntelligenceEngine's `recommendation` string at weighty title
@@ -28,16 +28,7 @@ fun RecommendationCard(
     onStartPlan: (WorkoutPlan) -> Unit,
     onSaveTemplate: () -> Unit = {}
 ) = RepLogCard {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(Icons.Default.PlayArrow, null, tint = MaterialTheme.colorScheme.primary)
-        Spacer(Modifier.width(8.dp))
-        Text(
-            "RECOMMENDED TODAY",
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
-        )
-    }
+    SectionHeader("RECOMMENDED TODAY", Icons.Default.PlayArrow)
     Spacer(Modifier.height(4.dp))
     Text(
         b.recommendation,

@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import com.replog.domain.volume.VolumeLandmark
 import com.replog.domain.volume.VolumeStatus
 import com.replog.ui.components.RepLogCard
+import com.replog.ui.components.SectionHeader
 
 // Phase 2 Gap 5: dedicated weekly-volume card with its own visual hierarchy.
 // Renders the ten hypertrophy groups from `VolumeLandmarks.analyze(weeks = 1)`
@@ -28,20 +29,7 @@ fun WeeklyLandmarksCard(
     landmarks: List<VolumeLandmark>,
     onOpen: () -> Unit
 ) = RepLogCard {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            Icons.Default.StackedBarChart,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            "WEEKLY VOLUME",
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
-        )
-    }
+    SectionHeader("WEEKLY VOLUME", Icons.Default.StackedBarChart)
     Spacer(Modifier.height(4.dp))
     val underCount = landmarks.count {
         it.status == VolumeStatus.UNDER ||
