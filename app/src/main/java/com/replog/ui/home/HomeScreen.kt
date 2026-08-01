@@ -3,6 +3,7 @@ package com.replog.ui.home
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -122,24 +123,26 @@ fun HomeScreen(
         }
 
         // Priority 2: Continue Workout - the top card when a session is in progress.
-        continueWorkout?.let { cw ->
-            item { ContinueWorkoutCard(cw, onContinue = onStartWorkout) }
+        renderIfNotNull(continueWorkout) { cw ->
+            ContinueWorkoutCard(cw, onContinue = onStartWorkout)
         }
 
         // Priority 1: Today's Briefing - the unified intelligence card.
-        briefing?.let { b ->
-            item { TodaysBriefingCard(b, onOpenRecovery = onOpenRecoveryCentre) }
-            // Phase 2 Gap 3: dedicated recommendation card so the headline
-            // recommendation gets its own visual hierarchy + a CTA distinct
-            // from the briefing's narrative. The CoachDashboardCard below
-            // remains untouched — it pulls from coachState (CoachViewModel)
-            // and owns the dismiss / refresh / train-anyway UX.
-            item { RecommendationCard(b, onStart = onStartRecommendedWorkout, recommendedWorkout = recommendedWorkout, onStartPlan = { plan -> viewModel.startRecommendedWorkout(plan, b.recommendation); onStartWorkout() }, onSaveTemplate = { viewModel.saveRecommendedWorkoutAsTemplate() }) }
+        renderIfNotNull(briefing) { b ->
+            TodaysBriefingCard(b, onOpenRecovery = onOpenRecoveryCentre)
+        }
+        // Phase 2 Gap 3: dedicated recommendation card so the headline
+        // recommendation gets its own visual hierarchy + a CTA distinct
+        // from the briefing's narrative. The CoachDashboardCard below
+        // remains untouched — it pulls from coachState (CoachViewModel)
+        // and owns the dismiss / refresh / train-anyway UX.
+        renderIfNotNull(briefing) { b ->
+            RecommendationCard(b, onStart = onStartRecommendedWorkout, recommendedWorkout = recommendedWorkout, onStartPlan = { plan -> viewModel.startRecommendedWorkout(plan, b.recommendation); onStartWorkout() }, onSaveTemplate = { viewModel.saveRecommendedWorkoutAsTemplate() })
         }
 
         // Sprint 8 P5: RepLog Score with explainable component breakdown.
-        repLogScore?.let { s ->
-            item { RepLogScoreCard(s) }
+        renderIfNotNull(repLogScore) { s ->
+            RepLogScoreCard(s)
         }
 
         // Sprint 9: intelligence hubs (Recovery Centre / Muscle Balance / DNA Evolution).
@@ -155,33 +158,31 @@ fun HomeScreen(
         // Empty list is the low-data state (the briefing itself still shows the
         // "Log a few more workouts" fallback); we hide silently in that case so
         // the card never advertises zeros.
-        weeklyLandmarks?.takeIf { it.isNotEmpty() }?.let { landmarks ->
-            item { WeeklyLandmarksCard(landmarks, onOpen = onOpenMuscleBalance) }
+        renderIfNotNull(weeklyLandmarks?.takeIf { it.isNotEmpty() }) { landmarks ->
+            WeeklyLandmarksCard(landmarks, onOpen = onOpenMuscleBalance)
         }
 
         // Phase 2 Gap 4: muscle-gap card. Each row carries its own per-muscle
         // "Start focus workout" CTA that delegates to the existing
         // `IntelligenceRepository.startMuscleGapWorkout()`, which creates a
         // session + sets active id; Home then navigates to the workout tab.
-        muscleGapSuggestions?.takeIf { it.isNotEmpty() }?.let { suggestions ->
-            item {
-                MuscleGapCard(
-                    suggestions = suggestions,
-                    onStartMuscle = { muscle ->
-                        viewModel.startMuscleGapFocus(muscle)
-                        onStartWorkout()
-                    },
-                    onOpen = onOpenMuscleBalance
-                )
-            }
+        renderIfNotNull(muscleGapSuggestions?.takeIf { it.isNotEmpty() }) { suggestions ->
+            MuscleGapCard(
+                suggestions = suggestions,
+                onStartMuscle = { muscle ->
+                    viewModel.startMuscleGapFocus(muscle)
+                    onStartWorkout()
+                },
+                onOpen = onOpenMuscleBalance
+            )
         }
 
         // Phase 2 Gap 6: progression-forecast card. One headline projection
         // (the top result by confidence + weekly gain) plus a compact list
         // of secondary lifts — mirrors what the briefing's "Progress
         // Forecast" explainSection carries, but expanded to a full Home card.
-        progressionForecasts?.takeIf { it.isNotEmpty() }?.let { forecasts ->
-            item { ProgressionForecastCard(forecasts, onOpen = onOpenDnaEvolution) }
+        renderIfNotNull(progressionForecasts?.takeIf { it.isNotEmpty() }) { forecasts ->
+            ProgressionForecastCard(forecasts, onOpen = onOpenDnaEvolution)
         }
 
         // Coach Dashboard — the unified "Good morning" advisor (recommendation +
@@ -292,13 +293,13 @@ fun HomeScreen(
         }
 
         // Top goal progress (P6) — tap to open Goals.
-        state.topGoal?.let { goal ->
-            item { HomeGoalCard(goal, onClick = onOpenGoals) }
+        renderIfNotNull(state.topGoal) { goal ->
+            HomeGoalCard(goal, onClick = onOpenGoals)
         }
 
         // Training Genome headline (P2) — tap to open Training DNA.
-        state.genomeHeadline?.let { headline ->
-            item { HomeGenomeCard(headline, onClick = onOpenTrainingDna) }
+        renderIfNotNull(state.genomeHeadline) { headline ->
+            HomeGenomeCard(headline, onClick = onOpenTrainingDna)
         }
 
         // Coaching insight + last PR (single, not a full feed — that lives in History/Progress)
@@ -468,4 +469,12 @@ private fun RepLogScoreCard(s: RepLogScoreResult) = RepLogCard {
             Spacer(Modifier.height(6.dp))
         }
     }
+}
+
+/**
+ * Emits a single LazyColumn item only when [value] is non-null — the shared
+ * null-check render pattern used by the Home cards.
+ */
+private fun <T> LazyListScope.renderIfNotNull(value: T?, itemContent: @Composable (T) -> Unit) {
+    if (value != null) item { itemContent(value) }
 }
