@@ -127,6 +127,80 @@ class AppDatabaseMigrationTest {
         db.close()
     }
 
+    @Test
+    fun migrate13To14_addsRestDayOverridesTable() {
+        helper.createDatabase(testDb, 13).close()
+
+        val db = helper.runMigrationsAndValidate(
+            testDb,
+            14,
+            true,
+            AppDatabase.MIGRATION_13_14
+        )
+
+        assertTableExists(db, "rest_day_overrides")
+        assertColumnExists(db, "rest_day_overrides", "timestamp")
+        assertColumnExists(db, "rest_day_overrides", "recoveryScore")
+        assertColumnExists(db, "rest_day_overrides", "recommendationReason")
+        db.close()
+    }
+
+    @Test
+    fun migrate14To15_addsFavoriteToWorkoutTemplates() {
+        helper.createDatabase(testDb, 14).apply {
+            execSQL(
+                "CREATE TABLE IF NOT EXISTS workout_templates (" +
+                    "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "name TEXT NOT NULL, " +
+                    "isBuiltIn INTEGER NOT NULL)"
+            )
+            close()
+        }
+
+        val db = helper.runMigrationsAndValidate(
+            testDb,
+            15,
+            true,
+            AppDatabase.MIGRATION_14_15
+        )
+
+        assertColumnExists(db, "workout_templates", "isFavorite")
+        db.close()
+    }
+
+    @Test
+    fun migrate15To16_dropsAbandonedPrototypeTables() {
+        helper.createDatabase(testDb, 15).apply {
+            execSQL(
+                "CREATE TABLE IF NOT EXISTS training_dna_metrics (" +
+                    "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "dimension TEXT NOT NULL, subjectType TEXT NOT NULL, subjectId TEXT, " +
+                    "value REAL NOT NULL, confidence REAL NOT NULL, sampleSize INTEGER NOT NULL, " +
+                    "updatedAt INTEGER NOT NULL, metadataJson TEXT NOT NULL)"
+            )
+            execSQL(
+                "CREATE TABLE IF NOT EXISTS knowledge_graph_relations (" +
+                    "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "sourceType TEXT NOT NULL, sourceId TEXT NOT NULL, " +
+                    "targetType TEXT NOT NULL, targetId TEXT NOT NULL, relationType TEXT NOT NULL, " +
+                    "strength REAL NOT NULL, evidenceCount INTEGER NOT NULL, firstSeenAt INTEGER NOT NULL, " +
+                    "lastSeenAt INTEGER NOT NULL, metadataJson TEXT NOT NULL)"
+            )
+            close()
+        }
+
+        val db = helper.runMigrationsAndValidate(
+            testDb,
+            16,
+            true,
+            AppDatabase.MIGRATION_15_16
+        )
+
+        assertTableDoesNotExist(db, "training_dna_metrics")
+        assertTableDoesNotExist(db, "knowledge_graph_relations")
+        db.close()
+    }
+
     private fun createVersion6Schema(db: SupportSQLiteDatabase) {
         db.execSQL("CREATE TABLE IF NOT EXISTS exercises (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, name TEXT NOT NULL, category TEXT NOT NULL, equipment TEXT NOT NULL, type TEXT NOT NULL, muscles TEXT NOT NULL, primaryMuscles TEXT NOT NULL, secondaryMuscles TEXT NOT NULL, movementPattern TEXT NOT NULL, difficulty TEXT NOT NULL, mediaAsset TEXT NOT NULL, isCustom INTEGER NOT NULL)")
         db.execSQL("CREATE TABLE IF NOT EXISTS workout_sessions (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, templateName TEXT, startTime INTEGER NOT NULL, endTime INTEGER, notes TEXT)")
@@ -203,6 +277,12 @@ class AppDatabaseMigrationTest {
     private fun assertTableExists(db: SupportSQLiteDatabase, tableName: String) {
         db.query("SELECT name FROM sqlite_master WHERE type='table' AND name=?", arrayOf(tableName)).use { cursor ->
             check(cursor.moveToFirst()) { "Missing table $tableName" }
+        }
+    }
+
+    private fun assertTableDoesNotExist(db: SupportSQLiteDatabase, tableName: String) {
+        db.query("SELECT name FROM sqlite_master WHERE type='table' AND name=?", arrayOf(tableName)).use { cursor ->
+            check(!cursor.moveToFirst()) { "Unexpected table $tableName" }
         }
     }
 

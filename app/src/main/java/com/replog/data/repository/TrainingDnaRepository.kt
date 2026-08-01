@@ -23,7 +23,7 @@ class TrainingDNARepository @Inject constructor(
     private val sessionDao: SessionDao
 ) {
     suspend fun generateDNA(): TrainingDnaResult {
-        val sessions = sessionDao.getAllSessions().first().filter { it.session.endTime != null }
+        val sessions = sessionDao.getRecentCompletedSessions(200).first().filter { it.session.endTime != null }
         val engine = TrainingDnaEngine(TrainingDnaConfig(nowMillis = System.currentTimeMillis()))
         val result = engine.generate(sessions)
         persist(result)
