@@ -60,12 +60,12 @@ val ForecastTrend.glyph: String
         ForecastTrend.DECLINING -> "▼"
     }
 
-/** Trend arrow colour — fixed brand palette, deliberately not theme colours. */
+/** Trend arrow colour from the active Material theme. */
 val ForecastTrend.color: Color
-    get() = when (this) {
-        ForecastTrend.RISING -> Color(0xFF4CAF50)
-        ForecastTrend.FLAT -> Color(0xFFFF9800)
-        ForecastTrend.DECLINING -> Color(0xFFE53935)
+    @Composable get() = when (this) {
+        ForecastTrend.RISING -> MaterialTheme.colorScheme.primary
+        ForecastTrend.FLAT -> MaterialTheme.colorScheme.tertiary
+        ForecastTrend.DECLINING -> MaterialTheme.colorScheme.error
     }
 
 // ---- ForecastConfidence ----------------------------------------------
@@ -116,9 +116,10 @@ val RecoveryDay.background: Color
 
 // ---- Training DNA maturity (string-based, from the snapshot engine) ----
 
-/** Accent colour for the genome-maturity badge. */
+/** Accent colour for the genome-maturity badge from the active Material theme. */
+@Composable
 fun dnaMaturityAccent(maturity: String): Color = when (maturity) {
-    "Mature" -> Color(0xFF4CAF50)
-    "Developing" -> Color(0xFFFF9800)
-    else -> Color(0xFF2196F3)
+    "Mature" -> MaterialTheme.colorScheme.primary
+    "Developing" -> MaterialTheme.colorScheme.tertiary
+    else -> MaterialTheme.colorScheme.secondary
 }

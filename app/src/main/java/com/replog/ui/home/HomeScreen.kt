@@ -46,8 +46,11 @@ import com.replog.ui.home.cards.WeeklyLandmarksCard
 import com.replog.util.ShareCardRenderer
 import com.replog.util.ShareStat
 import com.replog.util.profile.Greetings
-import java.text.SimpleDateFormat
-import java.util.*
+import java.time.Instant
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import kotlin.math.roundToInt
 
 @Composable
@@ -115,7 +118,7 @@ fun HomeScreen(
     LazyColumn(Modifier.fillMaxSize().padding(contentPadding), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
             val name = displayName?.takeIf { it.isNotBlank() }
-            val hour = remember { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
+            val hour = remember { LocalTime.now().hour }
             val header = if (name != null) Greetings.timeOfDay(name, hour) else "Today"
             val subtitle = if (name != null) Greetings.possessive(name, "training dashboard") else "Your training dashboard."
             Text(header, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.ExtraBold)
@@ -403,7 +406,7 @@ private fun RecentWorkoutCard(session: SessionWithExercises) = RepLogCard {
     val duration = session.session.endTime?.let { ((it - session.session.startTime) / 60000.0).roundToInt().toString() + " min" } ?: "In progress"
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Default.FitnessCenter, null, tint = MaterialTheme.colorScheme.primary); Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) { Text(session.session.templateName ?: "Workout", fontWeight = FontWeight.Bold); Text(SimpleDateFormat("EEE d MMM, HH:mm", Locale.getDefault()).format(Date(session.session.startTime)), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall); Text("${session.exercises.size} exercises • ${session.exercises.sumOf { it.sets.size }} sets", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) }
+        Column(Modifier.weight(1f)) { Text(session.session.templateName ?: "Workout", fontWeight = FontWeight.Bold); Text(Instant.ofEpochMilli(session.session.startTime).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("EEE d MMM, HH:mm", Locale.getDefault())), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall); Text("${session.exercises.size} exercises • ${session.exercises.sumOf { it.sets.size }} sets", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) }
         Icon(Icons.Default.Timer, null, tint = MaterialTheme.colorScheme.onSurfaceVariant); Spacer(Modifier.width(4.dp)); Text(duration, style = MaterialTheme.typography.bodySmall)
     }
 }

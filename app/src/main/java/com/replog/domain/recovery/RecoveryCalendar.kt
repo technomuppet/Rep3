@@ -1,6 +1,10 @@
 package com.replog.domain.recovery
 
-import java.util.Calendar
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.TextStyle
+import java.util.Locale
 
 /**
  * Recovery Calendar — a green/yellow/red day grid (offline).
@@ -21,8 +25,6 @@ data class RecoveryCalendarDay(
 )
 
 object RecoveryCalendar {
-
-    private const val DAY_MS = 24L * 60L * 60L * 1000L
 
     /**
      * @param sessionDaysToVolume completed-session (startTimeMillis, totalVolume) pairs
@@ -88,23 +90,17 @@ object RecoveryCalendar {
         }
     }
 
-    private fun dayIndex(millis: Long): Long {
-        val cal = Calendar.getInstance().apply {
-            timeInMillis = millis
-            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
-        }
-        return cal.timeInMillis / DAY_MS
-    }
+    /** Converts an instant to its local calendar day without legacy Calendar truncation. */
+    private fun dayIndex(millis: Long): Long =
+        Instant.ofEpochMilli(millis)
+            .atZone(ZoneId.systemDefault())
+            .toLocalDate()
+            .toEpochDay()
 
-    private fun calForDay(day: Long): Calendar =
-        Calendar.getInstance().apply { timeInMillis = day * DAY_MS }
+    private fun dateForDay(day: Long): LocalDate = LocalDate.ofEpochDay(day)
 
-    private fun weekdayLabel(day: Long): String = when (calForDay(day).get(Calendar.DAY_OF_WEEK)) {
-        Calendar.MONDAY -> "Mon"; Calendar.TUESDAY -> "Tue"; Calendar.WEDNESDAY -> "Wed"
-        Calendar.THURSDAY -> "Thu"; Calendar.FRIDAY -> "Fri"; Calendar.SATURDAY -> "Sat"
-        else -> "Sun"
-    }
+    private fun weekdayLabel(day: Long): String =
+        dateForDay(day).dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.ENGLISH)
 
-    private fun dayOfMonth(day: Long): Int = calForDay(day).get(Calendar.DAY_OF_MONTH)
+    private fun dayOfMonth(day: Long): Int = dateForDay(day).dayOfMonth
 }
