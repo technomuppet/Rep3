@@ -346,7 +346,7 @@ class IntelligenceRepository @Inject constructor(
             factors = state.factors
         )
         val improvements = guidance.improvements.toMutableList()
-        NutritionGuidelines.recoveryGuideline(profile)?.let { improvements += it }
+        profile?.let { NutritionGuidelines.recoveryGuideline(it) }?.let { improvements += it }
         val warnings = guidance.warnings.toMutableList()
 
         return RecoveryCentreData(
