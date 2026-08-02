@@ -225,8 +225,13 @@ private fun ExerciseItem(
         }
         Icon(Icons.Default.TrendingUp, contentDescription = "Progress", tint = MaterialTheme.colorScheme.primary)
         if (exercise.isCustom) {
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, "Delete", tint = MaterialTheme.colorScheme.error)
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier.semantics {
+                    contentDescription = "Delete custom exercise ${exercise.name}"
+                }
+            ) {
+                Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error)
             }
         }
     }
@@ -665,12 +670,14 @@ private fun ProgressChart(history: List<com.replog.data.model.ExerciseSetHistory
     val max = points.maxOf { it.second }
     val range = (max - min).takeIf { it > 0.0 } ?: 1.0
 
+    val chartDescription = "Estimated one rep max trend chart with ${points.size} workouts, ranging from ${formatWeight(min, useKg)} to ${formatWeight(max, useKg)}"
+
     RepLogCard {
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(170.dp)
-                .semantics { contentDescription = "Estimated one rep max trend chart for this exercise" }
+                .semantics { contentDescription = chartDescription }
         ) {
             val left = 8.dp.toPx()
             val right = size.width - 8.dp.toPx()

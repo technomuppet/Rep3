@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.replog.data.model.SessionWithExercises
 import com.replog.data.repository.WorkoutRepository
+import com.replog.util.PreferencesManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,6 +19,8 @@ import javax.inject.Inject
 data class HistoryUiState(
     val sessions: List<SessionWithExercises> = emptyList(),
     val isLoading: Boolean = true,
+    /** Profile weight is optional; null keeps the history screen honest. */
+    val profileWeightKg: Double? = null,
     /** True while more older sessions exist beyond the current window (P2). */
     val canLoadMore: Boolean = false
 )
@@ -31,7 +34,10 @@ data class HistoryUiState(
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
-class HistoryViewModel @Inject constructor(private val repo: WorkoutRepository) : ViewModel() {
+class HistoryViewModel @Inject constructor(
+    private val repo: WorkoutRepository,
+    private val prefs: PreferencesManager
+) : ViewModel() {
 
     private val pageSize = 30
     private val windowLimit = MutableStateFlow(pageSize)
@@ -40,11 +46,13 @@ class HistoryViewModel @Inject constructor(private val repo: WorkoutRepository) 
         .flatMapLatest { limit ->
             combine(
                 repo.getRecentCompletedSessions(limit),
-                repo.getCompletedSessionCountFlow()
-            ) { sessions, total ->
+                repo.getCompletedSessionCountFlow(),
+                prefs.userProfile
+            ) { sessions, total, profile ->
                 HistoryUiState(
                     sessions = sessions,
                     isLoading = false,
+                    profileWeightKg = profile?.weightKg,
                     canLoadMore = sessions.size >= limit && limit < total
                 )
             }

@@ -19,6 +19,8 @@ import com.replog.data.repository.WorkoutRepository
 import com.replog.domain.pr.PRDetector
 import com.replog.domain.progression.ProgressionSuggester
 import com.replog.domain.scoring.WorkoutScorer
+import com.replog.domain.workout.SupersetRestPolicy
+import com.replog.domain.workout.SupersetSetProgress
 import com.replog.util.ActiveWorkoutRecovery
 import com.replog.util.ActiveWorkoutRecoveryDecision
 import com.replog.util.AdaptiveProgramEngine
@@ -488,8 +490,9 @@ class ActiveWorkoutViewModel @Inject constructor(
         if (weight < 0 || reps <= 0) return@launch
         saving.value = true
         val pr = workouts.checkPR(entry.exercise.id, weight, reps)
-        val setId = workouts.insertSet(SetLog(sessionExerciseId = entry.sessionExercise.id, setNumber = entry.sets.size + 1, weight = weight, reps = reps, isPR = pr.isPR, prType = pr.types.firstOrNull(), setType = setType, rpe = rpe, tempo = tempo?.takeIf { it.isNotBlank() }, completed = true)).toInt()
-        if (prefs.restAutoStart.first()) {
+        val setNumber = (entry.sets.maxOfOrNull { it.setNumber } ?: 0) + 1
+        val setId = workouts.insertSet(SetLog(sessionExerciseId = entry.sessionExercise.id, setNumber = setNumber, weight = weight, reps = reps, isPR = pr.isPR, prType = pr.types.firstOrNull(), setType = setType, rpe = rpe, tempo = tempo?.takeIf { it.isNotBlank() }, completed = true)).toInt()
+        if (prefs.restAutoStart.first() && shouldStartRestAfterSet(entry, setNumber, setType)) {
             val restSeconds = restTimer.resolveRestSeconds(entry.exercise)
             restTimer.start(restSeconds, entry.sessionExercise.id, setId)
         }
@@ -502,12 +505,45 @@ class ActiveWorkoutViewModel @Inject constructor(
         val source = lastCurrent ?: lastPrevious ?: return@launch
         saving.value = true
         val pr = workouts.checkPR(entry.exercise.id, source.weight, source.reps)
-        val setId = workouts.insertSet(SetLog(sessionExerciseId = entry.sessionExercise.id, setNumber = entry.sets.size + 1, weight = source.weight, reps = source.reps, isPR = pr.isPR, prType = pr.types.firstOrNull(), setType = source.setType, rpe = source.rpe, tempo = source.tempo, completed = true)).toInt()
-        if (prefs.restAutoStart.first()) {
+        val setNumber = (entry.sets.maxOfOrNull { it.setNumber } ?: 0) + 1
+        val setId = workouts.insertSet(SetLog(sessionExerciseId = entry.sessionExercise.id, setNumber = setNumber, weight = source.weight, reps = source.reps, isPR = pr.isPR, prType = pr.types.firstOrNull(), setType = source.setType, rpe = source.rpe, tempo = source.tempo, completed = true)).toInt()
+        if (prefs.restAutoStart.first() && shouldStartRestAfterSet(entry, setNumber, source.setType)) {
             val restSeconds = restTimer.resolveRestSeconds(entry.exercise)
             restTimer.start(restSeconds, entry.sessionExercise.id, setId)
         }
         saving.value = false; refresh()
+    }
+
+    private suspend fun shouldStartRestAfterSet(
+        entry: SessionExerciseWithSets,
+        setNumber: Int,
+        setType: String
+    ): Boolean {
+        val group = entry.sessionExercise.supersetGroup ?: return true
+        // Warmups are local to a movement. They should never wait for another
+        // superset movement before starting their ordinary rest interval.
+        if (setType == SetType.WARMUP) return true
+
+        val session = activeId.value?.let { workouts.getSessionById(it) } ?: return true
+        val groupedEntries = session.exercises.filter { it.sessionExercise.supersetGroup == group }
+        val groupedRoundNumbers = groupedEntries.map { groupedEntry ->
+            val progress = groupedEntry.sets
+                .filter { it.completed }
+                .map { SupersetSetProgress(it.setNumber, it.setType == SetType.WARMUP) }
+                .let { existing ->
+                    if (groupedEntry.sessionExercise.id == entry.sessionExercise.id) {
+                        existing + SupersetSetProgress(setNumber, isWarmup = false)
+                    } else {
+                        existing
+                    }
+                }
+            SupersetRestPolicy.completedRoundNumbers(progress)
+        }
+        val currentRoundNumber = groupedRoundNumbers
+            .getOrNull(groupedEntries.indexOfFirst { it.sessionExercise.id == entry.sessionExercise.id })
+            ?.maxOrNull()
+            ?: return false
+        return SupersetRestPolicy.shouldStartRest(group, currentRoundNumber, groupedRoundNumbers)
     }
 
     fun quickCompleteSet(entry: SessionExerciseWithSets, weight: Double, reps: Int) = viewModelScope.launch {
