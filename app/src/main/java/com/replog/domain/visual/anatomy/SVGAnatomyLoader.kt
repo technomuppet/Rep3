@@ -218,20 +218,17 @@ object SVGAnatomyLoader {
         return path
     }
 
-    private fun tokenizePathData(d: String): List<String> {
-        val tokens = mutableListOf<String>()
-        val cleaned = d
-            .replace("(", " ")
-            .replace(")", " ")
-            .replace(",", " ")
-        val parts = cleaned.split(Regex("\\s+"))
-        for (part in parts) {
-            val trimmed = part.trim()
-            if (trimmed.isNotEmpty()) {
-                tokens.add(trimmed)
-            }
-        }
-        return tokens
+    /**
+     * Tokenize SVG path data independently of whitespace and comma placement.
+     * SVG commonly writes commands directly beside their first number (for
+     * example `M250 30` or `C285 30`), so splitting on whitespace alone would
+     * turn those into unknown tokens and silently produce empty geometry.
+     */
+    internal fun tokenizePathData(d: String): List<String> {
+        val tokenPattern = Regex(
+            """[AaCcHhLlMmQqSsTtVvZz]|[-+]?(?:\\d*\\.\\d+|\\d+\\.?)(?:[eE][-+]?\\d+)?"""
+        )
+        return tokenPattern.findAll(d).map { it.value }.toList()
     }
 
     private fun parseNextFloat(tokens: List<String>, index: Int): Float {

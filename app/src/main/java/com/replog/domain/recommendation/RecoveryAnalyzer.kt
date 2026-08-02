@@ -1,10 +1,9 @@
 package com.replog.domain.recommendation
 
 import com.replog.data.model.BodyweightLog
-import com.replog.data.model.SessionExerciseWithSets
-import com.replog.data.model.SessionWithExercises
 import com.replog.data.model.SetLog
-import com.replog.util.PRCalculator
+import com.replog.data.model.SetType
+import com.replog.data.model.SessionWithExercises
 
 object RecoveryAnalyzer {
 
@@ -13,7 +12,13 @@ object RecoveryAnalyzer {
         bodyweights: List<BodyweightLog>,
         nowMillis: Long
     ): OverallRecovery {
-        if (sessions.size < 2) {
+        val completed = sessions
+            .filter { session ->
+                val endTime = session.session.endTime
+                endTime != null && endTime <= nowMillis && session.hasHardSets()
+            }
+            .sortedByDescending { it.session.endTime ?: Long.MIN_VALUE }
+        if (completed.size < 2) {
             return OverallRecovery(
                 score = 75.0,
                 label = "Normal",
@@ -21,51 +26,102 @@ object RecoveryAnalyzer {
             )
         }
 
-        val completed = sessions.filter { it.session.endTime != null }.sortedByDescending { it.session.startTime }
         val lastSession = completed.firstOrNull()
-        val hoursSinceLastSession = lastSession?.let { (nowMillis - it.session.startTime) / (3_600_000.0) } ?: Double.MAX_VALUE
+        val hoursSinceLastSession = lastSession?.let {
+            ((nowMillis - (it.session.endTime ?: it.session.startTime)).coerceAtLeast(0L)) / HOUR_MS.toDouble()
+        } ?: Double.MAX_VALUE
 
-        val last7 = completed.filter { it.session.startTime >= nowMillis - 7L * DAY }
-        val last14 = completed.filter { it.session.startTime >= nowMillis - 14L * DAY }
+        val last7 = completed.filter { it.trainingTime() in (nowMillis - 7L * DAY)..nowMillis }
+        val previous7 = completed.filter {
+            it.trainingTime() in (nowMillis - 14L * DAY) until (nowMillis - 7L * DAY)
+        }
         val frequency7 = last7.size
-        val frequency14 = last14.size
+        val frequency14 = completed.count { it.trainingTime() >= nowMillis - 14L * DAY }
 
-        val weeklyVolume = completed
-            .groupBy { weekStart(it.session.startTime) }
-            .map { (_, weekSessions) -> weekSessions.sumOf { it.volume() } }
-            .filter { it > 0.0 }
-        val recentVolume = weeklyVolume.lastOrNull() ?: 0.0
-        val previousVolume = weeklyVolume.dropLast(1).lastOrNull() ?: recentVolume
-        val volumeRatio = if (previousVolume > 0) recentVolume / previousVolume else 1.0
+        // Compare equal rolling windows instead of calendar weeks. This avoids a
+        // false workload drop when the user checks Recovery Centre mid-week.
+        val recentVolume = last7.sumOf { it.volume() }
+        val previousVolume = previous7.sumOf { it.volume() }
+        val volumeRatio = if (previousVolume > 0.0) recentVolume / previousVolume else null
 
-        val highRpeSetsLast7 = last7.flatMap { it.exercises }.flatMap { it.sets }.count { (it.rpe ?: 0.0) >= 9.0 }
-        val avgRpeLast7 = last7.flatMap { it.exercises }.flatMap { it.sets }.mapNotNull { it.rpe }.takeIf { it.isNotEmpty() }?.average()
+        val hardSetsLast7 = last7.flatMap { it.hardSets() }
+        val highRpeSetsLast7 = hardSetsLast7.count { it.rpeValue() >= HIGH_RPE }
+        val avgRpeLast7 = hardSetsLast7.mapNotNull { it.rpeValueOrNull() }.takeIf { it.isNotEmpty() }?.average()
+        val rpeDensity = if (hardSetsLast7.isNotEmpty()) {
+            highRpeSetsLast7.toDouble() / hardSetsLast7.size
+        } else {
+            0.0
+        }
 
         val bwTrend = bodyweightTrend(bodyweights)
 
         var score = 75
         val reasons = mutableListOf<String>()
 
-        if (frequency7 >= 6) { score -= 20; reasons += "Very high training frequency this week" }
-        else if (frequency7 in 4..5) { score -= 8; reasons += "Above-average frequency this week" }
-        else if (frequency7 <= 1) { score += 8; reasons += "Low frequency this week" }
+        if (frequency7 >= 6) {
+            score -= 20
+            reasons += "Very high training frequency this week"
+        } else if (frequency7 in 4..5) {
+            score -= 8
+            reasons += "Above-average frequency this week"
+        } else if (frequency7 <= 1) {
+            score += 8
+            reasons += "Low frequency this week"
+        }
 
-        if (frequency14 >= 10) { score -= 10; reasons += "Dense two-week workload" }
+        if (frequency14 >= 10) {
+            score -= 10
+            reasons += "Dense two-week workload"
+        }
 
-        if (volumeRatio > 1.35) { score -= 18; reasons += "Weekly volume jumped ${((volumeRatio - 1.0) * 100).toInt()}%" }
-        else if (volumeRatio < 0.65) { score += 8; reasons += "Weekly volume dropped recently" }
+        when {
+            volumeRatio != null && volumeRatio > 1.35 -> {
+                score -= 18
+                reasons += "Recent 7-day volume jumped ${((volumeRatio - 1.0) * 100).toInt()}%"
+            }
+            volumeRatio != null && volumeRatio < 0.65 -> {
+                score += 8
+                reasons += "Recent 7-day volume dropped"
+            }
+        }
 
-        if (avgRpeLast7 != null && avgRpeLast7 >= 9.0) { score -= 15; reasons += "Average RPE is very high" }
-        else if (avgRpeLast7 != null && avgRpeLast7 <= 7.5) { score += 8; reasons += "Average RPE is manageable" }
+        if (avgRpeLast7 != null && avgRpeLast7 >= 9.0) {
+            score -= 15
+            reasons += "Average RPE is very high"
+        } else if (avgRpeLast7 != null && avgRpeLast7 <= 7.5) {
+            score += 8
+            reasons += "Average RPE is manageable"
+        }
 
-        if (highRpeSetsLast7 >= 4) { score -= 10; reasons += "Multiple high-RPE sets this week" }
+        // Density is more informative than a raw count, but require a modest
+        // sample so one maximal set cannot dominate a whole-week signal.
+        if (hardSetsLast7.size >= MIN_SETS_FOR_DENSITY && rpeDensity >= HIGH_RPE_DENSITY) {
+            score -= 10
+            reasons += "A high proportion of recent sets were high-RPE"
+        }
 
-        if (hoursSinceLastSession < 18) { score -= 15; reasons += "Last session was very recent" }
-        else if (hoursSinceLastSession in 18.0..36.0) { score -= 5; reasons += "Last session was recent" }
-        else if (hoursSinceLastSession > 72) { score += 8; reasons += "Long recovery window since last session" }
+        when {
+            hoursSinceLastSession < 18 -> {
+                score -= 15
+                reasons += "Last session ended very recently"
+            }
+            hoursSinceLastSession in 18.0..36.0 -> {
+                score -= 5
+                reasons += "Last session ended recently"
+            }
+            hoursSinceLastSession > 72 -> {
+                score += 8
+                reasons += "Long recovery window since last session"
+            }
+        }
 
-        if (bwTrend < -0.7) { score -= 10; reasons += "Bodyweight is trending down" }
-        else if (bwTrend > 0.5) { score += 3; reasons += "Bodyweight is stable or trending up" }
+        if (bwTrend < -0.7) {
+            score -= 10
+            reasons += "Bodyweight is trending down"
+        } else if (bwTrend > 0.5) {
+            score += 3
+            reasons += "Bodyweight is stable or trending up"
+        }
 
         score = score.coerceIn(0, 100)
         val label = when {
@@ -86,39 +142,73 @@ object RecoveryAnalyzer {
         sessions: List<SessionWithExercises>,
         nowMillis: Long
     ): List<MuscleRecovery> {
-        val completed = sessions.filter { it.session.endTime != null }
+        val completed = sessions.filter { session ->
+            val endTime = session.session.endTime
+            endTime != null && endTime <= nowMillis && session.hasHardSets()
+        }
         if (completed.isEmpty()) return emptyList()
 
         data class MuscleSession(
             val startTime: Long,
+            val endTime: Long,
             val sets: List<SetLog>
         )
 
         val muscleData = mutableMapOf<String, MutableList<MuscleSession>>()
         completed.forEach { session ->
             session.exercises.forEach { entry ->
-                val primary = splitCsv(entry.exercise.primaryMuscles.ifBlank { entry.exercise.muscles }).filter { it.isNotBlank() }
-                val secondary = splitCsv(entry.exercise.secondaryMuscles).filter { it.isNotBlank() }
-                val muscleSession = MuscleSession(session.session.startTime, entry.sets)
-                primary.forEach { muscle -> muscleData.getOrPut(muscle) { mutableListOf() } += muscleSession }
-                secondary.forEach { muscle -> muscleData.getOrPut(muscle) { mutableListOf() } += muscleSession.copy(sets = entry.sets.map { it.copy() }) }
+                val hardSets = entry.sets.hardSets()
+                if (hardSets.isEmpty()) return@forEach
+                val primary = splitCsv(entry.exercise.primaryMuscles.ifBlank { entry.exercise.muscles })
+                val secondary = splitCsv(entry.exercise.secondaryMuscles)
+                val muscleSession = MuscleSession(
+                    startTime = session.session.startTime,
+                    endTime = session.session.endTime ?: session.session.startTime,
+                    sets = hardSets
+                )
+                (primary + secondary).distinct().forEach { muscle ->
+                    muscleData.getOrPut(muscle) { mutableListOf() } += muscleSession
+                }
             }
         }
 
         return muscleData.map { (muscle, sessionsForMuscle) ->
-            val sorted = sessionsForMuscle.sortedByDescending { it.startTime }
-            val lastTrained = sorted.firstOrNull()?.startTime
-            val last7 = sorted.filter { it.startTime >= nowMillis - 7L * DAY }
-            val volumeLast7 = last7.sumOf { it.sets.hardSetsVolume() }
-            val highRpeSets = last7.flatMap { it.sets }.count { (it.rpe ?: 0.0) >= 9.0 }
-            val hoursSinceLastTrained = lastTrained?.let { (nowMillis - it) / (3_600_000.0) } ?: Double.MAX_VALUE
+            val sorted = sessionsForMuscle.sortedByDescending { it.endTime }
+            val latest = sorted.firstOrNull()
+            val lastTrained = latest?.endTime
+            val last7 = sorted.filter { it.endTime in (nowMillis - 7L * DAY)..nowMillis }
+            val hardSetsLast7 = last7.flatMap { it.sets.hardSets() }
+            // Keep tonnage as a display/context metric, but never use it as the
+            // fatigue score: a squat's kilograms must not outweigh ten light curls.
+            val volumeLast7 = hardSetsLast7.sumOf { it.weight * it.reps }
+            val highRpeSets = hardSetsLast7.count { it.rpeValue() >= HIGH_RPE }
+            val rpeDensity = if (hardSetsLast7.isNotEmpty()) {
+                highRpeSets.toDouble() / hardSetsLast7.size
+            } else {
+                0.0
+            }
+            val hoursSinceLastTrained = latest?.let {
+                ((nowMillis - it.endTime).coerceAtLeast(0L)) / HOUR_MS.toDouble()
+            } ?: Double.MAX_VALUE
 
-            val score = when {
+            val timeScore = when {
                 hoursSinceLastTrained > 72 -> 90.0
-                hoursSinceLastTrained > 48 -> 80.0 - (volumeLast7 / 5000.0).coerceIn(0.0, 20.0)
-                hoursSinceLastTrained > 24 -> 60.0 - (volumeLast7 / 3000.0).coerceIn(0.0, 30.0) - highRpeSets * 5.0
-                else -> 40.0 - (volumeLast7 / 2000.0).coerceIn(0.0, 30.0) - highRpeSets * 8.0
-            }.coerceIn(0.0, 100.0)
+                hoursSinceLastTrained > 48 -> 78.0
+                hoursSinceLastTrained > 24 -> 60.0
+                else -> 38.0
+            }
+            val workloadPenalty = when {
+                hoursSinceLastTrained <= 24 -> (hardSetsLast7.size / 12.0 * 22.0).coerceIn(0.0, 22.0)
+                hoursSinceLastTrained <= 48 -> (hardSetsLast7.size / 16.0 * 16.0).coerceIn(0.0, 16.0)
+                hoursSinceLastTrained <= 72 -> (hardSetsLast7.size / 20.0 * 10.0).coerceIn(0.0, 10.0)
+                else -> (hardSetsLast7.size / 24.0 * 5.0).coerceIn(0.0, 5.0)
+            }
+            val effortPenalty = if (hardSetsLast7.size >= MIN_SETS_FOR_DENSITY) {
+                (rpeDensity * 10.0).coerceIn(0.0, 10.0)
+            } else {
+                0.0
+            }
+            val score = (timeScore - workloadPenalty - effortPenalty).coerceIn(0.0, 100.0)
 
             val status = when {
                 score >= 80 -> MuscleRecoveryStatus.FRESH
@@ -138,30 +228,40 @@ object RecoveryAnalyzer {
     }
 
     private fun SessionWithExercises.volume(): Double =
-        exercises.flatMap { it.sets }.filter { it.setType != com.replog.data.model.SetType.WARMUP }.sumOf { it.weight * it.reps }
+        exercises.flatMap { it.sets.hardSets() }.sumOf { it.weight * it.reps }
 
-    private fun List<SetLog>.hardSetsVolume(): Double = filter { it.setType != com.replog.data.model.SetType.WARMUP }.sumOf { it.weight * it.reps }
+    private fun SessionWithExercises.hasHardSets(): Boolean =
+        exercises.any { it.sets.hardSets().isNotEmpty() }
+
+    private fun SessionWithExercises.trainingTime(): Long =
+        session.endTime ?: session.startTime
+
+    private fun SessionWithExercises.hardSets(): List<SetLog> =
+        exercises.flatMap { it.sets.hardSets() }
+
+    private fun List<SetLog>.hardSets(): List<SetLog> =
+        filter { it.completed && it.setType != SetType.WARMUP && it.reps > 0 }
+
+    private fun SetLog.rpeValueOrNull(): Double? = rpe?.takeIf { it.isFinite() }?.coerceIn(1.0, 10.0)
+
+    private fun SetLog.rpeValue(): Double = rpeValueOrNull() ?: 0.0
 
     private fun bodyweightTrend(bodyweights: List<BodyweightLog>): Double {
-        if (bodyweights.size < 4) return 0.0
-        val recent = bodyweights.takeLast(2).map { it.weight }.average()
-        val previous = bodyweights.takeLast(4).take(2).map { it.weight }.average()
+        val ordered = bodyweights
+            .filter { it.weight.isFinite() && it.weight > 0.0 }
+            .sortedBy { it.timestamp }
+        if (ordered.size < 4) return 0.0
+        val recent = ordered.takeLast(2).map { it.weight }.average()
+        val previous = ordered.dropLast(2).takeLast(2).map { it.weight }.average()
         return recent - previous
     }
 
-    private fun splitCsv(value: String): List<String> = value.split(",").map { it.trim() }.filter { it.isNotBlank() }
-
-    private fun weekStart(timestamp: Long): Long {
-        val cal = java.util.Calendar.getInstance()
-        cal.timeInMillis = timestamp
-        cal.firstDayOfWeek = java.util.Calendar.MONDAY
-        cal.set(java.util.Calendar.DAY_OF_WEEK, java.util.Calendar.MONDAY)
-        cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
-        cal.set(java.util.Calendar.MINUTE, 0)
-        cal.set(java.util.Calendar.SECOND, 0)
-        cal.set(java.util.Calendar.MILLISECOND, 0)
-        return cal.timeInMillis
-    }
+    private fun splitCsv(value: String): List<String> =
+        value.split(",").map { it.trim() }.filter { it.isNotBlank() }
 
     private const val DAY = 24L * 60L * 60L * 1000L
+    private const val HOUR_MS = 60L * 60L * 1000L
+    private const val HIGH_RPE = 9.0
+    private const val HIGH_RPE_DENSITY = 0.35
+    private const val MIN_SETS_FOR_DENSITY = 6
 }

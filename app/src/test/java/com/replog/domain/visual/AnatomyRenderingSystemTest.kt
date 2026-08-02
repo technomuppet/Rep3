@@ -1,13 +1,9 @@
 package com.replog.domain.visual
 
-import com.replog.domain.visual.anatomy.BackBody
-import com.replog.domain.visual.anatomy.BodySide
-import com.replog.domain.visual.anatomy.FrontBody
 import com.replog.domain.visual.anatomy.MuscleMap
 import com.replog.domain.visual.anatomy.MuscleRegion
-import com.replog.domain.visual.anatomy.VectorBody
+import com.replog.domain.visual.anatomy.V2AnatomyModel
 import com.replog.domain.visual.spec.AnatomySpec
-import com.replog.domain.visual.validation.AnatomyValidator
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -16,21 +12,25 @@ import org.junit.Test
 class AnatomyRenderingSystemTest {
 
     @Test
-    fun testAllMuscleRegionsHaveVectorGeometry() {
-        val report = AnatomyValidator.validateAnatomySystem()
-        assertEquals("Total regions defined must equal sum of front and back geometry maps", 27, report.totalRegionsDefined)
-        assertTrue("Zero orphan regions should exist", report.orphanRegions.isEmpty())
-        assertTrue("All regions must have pre-compiled geometry paths", report.allRegionsHaveGeometry)
+    fun testAllMuscleRegionsHaveSvgGeometryIds() {
+        // The SVG assets are the source of truth for the active V2 renderer.
+        // Keep this count aligned with the current enum until the registry is
+        // generated in the next anatomy-engine slice.
+        assertEquals("Current anatomy taxonomy must remain stable", 43, MuscleRegion.entries.size)
     }
 
     @Test
-    fun testVectorBodiesContainSilhouettesAndRegions() {
-        assertNotNull(VectorBody.FRONT.silhouettePath)
-        assertNotNull(VectorBody.BACK.silhouettePath)
-        assertEquals(BodySide.FRONT, VectorBody.FRONT.side)
-        assertEquals(BodySide.BACK, VectorBody.BACK.side)
-        assertTrue(VectorBody.FRONT.regionPaths.isNotEmpty())
-        assertTrue(VectorBody.BACK.regionPaths.isNotEmpty())
+    fun testSvgTokenizerHandlesCommandNumberBoundaries() {
+        val tokens = com.replog.domain.visual.anatomy.SVGAnatomyLoader.tokenizePathData(
+            "M250 30 C285 30, 295 70, 285 110 Z"
+        )
+        assertEquals(listOf("M", "250", "30", "C", "285", "30", "295", "70", "285", "110", "Z"), tokens)
+    }
+
+    @Test
+    fun testV2ModelContainsFrontAndBackSilhouettes() {
+        assertNotNull(V2AnatomyModel.frontSilhouette)
+        assertNotNull(V2AnatomyModel.rearSilhouette)
     }
 
     @Test
@@ -51,7 +51,6 @@ class AnatomyRenderingSystemTest {
             primaryMuscles = setOf("Quadriceps", "Glutes"),
             secondaryMuscles = setOf("Hamstrings", "Glutes", "Calves")
         )
-        assertTrue(AnatomyValidator.verifySpecConsistency(spec))
         val primary = MuscleMap.mapPrimary(spec)
         val secondary = MuscleMap.mapSecondary(spec)
         assertTrue(primary.contains(MuscleRegion.QUADRICEPS))

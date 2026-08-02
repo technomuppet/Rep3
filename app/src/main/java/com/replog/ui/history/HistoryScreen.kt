@@ -38,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.replog.data.model.SessionWithExercises
+import com.replog.domain.recovery.WorkoutEnergyEstimate
 import com.replog.ui.components.EmptyState
 import com.replog.ui.components.LoadingState
 import com.replog.ui.components.PRBadge
@@ -80,8 +81,9 @@ fun HistoryScreen(
             item { CalendarSummaryCard(sessions = completed) }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    StatCard("This month", sessionsThisMonth(completed).toString(), Modifier.weight(1f))
-                    StatCard("Month volume", formatWeight(monthVolume(completed)), Modifier.weight(1f))
+                    val now = Calendar.getInstance().timeInMillis
+                    StatCard("This month", HistoryCalculations.sessionsThisMonth(completed, now).toString(), Modifier.weight(1f))
+                    StatCard("Month volume", formatWeight(HistoryCalculations.monthVolume(completed, now)), Modifier.weight(1f))
                 }
             }
 
@@ -91,7 +93,7 @@ fun HistoryScreen(
                     Text(formatDayHeader(day), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 }
                 items(sessions, key = { it.session.id }) { session ->
-                    SessionHistoryCard(session) { pendingDelete = session }
+                    SessionHistoryCard(session, state.profileWeightKg) { pendingDelete = session }
                 }
             }
 
@@ -124,7 +126,7 @@ fun HistoryScreen(
 private fun CalendarSummaryCard(sessions: List<SessionWithExercises>) = RepLogCard {
     val calendar = Calendar.getInstance()
     val monthLabel = SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(calendar.time)
-    val sessionDays = sessions.map { dayOfMonth(it.session.startTime) }.toSet()
+    val sessionDays = HistoryCalculations.sessionDaysInMonth(sessions, calendar.timeInMillis)
     val daysInMonth = calendar.getActualMaximum(Calendar.DAY_OF_MONTH)
 
     Text(monthLabel, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -160,9 +162,26 @@ private fun CalendarSummaryCard(sessions: List<SessionWithExercises>) = RepLogCa
 }
 
 @Composable
-private fun SessionHistoryCard(session: SessionWithExercises, onDelete: () -> Unit) = RepLogCard {
+private fun SessionHistoryCard(
+    session: SessionWithExercises,
+    profileWeightKg: Double?,
+    onDelete: () -> Unit
+) = RepLogCard {
     val duration = session.session.endTime?.let { ((it - session.session.startTime) / 60000.0).roundToInt().toString() + " min" } ?: "In progress"
-    val volume = session.exercises.sumOf { entry -> entry.sets.sumOf { it.weight * it.reps } }
+    val workSets = HistoryCalculations.completedWorkSets(session)
+    val volume = workSets.sumOf { it.weight * it.reps }
+    val completedSets = workSets.size
+    val averageRpe = workSets
+        .mapNotNull { it.rpe }
+        .takeIf { it.isNotEmpty() }
+        ?.average()
+    val energyEstimate = WorkoutEnergyEstimate.estimate(
+        startTimeMillis = session.session.startTime,
+        endTimeMillis = session.session.endTime,
+        weightKg = profileWeightKg,
+        completedSetCount = completedSets,
+        averageRpe = averageRpe
+    )
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Default.FitnessCenter, null, tint = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.width(12.dp))
@@ -174,10 +193,23 @@ private fun SessionHistoryCard(session: SessionWithExercises, onDelete: () -> Un
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
-                "$duration • ${session.exercises.size} exercises • ${session.exercises.sumOf { it.sets.size }} sets • ${formatWeight(volume)}",
+                "$duration • ${session.exercises.size} exercises • $completedSets sets • ${formatWeight(volume)}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            energyEstimate?.let {
+                Text(
+                    it.label,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    "A broad estimate based on duration, profile weight and logged effort.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
         IconButton(onDelete) { Icon(Icons.Default.Delete, "Delete", tint = MaterialTheme.colorScheme.error) }
     }
@@ -185,7 +217,7 @@ private fun SessionHistoryCard(session: SessionWithExercises, onDelete: () -> Un
     session.exercises.forEach { ex ->
         Spacer(Modifier.height(8.dp))
         Text(ex.exercise.name, fontWeight = FontWeight.SemiBold)
-        ex.sets.forEach { set ->
+        ex.sets.filter { it.completed }.forEach { set ->
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(
@@ -214,21 +246,4 @@ private fun dayStart(timestamp: Long): Long {
     return cal.timeInMillis
 }
 
-private fun dayOfMonth(timestamp: Long): Int = Calendar.getInstance().apply { timeInMillis = timestamp }.get(Calendar.DAY_OF_MONTH)
 private fun formatDayHeader(timestamp: Long): String = SimpleDateFormat("EEEE, d MMM", Locale.getDefault()).format(Date(timestamp))
-
-private fun sessionsThisMonth(sessions: List<SessionWithExercises>): Int {
-    val now = Calendar.getInstance()
-    return sessions.count {
-        val cal = Calendar.getInstance().apply { timeInMillis = it.session.startTime }
-        cal.get(Calendar.YEAR) == now.get(Calendar.YEAR) && cal.get(Calendar.MONTH) == now.get(Calendar.MONTH)
-    }
-}
-
-private fun monthVolume(sessions: List<SessionWithExercises>): Double {
-    val now = Calendar.getInstance()
-    return sessions.filter {
-        val cal = Calendar.getInstance().apply { timeInMillis = it.session.startTime }
-        cal.get(Calendar.YEAR) == now.get(Calendar.YEAR) && cal.get(Calendar.MONTH) == now.get(Calendar.MONTH)
-    }.sumOf { session -> session.exercises.sumOf { entry -> entry.sets.sumOf { it.weight * it.reps } } }
-}

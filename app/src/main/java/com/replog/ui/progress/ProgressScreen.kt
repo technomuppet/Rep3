@@ -372,11 +372,15 @@ private fun BodyweightChart(logs: List<BodyweightLog>, goal: Double?) {
     val min = values.minOrNull() ?: 0.0
     val max = values.maxOrNull() ?: 1.0
     val range = (max - min).takeIf { it > 0.0 } ?: 1.0
+    val chartDescription = buildString {
+        append("Bodyweight trend chart with ${logs.size} entries and a rolling average")
+        if (goal != null) append(" plus a goal line")
+    }
     Canvas(
         Modifier
             .fillMaxWidth()
             .height(140.dp)
-            .semantics { contentDescription = "Bodyweight trend chart showing entries, rolling average and optional goal line" }
+            .semantics { contentDescription = chartDescription }
     ) {
         val left = 8.dp.toPx(); val right = size.width - 8.dp.toPx(); val top = 10.dp.toPx(); val bottom = size.height - 12.dp.toPx()
         val width = right - left; val height = bottom - top
@@ -437,7 +441,7 @@ private fun VolumeChart(points: List<WeeklyVolumePoint>) {
         Modifier
             .fillMaxWidth()
             .height(180.dp)
-            .semantics { contentDescription = "Weekly training volume chart for recent weeks" }
+            .semantics { contentDescription = "Weekly training volume chart covering ${points.size} recent weeks" }
     ) {
         val left = 8.dp.toPx(); val right = size.width - 8.dp.toPx(); val top = 12.dp.toPx(); val bottom = size.height - 18.dp.toPx()
         val width = right - left; val height = bottom - top

@@ -9,9 +9,12 @@ import com.replog.domain.intelligence.TodaysBriefing
 import com.replog.domain.musclegap.MuscleGapAnalyzer
 import com.replog.domain.recommendation.MuscleRecoveryStatus
 import com.replog.domain.recommendation.RecoveryAnalyzer
+import com.replog.data.model.SetType
+import com.replog.domain.recovery.NutritionGuidelines
 import com.replog.domain.recovery.RecoveryCalendar
 import com.replog.domain.recovery.RecoveryCalendarDay
 import com.replog.domain.recovery.RecoveryDashboard
+import com.replog.domain.recovery.RecoveryGuidance
 import com.replog.domain.volume.VolumeLandmarks
 import com.replog.domain.volume.VolumeStatus
 import com.replog.util.PreferencesManager
@@ -282,6 +285,7 @@ class IntelligenceRepository @Inject constructor(
         val sessions = workoutRepository.getRecentCompletedSessions(60).first()
         if (sessions.size < 3) return RecoveryCentreData(hasData = false)
         val bodyweights = bodyweightRepository.getAllBodyweights().first()
+        val profile = prefs.userProfile.first()
 
         val overall = RecoveryAnalyzer.overallRecovery(sessions, bodyweights, now)
         val state = RecoveryDashboard.from(overall)
@@ -303,7 +307,12 @@ class IntelligenceRepository @Inject constructor(
             .sortedBy { it.recoveryScore }.map { toUi(it) }
 
         val calendar = RecoveryCalendar.build(
-            sessions.map { c -> c.session.startTime to c.exercises.sumOf { e -> e.sets.sumOf { it.weight * it.reps } } },
+            sessions.map { c ->
+                c.session.startTime to c.exercises
+                    .flatMap { it.sets }
+                    .filter { it.completed && it.setType != SetType.WARMUP && it.reps > 0 }
+                    .sumOf { it.weight * it.reps }
+            },
             now, days = 14
         )
 
@@ -330,12 +339,15 @@ class IntelligenceRepository @Inject constructor(
             today < 45 -> "Recovery day"
             else -> "Balanced session"
         }
-        val improvements = mutableListOf<String>()
-        if (recovered.isNotEmpty()) improvements += "${recovered.size} muscle group${if (recovered.size == 1) "" else "s"} fully recovered."
-        if (today >= 80) improvements += "Overall recovery is excellent today."
-        val warnings = mutableListOf<String>()
-        if (today < 45) warnings += "Recovery is low - training hard today may set you back."
-        fatigued.firstOrNull()?.let { warnings += "${it.muscle} is still fatigued (${it.hoursUntilReady}h to go)." }
+        val guidance = RecoveryGuidance.build(
+            score = today,
+            recovered = muscle.filter { it.status == MuscleRecoveryStatus.FRESH || it.status == MuscleRecoveryStatus.RECOVERED },
+            fatigued = muscle.filter { it.status == MuscleRecoveryStatus.FATIGUED || it.status == MuscleRecoveryStatus.VERY_FATIGUED },
+            factors = state.factors
+        )
+        val improvements = guidance.improvements.toMutableList()
+        NutritionGuidelines.recoveryGuideline(profile)?.let { improvements += it }
+        val warnings = guidance.warnings.toMutableList()
 
         return RecoveryCentreData(
             hasData = true, score = state.score, statusLabel = state.statusLabel,
