@@ -61,6 +61,7 @@ class WorkoutStarter @Inject constructor(
         }
         if (prescriptions.isNotEmpty()) workouts.insertPrescriptions(prescriptions)
         prefs.setActiveSessionId(id)
+        prefs.requestPreWorkoutReminder()
         return id
     }
 
@@ -82,6 +83,7 @@ class WorkoutStarter @Inject constructor(
             }
         )
         prefs.setActiveSessionId(id)
+        prefs.requestPreWorkoutReminder()
         return id
     }
 
@@ -109,6 +111,7 @@ class WorkoutStarter @Inject constructor(
         }
         if (prescriptions.isNotEmpty()) workouts.insertPrescriptions(prescriptions)
         prefs.setActiveSessionId(id)
+        prefs.requestPreWorkoutReminder()
         return id
     }
 }

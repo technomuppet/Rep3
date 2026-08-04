@@ -21,6 +21,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.replog.domain.recovery.MacroTargets
+import com.replog.domain.recovery.NutritionGuidelines
 
 @Composable
 fun RepLogCard(modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
@@ -61,6 +63,41 @@ fun InlineEmpty(message: String, modifier: Modifier = Modifier) {
 fun StatCard(label: String, value: String, modifier: Modifier = Modifier) = RepLogCard(modifier) {
     Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
     Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+/**
+ * Two-row StatCard grid for daily macro targets (protein/carbs/fat/water).
+ * Shared by the Home dashboard and History month stats. When [targets] is null
+ * (no usable profile weight) every cell renders "—" so screens stay honest.
+ */
+@Composable
+fun MacroTargetStatCards(targets: MacroTargets?, modifier: Modifier = Modifier) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            StatCard(
+                "Daily protein",
+                targets?.let { "${it.proteinMinGrams}–${it.proteinMaxGrams}g" } ?: "—",
+                Modifier.weight(1f)
+            )
+            StatCard(
+                "Daily carbs",
+                targets?.let { "~${it.carbGrams}g" } ?: "—",
+                Modifier.weight(1f)
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            StatCard(
+                "Daily fat",
+                targets?.let { "~${it.fatGrams}g" } ?: "—",
+                Modifier.weight(1f)
+            )
+            StatCard(
+                "Daily water",
+                targets?.let { "~${NutritionGuidelines.formatLitres(it.waterLitres)}L" } ?: "—",
+                Modifier.weight(1f)
+            )
+        }
+    }
 }
 
 @Composable

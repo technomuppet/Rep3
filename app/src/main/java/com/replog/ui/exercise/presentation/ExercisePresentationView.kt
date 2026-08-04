@@ -104,8 +104,9 @@ fun ExercisePresentationView(exercise: Exercise, modifier: Modifier = Modifier) 
             }
         }
 
-        // 3. Textbook Anatomy Muscle Diagram
+        // 3. Premium Anatomy Illustration (PNG artwork; the legacy SVG vector pipeline was removed)
         val context = LocalContext.current
+        val anatomyImage = remember { loadAnatomyIllustration(context) }
         RepLogCard {
             Text("Target Muscle Activation", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
@@ -115,33 +116,19 @@ fun ExercisePresentationView(exercise: Exercise, modifier: Modifier = Modifier) 
             ) {
                 Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                     Canvas(modifier = Modifier.fillMaxWidth().height(220.dp)) {
-                        val regions = V2AnatomyModel.loadRegionsForSide(isFront = true, context = context)
-                        MuscleRenderer.drawRegions(
-                            drawScope = this,
-                            regions = regions,
-                            silhouettePath = V2AnatomyModel.frontSilhouette,
-                            primaryRegions = asset.anatomySpec.primaryMuscles.mapNotNull { name -> try { MuscleRegion.valueOf(name.uppercase()) } catch (e: Exception) { null } }.toSet(),
-                            secondaryRegions = asset.anatomySpec.secondaryMuscles.mapNotNull { name -> try { MuscleRegion.valueOf(name.uppercase()) } catch (e: Exception) { null } }.toSet(),
-                            palette = AnatomyPalette.default(),
-                            activations = emptyList(),
-                            stabiliserRegions = asset.anatomySpec.stabiliserMuscles.mapNotNull { name -> try { MuscleRegion.valueOf(name.uppercase()) } catch (e: Exception) { null } }.toSet()
-                        )
+                        anatomyImage?.let { image ->
+                            // Premium PNG artwork: front figure occupies the left half of the sprite sheet.
+                            drawAnatomyHalf(image = image, isFront = true)
+                        }
                     }
                     Text("Anterior (Front)", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
                 }
                 Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                     Canvas(modifier = Modifier.fillMaxWidth().height(220.dp)) {
-                        val regions = V2AnatomyModel.loadRegionsForSide(isFront = false, context = context)
-                        MuscleRenderer.drawRegions(
-                            drawScope = this,
-                            regions = regions,
-                            silhouettePath = V2AnatomyModel.rearSilhouette,
-                            primaryRegions = asset.anatomySpec.primaryMuscles.mapNotNull { name -> try { MuscleRegion.valueOf(name.uppercase()) } catch (e: Exception) { null } }.toSet(),
-                            secondaryRegions = asset.anatomySpec.secondaryMuscles.mapNotNull { name -> try { MuscleRegion.valueOf(name.uppercase()) } catch (e: Exception) { null } }.toSet(),
-                            palette = AnatomyPalette.default(),
-                            activations = emptyList(),
-                            stabiliserRegions = asset.anatomySpec.stabiliserMuscles.mapNotNull { name -> try { MuscleRegion.valueOf(name.uppercase()) } catch (e: Exception) { null } }.toSet()
-                        )
+                        anatomyImage?.let { image ->
+                            // Premium PNG artwork: back figure occupies the right half of the sprite sheet.
+                            drawAnatomyHalf(image = image, isFront = false)
+                        }
                     }
                     Text("Posterior (Back)", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
                 }

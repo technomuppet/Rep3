@@ -79,6 +79,10 @@ class PreferencesManager @Inject constructor(@ApplicationContext context: Contex
         val LEGAL_COMPLETED = booleanPreferencesKey("legal_completed")
         // Append-only acceptance history, one record per line; fields tab-separated.
         val LEGAL_HISTORY = stringPreferencesKey("legal_acceptance_history")
+        // Sprint 12: pre-workout fuel-up reminder fatigue suppression.
+        val PRE_WORKOUT_REMINDER_SKIPS = intPreferencesKey("pre_workout_reminder_skips")
+        val PRE_WORKOUT_REMINDER_SNOOZED_UNTIL = longPreferencesKey("pre_workout_reminder_snoozed_until")
+        val PRE_WORKOUT_REMINDER_PENDING = booleanPreferencesKey("pre_workout_reminder_pending")
     }
 
     val useKg: Flow<Boolean> = store.data.map { it[Keys.USE_KG] ?: true }
@@ -86,6 +90,11 @@ class PreferencesManager @Inject constructor(@ApplicationContext context: Contex
     val restSeconds: Flow<Int> = store.data.map { it[Keys.REST_SECONDS] ?: 90 }
     val activeSessionId: Flow<Int?> = store.data.map { it[Keys.ACTIVE_SESSION_ID]?.takeIf { id -> id > 0 } }
     val onboardingComplete: Flow<Boolean> = store.data.map { it[Keys.ONBOARDING_COMPLETE] ?: false }
+    val preWorkoutReminderSkips: Flow<Int> = store.data.map { it[Keys.PRE_WORKOUT_REMINDER_SKIPS] ?: 0 }
+    val preWorkoutReminderSnoozedUntil: Flow<Long?> = store.data.map {
+        it[Keys.PRE_WORKOUT_REMINDER_SNOOZED_UNTIL]?.takeIf { timestamp -> timestamp > 0L }
+    }
+    val preWorkoutReminderPending: Flow<Boolean> = store.data.map { it[Keys.PRE_WORKOUT_REMINDER_PENDING] ?: false }
     val bodyweightGoal: Flow<Double?> = store.data.map { it[Keys.BODYWEIGHT_GOAL]?.takeIf { value -> value > 0.0 } }
     val customKgPlates: Flow<String> = store.data.map { it[Keys.CUSTOM_KG_PLATES] ?: PlateCalculator.formatPlates(PlateCalculator.metricPlates) }
     val customLbPlates: Flow<String> = store.data.map { it[Keys.CUSTOM_LB_PLATES] ?: PlateCalculator.formatPlates(PlateCalculator.imperialPlates) }
@@ -149,6 +158,58 @@ class PreferencesManager @Inject constructor(@ApplicationContext context: Contex
     suspend fun setUseKg(value: Boolean) { store.edit { it[Keys.USE_KG] = value } }
     suspend fun setFirstLaunchComplete() { store.edit { it[Keys.FIRST_LAUNCH] = false } }
     suspend fun setRestSeconds(value: Int) { store.edit { it[Keys.REST_SECONDS] = value.coerceIn(15, 600) } }
+
+    /** Increment the pre-workout reminder dismissal counter (used for fatigue suppression). */
+    suspend fun recordPreWorkoutReminderDismissal() {
+        store.edit { it[Keys.PRE_WORKOUT_REMINDER_SKIPS] = (it[Keys.PRE_WORKOUT_REMINDER_SKIPS] ?: 0) + 1 }
+    }
+
+    /** Mark that another screen created a session and Active Workout should show the reminder. */
+    suspend fun requestPreWorkoutReminder() {
+        store.edit { it[Keys.PRE_WORKOUT_REMINDER_PENDING] = true }
+    }
+
+    /** Consume a pending request exactly once when Active Workout resumes the session. */
+    suspend fun consumePreWorkoutReminderRequest(): Boolean {
+        var requested = false
+        store.edit {
+            requested = it[Keys.PRE_WORKOUT_REMINDER_PENDING] == true
+            it.remove(Keys.PRE_WORKOUT_REMINDER_PENDING)
+        }
+        return requested
+    }
+
+    /** Clear persisted suppression state, useful for user-facing reminder reset controls. */
+    suspend fun clearPreWorkoutReminderSuppression() {
+        store.edit {
+            it.remove(Keys.PRE_WORKOUT_REMINDER_SKIPS)
+            it.remove(Keys.PRE_WORKOUT_REMINDER_SNOOZED_UNTIL)
+        }
+    }
+
+    /** Snooze the reminder; its dismissal count is reset when the snooze expires. */
+    suspend fun snoozePreWorkoutReminder(
+        nowMillis: Long = System.currentTimeMillis(),
+        durationMillis: Long
+    ) {
+        store.edit {
+            it[Keys.PRE_WORKOUT_REMINDER_SNOOZED_UNTIL] = nowMillis + durationMillis
+        }
+    }
+
+    /** Atomically clear an expired snooze and its accumulated dismissal count. */
+    suspend fun resetPreWorkoutReminderIfSnoozeExpired(nowMillis: Long): Boolean {
+        var reset = false
+        store.edit {
+            val snoozedUntil = it[Keys.PRE_WORKOUT_REMINDER_SNOOZED_UNTIL]
+            if (snoozedUntil != null && snoozedUntil <= nowMillis) {
+                it.remove(Keys.PRE_WORKOUT_REMINDER_SNOOZED_UNTIL)
+                it.remove(Keys.PRE_WORKOUT_REMINDER_SKIPS)
+                reset = true
+            }
+        }
+        return reset
+    }
     suspend fun setCustomKgPlates(value: String) { store.edit { it[Keys.CUSTOM_KG_PLATES] = value } }
     suspend fun setCustomLbPlates(value: String) { store.edit { it[Keys.CUSTOM_LB_PLATES] = value } }
     suspend fun setBodyweightGoal(value: Double?) {

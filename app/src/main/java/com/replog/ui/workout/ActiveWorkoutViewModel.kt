@@ -27,12 +27,14 @@ import com.replog.util.AdaptiveProgramEngine
 import com.replog.util.AdaptiveWorkoutPlan
 import com.replog.util.PreferencesManager
 import com.replog.util.ProgressionEngine
+import com.replog.util.profile.UserProfile
 import com.replog.util.timer.RestTimerManager
 import com.replog.util.timer.RestTimerState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -98,7 +100,9 @@ data class ActiveWorkoutUiState(
     val restoredWorkout: Boolean = false,
     val summary: WorkoutSummary? = null,
     val adaptivePlan: AdaptiveWorkoutPlan? = null,
-    val targetsByExerciseId: Map<Int, WorkoutTargetUi> = emptyMap()
+    val targetsByExerciseId: Map<Int, WorkoutTargetUi> = emptyMap(),
+    /** Full profile (weight + goal) for the completion-dialog refuel tip; null before onboarding. */
+    val profile: UserProfile? = null
 )
 
 /** Typed holders so the ActiveWorkout combine() has no positional casts (Sprint 19). */
@@ -117,7 +121,8 @@ private data class AwDataGroup(
 )
 private data class AwPrefsGroup(
     val restAutoStart: Boolean,
-    val autoFocusField: String
+    val autoFocusField: String,
+    val profile: UserProfile?
 )
 
 @HiltViewModel
@@ -146,6 +151,49 @@ class ActiveWorkoutViewModel @Inject constructor(
     val templateMessage: StateFlow<String?> = templateMessageFlow
 
     fun clearTemplateMessage() { templateMessageFlow.value = null }
+
+    /** Transient pre-workout fuel reminder shown right after a session starts. */
+    private val preWorkoutReminder = PreWorkoutReminder()
+    val nutritionReminder: StateFlow<String?> = preWorkoutReminder.state
+
+    fun clearNutritionReminder() { preWorkoutReminder.clear() }
+
+    /** Show the pre-workout tip when a session starts (only for onboarded users). */
+    private suspend fun remindPreWorkoutNutrition() {
+        val now = System.currentTimeMillis()
+        prefs.resetPreWorkoutReminderIfSnoozeExpired(now)
+        val profile = prefs.userProfile.first()
+        val skips = prefs.preWorkoutReminderSkips.first()
+        val snoozedUntil = prefs.preWorkoutReminderSnoozedUntil.first()
+        preWorkoutReminder.show(profile, skips, snoozedUntil, now)
+    }
+
+    /**
+     * Consume a cross-screen start request exactly once, adopt its active session,
+     * then show the reminder for the new session.
+     */
+    private suspend fun consumePendingReminderAndShow() {
+        if (prefs.consumePreWorkoutReminderRequest()) {
+            prefs.activeSessionId.first()?.let { requestedId ->
+                if (workouts.getSessionEntity(requestedId)?.endTime == null) {
+                    activeId.value = requestedId
+                }
+            }
+        }
+        remindPreWorkoutNutrition()
+    }
+
+    /** Record a dismissal (Skip button or tap-outside) — after N dismissals the dialog is suppressed. */
+    fun onReminderDismissed() = viewModelScope.launch {
+        prefs.recordPreWorkoutReminderDismissal()
+        preWorkoutReminder.clear()
+    }
+
+    /** Hide the dialog and let the user choose to see it again in one week. */
+    fun onReminderSnoozed() = viewModelScope.launch {
+        prefs.snoozePreWorkoutReminder(durationMillis = PreWorkoutReminder.SNOOZE_DURATION_MILLIS)
+        preWorkoutReminder.clear()
+    }
 
     /**
      * Serialize a template to a portable .replogtemplate file in the cache and
@@ -200,8 +248,8 @@ class ActiveWorkoutViewModel @Inject constructor(
         AwDataGroup(allExercises, templates, timerState, allSessions, useKg)
     }
     private val awPrefs: kotlinx.coroutines.flow.Flow<AwPrefsGroup> = combine(
-        prefs.restAutoStart, prefs.autoFocusField
-    ) { restAutoStart, autoFocusField -> AwPrefsGroup(restAutoStart, autoFocusField) }
+        prefs.restAutoStart, prefs.autoFocusField, prefs.userProfile
+    ) { restAutoStart, autoFocusField, profile -> AwPrefsGroup(restAutoStart, autoFocusField, profile) }
 
     val uiState: StateFlow<ActiveWorkoutUiState> = combine(
         awCore, awData, awPrefs
@@ -217,6 +265,7 @@ class ActiveWorkoutViewModel @Inject constructor(
         val useKg = data.useKg
         val restAutoStart = pref.restAutoStart
         val autoFocusField = pref.autoFocusField
+        val profile = pref.profile
 
         val session = id?.let { workouts.getSessionById(it) }
         val prescriptions = id?.let { workouts.getPrescriptionsForSession(it) }.orEmpty()
@@ -267,6 +316,7 @@ class ActiveWorkoutViewModel @Inject constructor(
             restoredWorkout = restoredWorkout,
             summary = currentSummary,
             adaptivePlan = adaptivePlan,
+            profile = profile,
             targetsByExerciseId = prescriptions.associate { p ->
                 p.exerciseId to WorkoutTargetUi(
                     p.exerciseId,
@@ -283,9 +333,24 @@ class ActiveWorkoutViewModel @Inject constructor(
             if (storedId != null) {
                 val session = workouts.getSessionEntity(storedId)
                 when (ActiveWorkoutRecovery.decide(storedId, session != null, session?.endTime != null)) {
-                    ActiveWorkoutRecoveryDecision.RESUME -> { activeId.value = storedId; restored.value = true; refresh() }
+                    ActiveWorkoutRecoveryDecision.RESUME -> {
+                        activeId.value = storedId
+                        restored.value = true
+                        refresh()
+                    }
                     ActiveWorkoutRecoveryDecision.CLEAR_STALE -> prefs.setActiveSessionId(null)
                     ActiveWorkoutRecoveryDecision.NONE -> Unit
+                }
+            }
+        }
+        // Home, Quick Workouts and Muscle Balance can create a session before
+        // navigating here. Collect the durable hand-off so this ViewModel also
+        // works when its instance already exists (not only on first composition).
+        viewModelScope.launch {
+            prefs.preWorkoutReminderPending.collect { pending ->
+                if (pending) {
+                    consumePendingReminderAndShow()
+                    refresh()
                 }
             }
         }
@@ -319,7 +384,9 @@ class ActiveWorkoutViewModel @Inject constructor(
     fun startWorkout(name: String? = null) = viewModelScope.launch {
         summary.value = null; previousWorkoutCache.clear(); cachedForSessionId = null; restTimer.cancel()
         val id = workouts.insertSession(WorkoutSession(templateName = name?.ifBlank { null }, startTime = System.currentTimeMillis())).toInt()
-        activeId.value = id; prefs.setActiveSessionId(id); refresh()
+        activeId.value = id; prefs.setActiveSessionId(id)
+        consumePendingReminderAndShow()
+        refresh()
     }
 
     fun createTemplate(name: String, selectedExercises: List<TemplateExerciseDraft>) = viewModelScope.launch {
@@ -355,7 +422,9 @@ class ActiveWorkoutViewModel @Inject constructor(
             workouts.insertSessionExercise(SessionExercise(sessionId = id, exerciseId = entry.exercise.id, orderIndex = index, supersetGroup = entry.sessionExercise.supersetGroup, notes = ""))
         }
         workouts.insertPrescriptions(plan.targets.map { t -> WorkoutPrescription(sessionId = id, exerciseId = t.exerciseId, source = "Adaptive", targetSets = t.suggestedSets, targetReps = t.suggestedReps, targetWeight = t.suggestedWeight, adjustment = t.adjustment, reason = t.reason) })
-        activeId.value = id; prefs.setActiveSessionId(id); refresh()
+        activeId.value = id; prefs.setActiveSessionId(id)
+        consumePendingReminderAndShow()
+        refresh()
     }
 
     /**
@@ -388,13 +457,17 @@ class ActiveWorkoutViewModel @Inject constructor(
             )
         })
         pendingCoachRecommendation = rec
-        activeId.value = id; prefs.setActiveSessionId(id); refresh()
+        activeId.value = id; prefs.setActiveSessionId(id)
+        consumePendingReminderAndShow()
+        refresh()
     }
 
     fun startWorkoutFromTemplate(template: TemplateWithExercises) = viewModelScope.launch {
         summary.value = null; previousWorkoutCache.clear(); cachedForSessionId = null; restTimer.cancel()
         val id = workoutStarter.startTemplate(template)
-        activeId.value = id; refresh()
+        activeId.value = id
+        consumePendingReminderAndShow()
+        refresh()
     }
 
     /**

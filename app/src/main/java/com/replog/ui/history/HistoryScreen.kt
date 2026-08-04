@@ -38,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.replog.data.model.SessionWithExercises
+import com.replog.domain.recovery.NutritionGuidelines
 import com.replog.domain.recovery.WorkoutEnergyEstimate
 import com.replog.ui.components.EmptyState
 import com.replog.ui.components.LoadingState
@@ -46,6 +47,7 @@ import com.replog.ui.components.RepLogCard
 import com.replog.ui.components.SecondaryButton
 import com.replog.ui.components.StatCard
 import com.replog.ui.components.formatWeight
+import com.replog.util.profile.UserProfile
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -59,6 +61,7 @@ fun HistoryScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val completed = state.sessions.filter { it.session.endTime != null }
+    val macroTargets = state.profile?.let { NutritionGuidelines.dailyTargets(it) }
     var pendingDelete by remember { mutableStateOf<SessionWithExercises?>(null) }
 
     LazyColumn(
@@ -86,6 +89,7 @@ fun HistoryScreen(
                     StatCard("Month volume", formatWeight(HistoryCalculations.monthVolume(completed, now)), Modifier.weight(1f))
                 }
             }
+            item { MacroTargetStatCards(macroTargets) }
 
             val grouped = state.sessions.groupBy { dayStart(it.session.startTime) }.toSortedMap(compareByDescending { it })
             grouped.forEach { (day, sessions) ->
@@ -93,7 +97,7 @@ fun HistoryScreen(
                     Text(formatDayHeader(day), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 }
                 items(sessions, key = { it.session.id }) { session ->
-                    SessionHistoryCard(session, state.profileWeightKg) { pendingDelete = session }
+                    SessionHistoryCard(session, state.profile) { pendingDelete = session }
                 }
             }
 
@@ -164,7 +168,7 @@ private fun CalendarSummaryCard(sessions: List<SessionWithExercises>) = RepLogCa
 @Composable
 private fun SessionHistoryCard(
     session: SessionWithExercises,
-    profileWeightKg: Double?,
+    profile: UserProfile?,
     onDelete: () -> Unit
 ) = RepLogCard {
     val duration = session.session.endTime?.let { ((it - session.session.startTime) / 60000.0).roundToInt().toString() + " min" } ?: "In progress"
@@ -178,7 +182,7 @@ private fun SessionHistoryCard(
     val energyEstimate = WorkoutEnergyEstimate.estimate(
         startTimeMillis = session.session.startTime,
         endTimeMillis = session.session.endTime,
-        weightKg = profileWeightKg,
+        weightKg = profile?.weightKg,
         completedSetCount = completedSets,
         averageRpe = averageRpe
     )
@@ -209,6 +213,16 @@ private fun SessionHistoryCard(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                profile?.let { p ->
+                    NutritionGuidelines.postWorkoutTip(p, it.durationMinutes)?.let { tip ->
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            "Refuel: $tip",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
         }
         IconButton(onDelete) { Icon(Icons.Default.Delete, "Delete", tint = MaterialTheme.colorScheme.error) }

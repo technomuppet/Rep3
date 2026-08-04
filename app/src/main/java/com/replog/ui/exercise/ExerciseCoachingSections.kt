@@ -31,9 +31,9 @@ fun CoachingCueSections(
         // Setup — always visible
         PremiumSectionCard(title = "SETUP", icon = "📍") {
             coaching.steps.forEachIndexed { i, s ->
-                Row(modifier = Modifier.padding(vertical = 2.dp)) {
+                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
                     Text("${i + 1}.  ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text(s, style = MaterialTheme.typography.bodyMedium)
+                    Text(s, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                 }
             }
         }
@@ -93,20 +93,20 @@ fun CoachingCueSections(
             coaching.mistakes.forEachIndexed { i, mistake ->
                 Column(modifier = Modifier.padding(vertical = 6.dp)) {
                     // Problem
-                    Row(modifier = Modifier.padding(vertical = 1.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp)) {
                         Text("✗ PROBLEM:  ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
-                        Text(mistake, style = MaterialTheme.typography.bodyMedium)
+                        Text(mistake, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                     }
                     // Why it matters
-                    Row(modifier = Modifier.padding(vertical = 1.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp)) {
                         Text("  WHY IT MATTERS:  ", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.tertiary)
-                        Text("Reduces target-muscle activation, increases injury risk, and compromises movement quality.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Reduces target-muscle activation, increases injury risk, and compromises movement quality.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
                     }
                     // How to correct
-                    Row(modifier = Modifier.padding(vertical = 1.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp)) {
                         Text("  FIX:  ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                         val fix = generateFixFromMistake(mistake)
-                        Text(fix, style = MaterialTheme.typography.bodyMedium)
+                        Text(fix, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                     }
                 }
             }
@@ -115,9 +115,9 @@ fun CoachingCueSections(
         // Safety — always visible
         PremiumSectionCard(title = "SAFETY", icon = "🛡️", errorColor = true) {
             coaching.safety.forEach { advice ->
-                Row(modifier = Modifier.padding(vertical = 2.dp)) {
+                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
                     Text("•  ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
-                    Text(advice, style = MaterialTheme.typography.bodyMedium)
+                    Text(advice, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                 }
             }
         }

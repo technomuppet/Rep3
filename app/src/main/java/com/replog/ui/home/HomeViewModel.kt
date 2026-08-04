@@ -9,6 +9,7 @@ import com.replog.data.repository.WorkoutRepository
 import com.replog.domain.genome.TrainingGenomeEngine
 import com.replog.domain.goals.GoalForecast
 import com.replog.util.PreferencesManager
+import com.replog.util.profile.UserProfile
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -53,6 +54,8 @@ data class HomeUiState(
     val topGoal: HomeGoal? = null,
     val genomeHeadline: String? = null,
     val favoriteTemplates: List<com.replog.data.model.TemplateWithExercises> = emptyList(),
+    /** Full profile (weight + goal) for the daily macro grid; null before onboarding. */
+    val profile: UserProfile? = null,
     val isLoading: Boolean = true
 )
 
@@ -66,7 +69,8 @@ private data class HomeGroupA(
 )
 private data class HomeGroupB(
     val activeGoals: List<com.replog.data.model.Goal>,
-    val favorites: List<com.replog.data.model.TemplateWithExercises>
+    val favorites: List<com.replog.data.model.TemplateWithExercises>,
+    val profile: UserProfile?
 )
 
 @HiltViewModel
@@ -151,8 +155,9 @@ class HomeViewModel @Inject constructor(
     }
     private val homeGroupB: kotlinx.coroutines.flow.Flow<HomeGroupB> = combine(
         goalRepository.getActive(),
-        repo.getFavoriteTemplates()
-    ) { activeGoals, favorites -> HomeGroupB(activeGoals, favorites) }
+        repo.getFavoriteTemplates(),
+        prefs.userProfile
+    ) { activeGoals, favorites, profile -> HomeGroupB(activeGoals, favorites, profile) }
 
     val uiState: StateFlow<HomeUiState> = combine(homeGroupA, homeGroupB) { a, b ->
         val s = a.stats
@@ -162,6 +167,7 @@ class HomeViewModel @Inject constructor(
         val recentCompleted = a.recentCompleted
         val activeGoals = b.activeGoals
         val favorites = b.favorites
+        val profile = b.profile
         val now = System.currentTimeMillis()
         // Phase 2: cheap stats from SQL-aggregated summaries (no full graph load).
         val startTimes = summaries.map { it.startTime }
@@ -195,6 +201,7 @@ class HomeViewModel @Inject constructor(
             topGoal = topGoal,
             genomeHeadline = genomeHeadline,
             favoriteTemplates = favorites,
+            profile = profile,
             isLoading = false
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HomeUiState())
