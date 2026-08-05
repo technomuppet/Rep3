@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -77,8 +79,10 @@ import com.replog.data.model.SessionExerciseWithSets
 import com.replog.data.model.SetLog
 import com.replog.data.model.SetType
 import com.replog.data.model.TemplateWithExercises
+import com.replog.domain.recovery.NutritionGuidelines
 import com.replog.ui.components.EmptyState
 import com.replog.ui.components.ExerciseIcon
+import com.replog.ui.components.MacroTargetStatCards
 import com.replog.ui.components.NumberInputField
 import com.replog.ui.components.PRBadge
 import com.replog.ui.components.PrimaryButton
@@ -86,6 +90,7 @@ import com.replog.ui.components.RepLogCard
 import com.replog.ui.components.SecondaryButton
 import com.replog.ui.components.StatCard
 import com.replog.ui.components.formatWeight
+import com.replog.util.profile.UserProfile
 import com.replog.util.AdaptiveWorkoutPlan
 import com.replog.util.timer.RestTimerState
 
@@ -102,6 +107,7 @@ fun ActiveWorkoutScreen(
     }
     val state by viewModel.uiState.collectAsState()
     val templateMessage by viewModel.templateMessage.collectAsState()
+    val nutritionReminder by viewModel.nutritionReminder.collectAsState()
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val importTemplateLauncher = rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
@@ -129,7 +135,8 @@ fun ActiveWorkoutScreen(
         item {
             WorkoutHeader(
                 active = state.activeSessionId != null,
-                elapsed = elapsed(state.startTime)
+                elapsed = elapsed(state.startTime),
+                profile = state.profile
             )
         }
 
@@ -358,9 +365,32 @@ fun ActiveWorkoutScreen(
         )
     }
 
+    nutritionReminder?.let { msg ->
+        AlertDialog(
+            onDismissRequest = { viewModel.onReminderDismissed() },
+            icon = { Icon(Icons.Default.EditNote, null, tint = MaterialTheme.colorScheme.primary) },
+            title = { Text("Fuel up first") },
+            text = { Text(msg, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+            confirmButton = { TextButton(onClick = { viewModel.clearNutritionReminder() }) { Text("Start training") } },
+            dismissButton = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.End
+                ) {
+                    TextButton(onClick = { viewModel.onReminderSnoozed() }) {
+                        Text("Remind in 1 week")
+                    }
+                    TextButton(onClick = { viewModel.onReminderDismissed() }) {
+                        Text("Skip")
+                    }
+                }
+            }
+        )
+    }
+
     // Sprint 3 – Workout Completion Screen
     state.summary?.let { summary ->
-        WorkoutCompletionDialog(summary = summary, useKg = state.useKg, onRate = viewModel::rateWorkout, onDismiss = viewModel::dismissSummary)
+        WorkoutCompletionDialog(summary = summary, useKg = state.useKg, profile = state.profile, onRate = viewModel::rateWorkout, onDismiss = viewModel::dismissSummary)
     }
 }
 
@@ -382,20 +412,32 @@ private fun ConfirmActionDialog(
 }
 
 @Composable
-private fun WorkoutHeader(active: Boolean, elapsed: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Text("Workout", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.ExtraBold)
-            Text(
-                if (active) "Active • $elapsed" else "Templates, quick logging, personal bests and recovery.",
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+private fun WorkoutHeader(active: Boolean, elapsed: String, profile: UserProfile? = null) {
+    val preWorkoutTip = if (active && profile != null) NutritionGuidelines.preWorkoutTip() else null
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Workout", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.ExtraBold)
+                Text(
+                    if (active) "Active • $elapsed" else "Templates, quick logging, personal bests and recovery.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Icon(
+                imageVector = if (active) Icons.Default.Timer else Icons.Default.FitnessCenter,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
             )
         }
-        Icon(
-            imageVector = if (active) Icons.Default.Timer else Icons.Default.FitnessCenter,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary
-        )
+        if (preWorkoutTip != null) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = preWorkoutTip,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Medium
+            )
+        }
     }
 }
 
@@ -1013,7 +1055,7 @@ private fun ExercisePickerDialog(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun WorkoutCompletionDialog(summary: WorkoutSummary, useKg: Boolean, onRate: (Int) -> Unit, onDismiss: () -> Unit) {
+private fun WorkoutCompletionDialog(summary: WorkoutSummary, useKg: Boolean, profile: UserProfile?, onRate: (Int) -> Unit, onDismiss: () -> Unit) {
     // Session Rating (#10): 5 = Amazing ... 1 = Terrible.
     var rating by remember(summary.sessionId) { mutableStateOf(0) }
     val ratingLabels = listOf(5 to "Amazing", 4 to "Good", 3 to "Average", 2 to "Poor", 1 to "Terrible")
@@ -1022,7 +1064,12 @@ private fun WorkoutCompletionDialog(summary: WorkoutSummary, useKg: Boolean, onR
         icon = { Icon(Icons.Default.Star, null, tint = MaterialTheme.colorScheme.primary) },
         title = { Text("Workout Complete", fontWeight = FontWeight.ExtraBold) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 520.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 Text(summary.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text("How was this workout?", fontWeight = FontWeight.SemiBold)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1050,6 +1097,25 @@ private fun WorkoutCompletionDialog(summary: WorkoutSummary, useKg: Boolean, onR
                     Text("🏆 New Personal Best${if(summary.prCount>1) "s" else ""} – strong session!", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                 }
                 Text("Exercises: ${summary.exerciseCount} • Targets hit: ${summary.targetHitCount}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+                // Daily nutrition: targets + refuel timing together, right after the session.
+                profile?.let { p ->
+                    val durationMinutes = (summary.durationMillis / 60000).toInt()
+                    val targets = NutritionGuidelines.dailyTargets(p, durationMinutes)
+                    val tip = NutritionGuidelines.postWorkoutTip(p, durationMinutes)
+                    if (targets != null || tip != null) {
+                        Spacer(Modifier.height(4.dp))
+                        RepLogCard {
+                            Text("Daily nutrition", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.height(8.dp))
+                            MacroTargetStatCards(targets)
+                            tip?.let {
+                                Spacer(Modifier.height(8.dp))
+                                Text("🍽 $it", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                    }
+                }
             }
         },
         confirmButton = {

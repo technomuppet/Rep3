@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.replog.data.model.SessionWithExercises
 import com.replog.data.repository.WorkoutRepository
 import com.replog.util.PreferencesManager
+import com.replog.util.profile.UserProfile
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,6 +20,8 @@ import javax.inject.Inject
 data class HistoryUiState(
     val sessions: List<SessionWithExercises> = emptyList(),
     val isLoading: Boolean = true,
+    /** Full profile (weight + goal) for nutrition guidance; null keeps the history screen honest. */
+    val profile: UserProfile? = null,
     /** Profile weight is optional; null keeps the history screen honest. */
     val profileWeightKg: Double? = null,
     /** True while more older sessions exist beyond the current window (P2). */
@@ -52,6 +55,7 @@ class HistoryViewModel @Inject constructor(
                 HistoryUiState(
                     sessions = sessions,
                     isLoading = false,
+                    profile = profile,
                     profileWeightKg = profile?.weightKg,
                     canLoadMore = sessions.size >= limit && limit < total
                 )

@@ -237,6 +237,7 @@ private fun ExerciseItem(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ExerciseDetailDialog(
     insight: ExerciseInsight,
@@ -281,8 +282,8 @@ private fun ExerciseDetailDialog(
                 RepLogCard {
                     Text("EXERCISE HEADER", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.height(6.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(modifier = Modifier.padding(end = 12.dp), shape = androidx.compose.foundation.shape.CircleShape, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Surface(shape = androidx.compose.foundation.shape.CircleShape, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)) {
                             Text(" ${ex.movementPattern.ifBlank { "No pattern" }} ", modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                         }
                         Surface(shape = androidx.compose.foundation.shape.CircleShape, color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.12f)) {
@@ -332,11 +333,11 @@ private fun ExerciseDetailDialog(
                     }
                 }
 
-                // 3. MEDICAL MUSCLE ACTIVATION DIAGRAM — Data-driven, no stick figure, no block fill
+                // 3. MUSCLE ACTIVATION DIAGRAM — Premium shaded medical artwork
                 RepLogCard {
                     Text("MUSCLE ACTIVATION DIAGRAM", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.height(4.dp))
-                    Text("Medical-grade vector anatomy showing primary, secondary, and stabiliser activation for this movement.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Premium shaded medical illustration showing the primary and secondary muscles involved in this movement.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(8.dp))
                     com.replog.domain.visual.anatomy.AnatomicalMuscleDiagram(
                         anatomySpec = anatomySpec,
@@ -398,14 +399,14 @@ private fun ExerciseDetailDialog(
                 RepLogCard {
                     Text("MUSCLE BREAKDOWN", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.height(8.dp))
-                    val muscles = parseMuscleBreakdown(ex)
+                    val muscles = parseMuscleBreakdown(ex, anatomySpec)
                     muscles.forEach { muscle ->
                         Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(muscle.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
-                                Row {
+                                Row(modifier = Modifier.fillMaxWidth()) {
                                     Text("${muscle.activation}% • ", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text("${muscle.role} • ${muscle.subRole}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                                    Text("${muscle.role} • ${muscle.subRole}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
                                 }
                             }
                             val activationColor = when {
@@ -500,27 +501,68 @@ private data class MuscleBreakdownRow(
     val subRole: String
 )
 
-private fun parseMuscleBreakdown(ex: Exercise): List<MuscleBreakdownRow> {
-    val primary = ex.primaryMuscles.split(",").map { it.trim() }.filter { it.isNotBlank() }
-    val secondary = ex.secondaryMuscles.split(",").map { it.trim() }.filter { it.isNotBlank() }
+/**
+ * Builds the MUSCLE BREAKDOWN from the same resolved [com.replog.domain.visual.spec.AnatomySpec]
+ * and [com.replog.domain.visual.anatomy.MuscleActivationEngine] that drive the activation
+ * diagram, so every percentage is linked to the real exercise anatomy rather than
+ * hardcoded placeholder rows.
+ */
+private fun parseMuscleBreakdown(
+    ex: Exercise,
+    spec: com.replog.domain.visual.spec.AnatomySpec
+): List<MuscleBreakdownRow> {
+    val familyId = com.replog.domain.visual.resolver.ExerciseVisualResolver.resolve(ex).movementFamily.familyId
+    val activationByRegion = com.replog.domain.visual.anatomy.MuscleActivationEngine
+        .calculateActivations(spec = spec, progress = 1f, familyId = familyId)
+        .associateBy { it.region }
+
+    fun peakPercent(name: String): Int? =
+        com.replog.domain.visual.anatomy.MuscleMap.resolveRegions(name)
+            .mapNotNull { activationByRegion[it] }
+            .maxOfOrNull { it.factor }
+            ?.let { (it * 100).toInt() }
+
     val out = mutableListOf<MuscleBreakdownRow>()
-    primary.forEach { name ->
-        out.add(MuscleBreakdownRow(name = name, activation = 85, role = "Primary", subRole = "Main mover"))
+    spec.primaryMuscles.forEach { name ->
+        out.add(MuscleBreakdownRow(
+            name = name,
+            activation = (peakPercent(name) ?: 85).coerceIn(30, 95),
+            role = "Primary",
+            subRole = "Main mover"
+        ))
     }
-    secondary.forEach { name ->
-        out.add(MuscleBreakdownRow(name = name, activation = 45, role = "Secondary", subRole = "Supporting mover"))
+    spec.secondaryMuscles.forEach { name ->
+        out.add(MuscleBreakdownRow(
+            name = name,
+            activation = (peakPercent(name) ?: 45).coerceIn(15, 65),
+            role = "Secondary",
+            subRole = "Supporting mover"
+        ))
     }
-    out.add(MuscleBreakdownRow(name = "Stabilisers", activation = 25, role = "Stabiliser", subRole = "Joint control"))
-    out.add(MuscleBreakdownRow(name = "Antagonist", activation = 15, role = "Antagonist", subRole = "Opposite action"))
-    out.add(MuscleBreakdownRow(name = "Synergist", activation = 35, role = "Synergist", subRole = "Assists main mover"))
+    spec.stabiliserMuscles.forEach { name ->
+        out.add(MuscleBreakdownRow(
+            name = name,
+            activation = (peakPercent(name) ?: 25).coerceIn(10, 45),
+            role = "Stabiliser",
+            subRole = "Joint control"
+        ))
+    }
+
+    // Fallback for custom exercises with an empty resolved spec: show raw fields.
+    if (out.isEmpty()) {
+        val primary = ex.primaryMuscles.split(",").map { it.trim() }.filter { it.isNotBlank() }
+        primary.forEach { out.add(MuscleBreakdownRow(name = it, activation = 85, role = "Primary", subRole = "Main mover")) }
+        val secondary = ex.secondaryMuscles.split(",").map { it.trim() }.filter { it.isNotBlank() }
+        secondary.forEach { out.add(MuscleBreakdownRow(name = it, activation = 45, role = "Secondary", subRole = "Supporting mover")) }
+    }
     return out.distinctBy { it.name }
 }
 
 @Composable
 private fun InfoRow(label: String, value: String, modifier: Modifier = Modifier) {
     Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-        Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+        Text(label, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(0.42f))
+        Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(0.58f))
     }
 }
 

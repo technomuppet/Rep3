@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.replog.data.model.SessionWithExercises
+import com.replog.domain.recovery.NutritionGuidelines
 import com.replog.ui.components.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -46,6 +47,7 @@ fun HomeScreen(
     val continueWorkout by viewModel.continueWorkout.collectAsState()
     val repLogScore by viewModel.repLogScore.collectAsState()
     val displayName by viewModel.displayName.collectAsState()
+    val macroTargets = state.profile?.let { NutritionGuidelines.dailyTargets(it) }
     var showTrainAnywayDialog by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { viewModel.refresh(); viewModel.loadIntelligence(); coachViewModel.loadRecommendation(force = false) }
     LazyColumn(Modifier.fillMaxSize().padding(contentPadding), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -112,6 +114,11 @@ fun HomeScreen(
                 StatCard("Day streak", if (state.dayStreak > 0) "🔥 ${state.dayStreak}" else "—", Modifier.weight(1f))
                 StatCard("Total workouts", state.sessionCount.toString(), Modifier.weight(1f))
             }
+        }
+
+        // Daily nutrition targets at a glance (shared with the History month stats).
+        macroTargets?.let { m ->
+            item { MacroTargetStatCards(m) }
         }
 
         // Browse the curated Quick Workout library (P2/P3).

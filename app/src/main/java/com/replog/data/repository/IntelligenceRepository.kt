@@ -10,11 +10,13 @@ import com.replog.domain.musclegap.MuscleGapAnalyzer
 import com.replog.domain.recommendation.MuscleRecoveryStatus
 import com.replog.domain.recommendation.RecoveryAnalyzer
 import com.replog.data.model.SetType
+import com.replog.domain.recovery.NutritionGuidance
 import com.replog.domain.recovery.NutritionGuidelines
 import com.replog.domain.recovery.RecoveryCalendar
 import com.replog.domain.recovery.RecoveryCalendarDay
 import com.replog.domain.recovery.RecoveryDashboard
 import com.replog.domain.recovery.RecoveryGuidance
+import com.replog.domain.recovery.WorkoutEnergyEstimate
 import com.replog.domain.volume.VolumeLandmarks
 import com.replog.domain.volume.VolumeStatus
 import com.replog.util.PreferencesManager
@@ -59,7 +61,9 @@ data class RecoveryCentreData(
     val suggestedDurationMinutes: Int = 0,
     val suggestedType: String = "",
     val improvements: List<String> = emptyList(),
-    val warnings: List<String> = emptyList()
+    val warnings: List<String> = emptyList(),
+    /** Dedicated nutrition guidance (daily macros + timing tips); null when the profile weight is unusable. */
+    val nutrition: NutritionGuidance? = null
 )
 
 /** One muscle group's volume/balance line (from VolumeLandmarks). */
@@ -287,6 +291,25 @@ class IntelligenceRepository @Inject constructor(
         val bodyweights = bodyweightRepository.getAllBodyweights().first()
         val profile = prefs.userProfile.first()
 
+        // Last completed session energy estimate, used to tailor nutrition advice
+        // (longer sessions earn a hydration bump and a refuel reminder).
+        val lastCompleted = sessions
+            .filter { it.session.endTime != null && (it.session.endTime ?: 0L) <= now }
+            .maxByOrNull { it.session.endTime ?: 0L }
+        val lastSets = lastCompleted?.exercises?.flatMap { it.sets }.orEmpty()
+        val energy = lastCompleted?.let { s ->
+            WorkoutEnergyEstimate.estimate(
+                startTimeMillis = s.session.startTime,
+                endTimeMillis = s.session.endTime,
+                weightKg = profile?.weightKg,
+                completedSetCount = lastSets.count { it.completed && it.setType != SetType.WARMUP && it.reps > 0 },
+                averageRpe = lastSets.mapNotNull { it.rpe }.takeIf { it.isNotEmpty() }?.average()
+            )
+        }
+        val nutrition = profile?.let { p ->
+            NutritionGuidelines.dailyGuidance(p, energy?.durationMinutes)
+        }
+
         val overall = RecoveryAnalyzer.overallRecovery(sessions, bodyweights, now)
         val state = RecoveryDashboard.from(overall)
         val muscle = RecoveryAnalyzer.muscleRecovery(sessions, now)
@@ -346,7 +369,6 @@ class IntelligenceRepository @Inject constructor(
             factors = state.factors
         )
         val improvements = guidance.improvements.toMutableList()
-        NutritionGuidelines.recoveryGuideline(profile)?.let { improvements += it }
         val warnings = guidance.warnings.toMutableList()
 
         return RecoveryCentreData(
@@ -356,7 +378,8 @@ class IntelligenceRepository @Inject constructor(
             todayScore = today, tomorrowScore = tomorrow, in48hScore = in48,
             estimatedFullRecoveryHours = fullHours, suggestedIntensity = intensity,
             suggestedDurationMinutes = duration, suggestedType = type,
-            improvements = improvements, warnings = warnings
+            improvements = improvements, warnings = warnings,
+            nutrition = nutrition
         )
     }
 
@@ -417,6 +440,7 @@ class IntelligenceRepository @Inject constructor(
             )
         }
         prefs.setActiveSessionId(sessionId)
+        prefs.requestPreWorkoutReminder()
         return true
     }
 

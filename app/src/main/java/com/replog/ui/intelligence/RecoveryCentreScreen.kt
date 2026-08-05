@@ -36,6 +36,7 @@ import com.replog.domain.recovery.RecoveryCalendarDay
 import com.replog.domain.recovery.RecoveryDay
 import com.replog.ui.components.EmptyState
 import com.replog.ui.components.LoadingState
+import com.replog.ui.components.MacroTargetStatCards
 import com.replog.ui.components.RepLogCard
 import com.replog.ui.components.StatCard
 
@@ -145,6 +146,25 @@ private fun androidx.compose.foundation.lazy.LazyListScope.recoveryContent(d: Re
                 Text("Why? Recovery factors", fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(6.dp))
                 d.factors.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            }
+        }
+    }
+    d.nutrition?.let { nutrition ->
+        item {
+            RepLogCard {
+                Text("Nutrition for recovery", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.height(6.dp))
+                Text(nutrition.summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(10.dp))
+                MacroTargetStatCards(nutrition.macroTargets)
+                nutrition.preWorkoutTip?.let { tip ->
+                    Spacer(Modifier.height(8.dp))
+                    Text("Before training: $tip", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                nutrition.postWorkoutTip?.let { tip ->
+                    Spacer(Modifier.height(6.dp))
+                    Text("After training: $tip", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
     }
