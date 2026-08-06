@@ -42,6 +42,7 @@ import com.replog.domain.recovery.NutritionGuidelines
 import com.replog.domain.recovery.WorkoutEnergyEstimate
 import com.replog.ui.components.EmptyState
 import com.replog.ui.components.LoadingState
+import com.replog.ui.components.MacroTargetStatCards
 import com.replog.ui.components.PRBadge
 import com.replog.ui.components.RepLogCard
 import com.replog.ui.components.SecondaryButton
